@@ -1,0 +1,659 @@
+[
+ {
+  "scenario": "p6c2-iso1-d25",
+  "client": "current",
+  "room": 6,
+  "clients": 2,
+  "isolates": 1,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 97.6,
+   "p95": 123.2,
+   "max": 139.7
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 21,
+   "p95": 77,
+   "max": 1449
+  },
+  "observer": {
+   "frameJumpPxMax": 4.6,
+   "frameJumpPxP99": 4.1,
+   "stalledMovingFramesPct": 4.2,
+   "displayErrorPx": {
+    "p50": 32.3,
+    "p95": 37.5
+   },
+   "displayDelayMs": {
+    "p50": 144.6,
+    "p95": 164,
+    "max": 190.4
+   },
+   "trajectoryErrorPx": {
+    "p50": 1.3,
+    "p95": 4.1,
+    "max": 8.8
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 75,
+    "pressToConfirmMs": 75,
+    "firstPressAt": 9798,
+    "victimSeesDeathMs": 74,
+    "observersSeeBodyP50": 74,
+    "observersSeeBodyMax": 74,
+    "truthGapAtPress": 43,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 6,
+   "statementsPerSec": 10,
+   "writeStatementsPerSec": 5,
+   "kbReadPerSec": 4,
+   "primaryBusyPct": 0.2,
+   "avgQueueWaitMs": 0,
+   "stateBytes": 5526
+  },
+  "counts": {
+   "ws.connect": 2
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 6,
+   "framesPerSec": 61
+  }
+ },
+ {
+  "scenario": "p16-iso16-d25",
+  "client": "current",
+  "room": 16,
+  "clients": 16,
+  "isolates": 16,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 90.8,
+   "p95": 127.7,
+   "max": 150.6
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 199,
+   "p95": 1475,
+   "max": 11466
+  },
+  "observer": {
+   "frameJumpPxMax": 7.4,
+   "frameJumpPxP99": 5.3,
+   "stalledMovingFramesPct": 6.7,
+   "displayErrorPx": {
+    "p50": 52.6,
+    "p95": 76.8
+   },
+   "displayDelayMs": {
+    "p50": 283,
+    "p95": 359,
+    "max": 2243.7
+   },
+   "trajectoryErrorPx": {
+    "p50": 2.1,
+    "p95": 22.8,
+    "max": 205.9
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 2
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 73,
+    "pressToConfirmMs": 73,
+    "firstPressAt": 8298,
+    "victimSeesDeathMs": 141,
+    "observersSeeBodyP50": 141,
+    "observersSeeBodyMax": 10085,
+    "truthGapAtPress": 57,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 79,
+    "pressToConfirmMs": 79,
+    "firstPressAt": 11379,
+    "victimSeesDeathMs": 77,
+    "observersSeeBodyP50": 105,
+    "observersSeeBodyMax": 6945,
+    "truthGapAtPress": 98,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 79,
+    "pressToConfirmMs": 79,
+    "firstPressAt": 15419,
+    "victimSeesDeathMs": 148,
+    "observersSeeBodyP50": 152,
+    "observersSeeBodyMax": 3868,
+    "truthGapAtPress": 48,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 163,
+   "statementsPerSec": 287,
+   "writeStatementsPerSec": 126,
+   "kbReadPerSec": 484,
+   "primaryBusyPct": 5.8,
+   "avgQueueWaitMs": 0.6,
+   "stateBytes": 15313
+  },
+  "counts": {
+   "ws.connect": 19,
+   "vanish.event": 2
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 9,
+   "framesPerSec": 54
+  }
+ },
+ {
+  "scenario": "p29-iso29-d25",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 95,
+   "p95": 132.4,
+   "max": 169.4
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 220,
+   "p95": 2047,
+   "max": 12068
+  },
+  "observer": {
+   "frameJumpPxMax": 9.8,
+   "frameJumpPxP99": 6.8,
+   "stalledMovingFramesPct": 9.1,
+   "displayErrorPx": {
+    "p50": 51.7,
+    "p95": 88.1
+   },
+   "displayDelayMs": {
+    "p50": 323.8,
+    "p95": 417.1,
+    "max": 5062.2
+   },
+   "trajectoryErrorPx": {
+    "p50": 2.3,
+    "p95": 23.1,
+    "max": 252.8
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 4
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 87,
+    "pressToConfirmMs": 87,
+    "firstPressAt": 7761,
+    "victimSeesDeathMs": 103,
+    "observersSeeBodyP50": 1050,
+    "observersSeeBodyMax": 11302,
+    "truthGapAtPress": 49,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 79,
+    "pressToConfirmMs": 79,
+    "firstPressAt": 12674,
+    "victimSeesDeathMs": 177,
+    "observersSeeBodyP50": 154,
+    "observersSeeBodyMax": 3480,
+    "truthGapAtPress": 24,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 82,
+    "pressToConfirmMs": 82,
+    "firstPressAt": 15863,
+    "victimSeesDeathMs": 109,
+    "observersSeeBodyP50": 134,
+    "observersSeeBodyMax": 3633,
+    "truthGapAtPress": 66,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 287,
+   "statementsPerSec": 504,
+   "writeStatementsPerSec": 219,
+   "kbReadPerSec": 1587,
+   "primaryBusyPct": 9.3,
+   "avgQueueWaitMs": 8.2,
+   "stateBytes": 30693
+  },
+  "counts": {
+   "ws.connect": 30,
+   "vanish.event": 4
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 15,
+   "framesPerSec": 44
+  }
+ },
+ {
+  "scenario": "p29-iso1-d170",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 1,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 96.3,
+   "p95": 131.5,
+   "max": 225.6
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 75,
+   "p95": 1287,
+   "max": 9506
+  },
+  "observer": {
+   "frameJumpPxMax": 12.3,
+   "frameJumpPxP99": 7.3,
+   "stalledMovingFramesPct": 7.5,
+   "displayErrorPx": {
+    "p50": 32.7,
+    "p95": 63
+   },
+   "displayDelayMs": {
+    "p50": 161.7,
+    "p95": 366.2,
+    "max": 3820.4
+   },
+   "trajectoryErrorPx": {
+    "p50": 1.8,
+    "p95": 9.5,
+    "max": 267.7
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 228,
+    "pressToConfirmMs": 228,
+    "firstPressAt": 10249,
+    "victimSeesDeathMs": 227,
+    "observersSeeBodyP50": 234,
+    "observersSeeBodyMax": 5604,
+    "truthGapAtPress": 63,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 215,
+    "pressToConfirmMs": 215,
+    "firstPressAt": 11784,
+    "victimSeesDeathMs": 211,
+    "observersSeeBodyP50": 215,
+    "observersSeeBodyMax": 6771,
+    "truthGapAtPress": 91,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 199,
+    "pressToConfirmMs": 199,
+    "firstPressAt": 15879,
+    "victimSeesDeathMs": 194,
+    "observersSeeBodyP50": 200,
+    "observersSeeBodyMax": 4086,
+    "truthGapAtPress": 71,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 19,
+   "statementsPerSec": 27,
+   "writeStatementsPerSec": 10,
+   "kbReadPerSec": 186,
+   "primaryBusyPct": 0.7,
+   "avgQueueWaitMs": 0.2,
+   "stateBytes": 30410
+  },
+  "counts": {
+   "ws.connect": 30
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 14,
+   "framesPerSec": 45
+  }
+ },
+ {
+  "scenario": "p29-iso29-d170",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 98.4,
+   "p95": 134.7,
+   "max": 378.4
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 477,
+   "p95": 2074,
+   "max": 12410
+  },
+  "observer": {
+   "frameJumpPxMax": 13.4,
+   "frameJumpPxP99": 8.6,
+   "stalledMovingFramesPct": 17.6,
+   "displayErrorPx": {
+    "p50": 85.2,
+    "p95": 152.1
+   },
+   "displayDelayMs": {
+    "p50": 634.5,
+    "p95": 774.5,
+    "max": 5570.2
+   },
+   "trajectoryErrorPx": {
+    "p50": 3.1,
+    "p95": 35.8,
+    "max": 470
+   },
+   "missingWhileVisiblePct": 0.3,
+   "vanishEvents": 67
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 209,
+    "pressToConfirmMs": 209,
+    "firstPressAt": 7251,
+    "victimSeesDeathMs": 285,
+    "observersSeeBodyP50": 374,
+    "observersSeeBodyMax": 10075,
+    "truthGapAtPress": 139,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 274,
+    "pressToConfirmMs": 274,
+    "firstPressAt": 13929,
+    "victimSeesDeathMs": 320,
+    "observersSeeBodyP50": 767,
+    "observersSeeBodyMax": 5325,
+    "truthGapAtPress": 79,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 200,
+    "pressToConfirmMs": 200,
+    "firstPressAt": 16006,
+    "victimSeesDeathMs": 294,
+    "observersSeeBodyP50": 295,
+    "observersSeeBodyMax": 2627,
+    "truthGapAtPress": 100,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 152,
+   "statementsPerSec": 270,
+   "writeStatementsPerSec": 120,
+   "kbReadPerSec": 960,
+   "primaryBusyPct": 5.3,
+   "avgQueueWaitMs": 1.1,
+   "stateBytes": 30687
+  },
+  "counts": {
+   "ws.connect": 34,
+   "vanish.event": 67
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 18,
+   "framesPerSec": 42
+  }
+ },
+ {
+  "scenario": "p29-iso29-d170-adverse",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   30,
+   15
+  ],
+  "loss": 0.02,
+  "hide": {
+   "client": 5,
+   "from": 6000,
+   "to": 11000
+  },
+  "reconnect": {
+   "client": 7,
+   "at": 12000
+  },
+  "ackMs": {
+   "p50": 125.7,
+   "p95": 467.5,
+   "max": 1170.8
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 510,
+   "p95": 2094,
+   "max": 12368
+  },
+  "observer": {
+   "frameJumpPxMax": 13.3,
+   "frameJumpPxP99": 8.2,
+   "stalledMovingFramesPct": 25,
+   "displayErrorPx": {
+    "p50": 88.8,
+    "p95": 189.1
+   },
+   "displayDelayMs": {
+    "p50": 662.9,
+    "p95": 1021.6,
+    "max": 6705.2
+   },
+   "trajectoryErrorPx": {
+    "p50": 4.7,
+    "p95": 70,
+    "max": 468.3
+   },
+   "missingWhileVisiblePct": 0.8,
+   "vanishEvents": 117
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 219,
+    "pressToConfirmMs": 219,
+    "firstPressAt": 7197,
+    "victimSeesDeathMs": 344,
+    "observersSeeBodyP50": 413,
+    "observersSeeBodyMax": 6084,
+    "truthGapAtPress": 119,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 234,
+    "pressToConfirmMs": 234,
+    "firstPressAt": 12485,
+    "victimSeesDeathMs": 331,
+    "observersSeeBodyP50": 639,
+    "observersSeeBodyMax": 6724,
+    "truthGapAtPress": 103,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 241,
+    "pressToConfirmMs": 241,
+    "firstPressAt": 16163,
+    "victimSeesDeathMs": 346,
+    "observersSeeBodyP50": 423,
+    "observersSeeBodyMax": 3340,
+    "truthGapAtPress": 160,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 151,
+   "statementsPerSec": 259,
+   "writeStatementsPerSec": 110,
+   "kbReadPerSec": 965,
+   "primaryBusyPct": 5.2,
+   "avgQueueWaitMs": 1,
+   "stateBytes": 30416
+  },
+  "counts": {
+   "ws.connect": 37,
+   "vanish.event": 117
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 15,
+   "framesPerSec": 43
+  }
+ }
+]

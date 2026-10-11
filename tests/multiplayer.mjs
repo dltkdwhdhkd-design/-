@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+const total=Number(process.env.TEST_PLAYERS||16);
+const origin='http://terminal.local:4173';
+const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
+async function post(key,body){const res=await fetch(origin+'/api/game',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(body)});const b=await res.json();if(!res.ok)throw Error(JSON.stringify(b));return b;}
+async function get(key,code){const res=await fetch(origin+'/api/game?code='+code,{headers:{Authorization:'Bearer '+key}});const b=await res.json();if(!res.ok)throw Error(JSON.stringify(b));return b;}
+const host=token();let r=await post(host,{action:'create',config:{mode:'classic',count:total,night:120,discussion:300,vote:120}});const code=r.code;
+const clients=Array.from({length:total},(_,i)=>({key:token(),name:'검증'+i,avatar:i}));
+await Promise.all(clients.map(c=>post(c.key,{action:'join',code,name:c.name,avatar:c.avatar})));
+r=await get(host,code);assert.equal(r.players.length,total);
+await Promise.all(clients.map(c=>post(c.key,{action:'ready',code,ready:true,requestId:crypto.randomUUID()})));
+r=await get(host,code);assert.equal(r.players.filter(p=>p.ready).length,total);
+r=await post(host,{action:'start',code,seq:r.seq,requestId:crypto.randomUUID()});assert.equal(r.phase,'reveal');assert.ok(r.players.every(p=>p.role===null));
+const pv=await Promise.all(clients.map(c=>get(c.key,code)));assert.equal(pv.filter(v=>v.myRole==='mafia').length,total===29?5:3);assert.equal(pv.filter(v=>v.myRole==='spy').length,1);assert.equal(pv.filter(v=>v.myRole==='citizen').length,total===29?11:4);
+const index=role=>pv.findIndex(v=>v.myRole===role);const id=role=>pv[index(role)].me;
+r=await post(host,{action:'next',code,seq:r.seq});assert.equal(r.phase,'night');
+await Promise.all(pv.map((v,i)=>{let target;if(v.myRole==='mafia')target=id('doctor');if(v.myRole==='doctor')target=v.me;if(v.myRole==='police')target=id('mafia');if(v.myRole==='spy')target=id('mafia');if(v.myRole==='detective')target=id('police');if(!target)return Promise.resolve();return post(clients[i].key,{action:'night',code,seq:r.seq,target,requestId:crypto.randomUUID()});}));
+r=await post(host,{action:'next',code,seq:r.seq});assert.equal(r.phase,'dawn');assert.equal(r.players.filter(p=>p.alive).length,total);
+assert.ok((await get(clients[index('police')].key,code)).intel[0].text.includes('마피아입니다'));
+assert.ok((await get(clients[index('spy')].key,code)).connected);
+r=await post(host,{action:'next',code,seq:r.seq});r=await post(host,{action:'next',code,seq:r.seq});assert.equal(r.phase,'vote');
+const candidate=id('citizen');
+await Promise.all(pv.map((v,i)=>post(clients[i].key,{action:'vote',code,seq:r.seq,target:v.me===candidate?'skip':candidate,requestId:crypto.randomUUID()})));
+r=await get(host,code);assert.equal(r.voted.length,total);assert.equal(r.votes[candidate],total);
+r=await post(host,{action:'next',code,seq:r.seq});assert.equal(r.phase,'defense');assert.equal(r.candidate,candidate);r=await post(host,{action:'next',code,seq:r.seq});
+await Promise.all(pv.map((v,i)=>v.me===candidate?Promise.resolve():post(clients[i].key,{action:'trial',code,seq:r.seq,target:'yes',requestId:crypto.randomUUID()})));
+r=await get(host,code);assert.equal(r.trial.yes,total-1);r=await post(host,{action:'next',code,seq:r.seq});assert.equal(r.phase,'verdict');assert.equal(r.players.find(p=>p.id===candidate).alive,false);
+const evil=await fetch(origin+'/api/game?code='+code,{headers:{Authorization:'Bearer '+token()}});assert.equal(evil.status,400);
+const page=await fetch(origin);assert.equal(page.status,200);const html=await page.text();assert.ok(html.includes('밤의 시민'));assert.ok(!html.includes('Building your site'));
+for(const name of ['avatars-atlas','roles-atlas','spy','special-roles','night-city'])assert.equal((await fetch(origin+'/art/'+name+'.png')).status,200);
+console.log(`PASS: ${total} concurrent join + ready + vote, isolated role views, simultaneous night actions, doctor protection, spy contact, weighted nomination, concurrent trial votes, elimination, unauthorized access rejected, page and 5 image assets served.`);

@@ -1,0 +1,11 @@
+'use client';
+import {useState} from 'react';
+import {Gavel} from 'lucide-react';
+import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
+import {AlertDialog,AlertDialogContent,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction} from '@/components/ui/alert-dialog';
+import type {View} from '@/lib/game';
+export default function JudgePanel({room,send,busy}:{room:View;send:(a:string,e?:Record<string,unknown>)=>Promise<boolean>;busy:boolean}){
+ const [target,setTarget]=useState(''),[confirm,setConfirm]=useState(false),state=room.field?.judge,me=room.players.find(p=>p.id===room.me);if(!state)return null;
+ const ready=!!me?.alive&&!room.paused&&!busy&&room.phase==='vote'&&state.done>=state.required&&!state.used&&!state.pending;
+ return <section className="judge-panel"><h3><Gavel size={20}/> 판결권 <span>{state.used?'사용 완료':`미션 ${Math.min(state.done,state.required)} / ${state.required}`}</span></h3><p>{state.pending?`${room.players.find(p=>p.id===state.pending)?.name} 님에 대한 판결 예약 완료. 투표 종료 때 적용합니다.`:'게임당 한 번. 임포스터를 지목하면 대상을, 크루를 지목하면 나를 추방합니다.'}</p>{!state.used&&!state.pending&&<div className="judge-controls"><Select value={target} onValueChange={setTarget} disabled={!ready}><SelectTrigger className="select-box" aria-label="판결 대상"><SelectValue placeholder="판결 대상 선택"/></SelectTrigger><SelectContent>{room.players.filter(p=>p.alive&&p.id!==room.me).map(p=><SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select><button className="secondary" disabled={!ready||!target} onClick={()=>setConfirm(true)}><Gavel size={17}/>판결 예약</button></div>}<small>{state.done<state.required?'내 미션 3개를 완료하면 활성화됩니다.':room.phase!=='vote'?'추방 투표 시간에 사용할 수 있습니다.':'일반 투표도 별도로 참여하세요. 여러 판결이 예약되면 첫 판결만 사용됩니다.'}</small><AlertDialog open={confirm} onOpenChange={setConfirm}><AlertDialogContent className="game-dialog"><AlertDialogTitle>{room.players.find(p=>p.id===target)?.name} 님을 판결 대상으로 확정할까요?</AlertDialogTitle><AlertDialogDescription>크루를 지목하면 내가 탈락합니다. 예약 후 바꿀 수 없으며 투표 종료 때 판정됩니다.</AlertDialogDescription><AlertDialogFooter><AlertDialogCancel>돌아가기</AlertDialogCancel><AlertDialogAction disabled={!ready} onClick={()=>void send('judge',{target})}>판결 확정</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></section>;
+}

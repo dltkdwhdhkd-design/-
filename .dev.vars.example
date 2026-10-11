@@ -1,0 +1,10 @@
+# Example Worker variables for local runs (no secrets are needed by this project).
+# Wrangler reads .dev.vars next to the config it is given; this project's config is generated
+# into dist/server/ on every build, so pass variables on the command line instead:
+#   pnpm run start --var LIVE_D1_QUERY_BUDGET:800
+#
+# Nothing needs to be set. Optional upper bound on the D1 queries one live WebSocket
+# connection uses before the server asks the client to reconnect (seamless hand-over).
+# The host's real per-connection cap is learned automatically from its first
+# "too many requests" error; this value is mainly for tests (tests/run-all.mjs uses 40).
+LIVE_D1_QUERY_BUDGET=800
