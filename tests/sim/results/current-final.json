@@ -1,0 +1,828 @@
+[
+ {
+  "scenario": "p6c2-iso1-d25",
+  "client": "current",
+  "room": 6,
+  "clients": 2,
+  "isolates": 1,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 86.5,
+   "p95": 123.5,
+   "max": 151.4
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 21,
+   "p95": 58,
+   "max": 220
+  },
+  "observer": {
+   "frameJumpPxMax": 4.6,
+   "frameJumpPxP99": 4.3,
+   "stalledMovingFramesPct": 1.6,
+   "displayErrorPx": {
+    "p50": 28.7,
+    "p95": 37.9
+   },
+   "displayDelayMs": {
+    "p50": 141,
+    "p95": 332,
+    "max": 334.2
+   },
+   "trajectoryErrorPx": {
+    "p50": 1.9,
+    "p95": 4.8,
+    "max": 10.4
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 70,
+    "pressToConfirmMs": 70,
+    "firstPressAt": 11322,
+    "victimSeesDeathMs": 74,
+    "observersSeeBodyP50": null,
+    "observersSeeBodyMax": null,
+    "truthGapAtPress": 44,
+    "witnesses": 0,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 6,
+   "statementsPerSec": 10,
+   "writeStatementsPerSec": 5,
+   "kbReadPerSec": 4,
+   "primaryBusyPct": 0.2,
+   "avgQueueWaitMs": 0,
+   "stateBytes": 5539
+  },
+  "counts": {
+   "ws.connect": 2,
+   "client.frame.http": 3,
+   "client.live.ready": 2,
+   "client.frame.live": 656,
+   "client.act.live": 1,
+   "client.frame.action": 1
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 6,
+   "framesPerSec": 61
+  }
+ },
+ {
+  "scenario": "p16-iso16-d25",
+  "client": "current",
+  "room": 16,
+  "clients": 16,
+  "isolates": 16,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 89.2,
+   "p95": 125.5,
+   "max": 162.6
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 163,
+   "p95": 228,
+   "max": 8713
+  },
+  "observer": {
+   "frameJumpPxMax": 11.1,
+   "frameJumpPxP99": 5.1,
+   "stalledMovingFramesPct": 2.7,
+   "displayErrorPx": {
+    "p50": 49.3,
+    "p95": 75.4
+   },
+   "displayDelayMs": {
+    "p50": 287,
+    "p95": 362.2,
+    "max": 2430
+   },
+   "trajectoryErrorPx": {
+    "p50": 2.2,
+    "p95": 23.2,
+    "max": 162.3
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 65,
+    "pressToConfirmMs": 65,
+    "firstPressAt": 7867,
+    "victimSeesDeathMs": 155,
+    "observersSeeBodyP50": 174,
+    "observersSeeBodyMax": 181,
+    "truthGapAtPress": 119,
+    "witnesses": 10,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 70,
+    "pressToConfirmMs": 70,
+    "firstPressAt": 11647,
+    "victimSeesDeathMs": 155,
+    "observersSeeBodyP50": 172,
+    "observersSeeBodyMax": 187,
+    "truthGapAtPress": 73,
+    "witnesses": 13,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 80,
+    "pressToConfirmMs": 80,
+    "firstPressAt": 16609,
+    "victimSeesDeathMs": 151,
+    "observersSeeBodyP50": 134,
+    "observersSeeBodyMax": 153,
+    "truthGapAtPress": 9,
+    "witnesses": 8,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 163,
+   "statementsPerSec": 282,
+   "writeStatementsPerSec": 120,
+   "kbReadPerSec": 485,
+   "primaryBusyPct": 5.2,
+   "avgQueueWaitMs": 0.8,
+   "stateBytes": 15243
+  },
+  "counts": {
+   "ws.connect": 16,
+   "client.frame.http": 23,
+   "client.live.ready": 16,
+   "client.frame.live": 5114,
+   "client.act.live": 3,
+   "client.frame.action": 3
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 8,
+   "framesPerSec": 55
+  }
+ },
+ {
+  "scenario": "p29-iso29-d25",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 97.1,
+   "p95": 133.5,
+   "max": 163.6
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 187,
+   "p95": 277,
+   "max": 8314
+  },
+  "observer": {
+   "frameJumpPxMax": 10.5,
+   "frameJumpPxP99": 6.7,
+   "stalledMovingFramesPct": 2.8,
+   "displayErrorPx": {
+    "p50": 57.5,
+    "p95": 88.8
+   },
+   "displayDelayMs": {
+    "p50": 335.8,
+    "p95": 443.5,
+    "max": 3079
+   },
+   "trajectoryErrorPx": {
+    "p50": 2.2,
+    "p95": 13.3,
+    "max": 171.7
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 82,
+    "pressToConfirmMs": 82,
+    "firstPressAt": 7577,
+    "victimSeesDeathMs": 190,
+    "observersSeeBodyP50": 185,
+    "observersSeeBodyMax": 2171,
+    "truthGapAtPress": 16,
+    "witnesses": 15,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 79,
+    "pressToConfirmMs": 79,
+    "firstPressAt": 11979,
+    "victimSeesDeathMs": 193,
+    "observersSeeBodyP50": 193,
+    "observersSeeBodyMax": 1729,
+    "truthGapAtPress": 64,
+    "witnesses": 21,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 95,
+    "pressToConfirmMs": 95,
+    "firstPressAt": 15999,
+    "victimSeesDeathMs": 106,
+    "observersSeeBodyP50": 138,
+    "observersSeeBodyMax": 2885,
+    "truthGapAtPress": 111,
+    "witnesses": 18,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 286,
+   "statementsPerSec": 511,
+   "writeStatementsPerSec": 228,
+   "kbReadPerSec": 1580,
+   "primaryBusyPct": 8.9,
+   "avgQueueWaitMs": 16.1,
+   "stateBytes": 30416
+  },
+  "counts": {
+   "ws.connect": 29,
+   "client.frame.http": 47,
+   "client.live.ready": 29,
+   "client.frame.live": 9296,
+   "client.act.live": 3,
+   "client.frame.action": 3
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 14,
+   "framesPerSec": 45
+  }
+ },
+ {
+  "scenario": "p29-iso1-d170",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 1,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 97.7,
+   "p95": 132.1,
+   "max": 164.5
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 66,
+   "p95": 100,
+   "max": 4347
+  },
+  "observer": {
+   "frameJumpPxMax": 8.5,
+   "frameJumpPxP99": 6.6,
+   "stalledMovingFramesPct": 2.1,
+   "displayErrorPx": {
+    "p50": 31.5,
+    "p95": 43.5
+   },
+   "displayDelayMs": {
+    "p50": 157,
+    "p95": 341.4,
+    "max": 4466.8
+   },
+   "trajectoryErrorPx": {
+    "p50": 2.1,
+    "p95": 9.7,
+    "max": 182.5
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 220,
+    "pressToConfirmMs": 220,
+    "firstPressAt": 9440,
+    "victimSeesDeathMs": 261,
+    "observersSeeBodyP50": 270,
+    "observersSeeBodyMax": 1201,
+    "truthGapAtPress": 54,
+    "witnesses": 4,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 248,
+    "pressToConfirmMs": 248,
+    "firstPressAt": 11415,
+    "victimSeesDeathMs": 283,
+    "observersSeeBodyP50": 300,
+    "observersSeeBodyMax": 6221,
+    "truthGapAtPress": 73,
+    "witnesses": 20,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 248,
+    "pressToConfirmMs": 248,
+    "firstPressAt": 15012,
+    "victimSeesDeathMs": 283,
+    "observersSeeBodyP50": 272,
+    "observersSeeBodyMax": 2308,
+    "truthGapAtPress": 107,
+    "witnesses": 18,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 19,
+   "statementsPerSec": 27,
+   "writeStatementsPerSec": 10,
+   "kbReadPerSec": 184,
+   "primaryBusyPct": 0.6,
+   "avgQueueWaitMs": 0.3,
+   "stateBytes": 30373
+  },
+  "counts": {
+   "ws.connect": 29,
+   "client.frame.http": 53,
+   "client.live.ready": 29,
+   "client.frame.live": 10350,
+   "client.act.live": 3,
+   "client.frame.action": 3
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 14,
+   "framesPerSec": 45
+  }
+ },
+ {
+  "scenario": "p29-iso29-d170",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 99.1,
+   "p95": 136.9,
+   "max": 197
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 337,
+   "p95": 435,
+   "max": 8922
+  },
+  "observer": {
+   "frameJumpPxMax": 14.3,
+   "frameJumpPxP99": 8.2,
+   "stalledMovingFramesPct": 4.9,
+   "displayErrorPx": {
+    "p50": 77.2,
+    "p95": 125.1
+   },
+   "displayDelayMs": {
+    "p50": 519.5,
+    "p95": 627.9,
+    "max": 2742
+   },
+   "trajectoryErrorPx": {
+    "p50": 2.3,
+    "p95": 22.1,
+    "max": 176.6
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 248,
+    "pressToConfirmMs": 248,
+    "firstPressAt": 7779,
+    "victimSeesDeathMs": 302,
+    "observersSeeBodyP50": 310,
+    "observersSeeBodyMax": 2756,
+    "truthGapAtPress": 182,
+    "witnesses": 21,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 259,
+    "pressToConfirmMs": 259,
+    "firstPressAt": 12914,
+    "victimSeesDeathMs": 343,
+    "observersSeeBodyP50": 345,
+    "observersSeeBodyMax": 3941,
+    "truthGapAtPress": 63,
+    "witnesses": 10,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 272,
+    "pressToConfirmMs": 272,
+    "firstPressAt": 16599,
+    "victimSeesDeathMs": 434,
+    "observersSeeBodyP50": 343,
+    "observersSeeBodyMax": 403,
+    "truthGapAtPress": 120,
+    "witnesses": 19,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 265,
+   "statementsPerSec": 481,
+   "writeStatementsPerSec": 220,
+   "kbReadPerSec": 1600,
+   "primaryBusyPct": 8.7,
+   "avgQueueWaitMs": 10.3,
+   "stateBytes": 30440
+  },
+  "counts": {
+   "ws.connect": 29,
+   "client.frame.http": 54,
+   "client.live.ready": 29,
+   "client.frame.live": 9133,
+   "client.act.live": 3,
+   "client.frame.action": 3
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 17,
+   "framesPerSec": 43
+  }
+ },
+ {
+  "scenario": "p29-iso29-d25-recycle",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "budget": 120,
+  "ackMs": {
+   "p50": 96.9,
+   "p95": 139.9,
+   "max": 306.7
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 186,
+   "p95": 274,
+   "max": 5536
+  },
+  "observer": {
+   "frameJumpPxMax": 15.6,
+   "frameJumpPxP99": 7,
+   "stalledMovingFramesPct": 2.8,
+   "displayErrorPx": {
+    "p50": 51.8,
+    "p95": 89.3
+   },
+   "displayDelayMs": {
+    "p50": 343.1,
+    "p95": 452.5,
+    "max": 5920.9
+   },
+   "trajectoryErrorPx": {
+    "p50": 2,
+    "p95": 17.5,
+    "max": 182.5
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 0
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 82,
+    "pressToConfirmMs": 82,
+    "firstPressAt": 8960,
+    "victimSeesDeathMs": 182,
+    "observersSeeBodyP50": 180,
+    "observersSeeBodyMax": 2915,
+    "truthGapAtPress": 77,
+    "witnesses": 12,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 142,
+    "pressToConfirmMs": 142,
+    "firstPressAt": 13152,
+    "victimSeesDeathMs": 176,
+    "observersSeeBodyP50": 258,
+    "observersSeeBodyMax": 2667,
+    "truthGapAtPress": 18,
+    "witnesses": 15,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 82,
+    "pressToConfirmMs": 82,
+    "firstPressAt": 17150,
+    "victimSeesDeathMs": 135,
+    "observersSeeBodyP50": 138,
+    "observersSeeBodyMax": 200,
+    "truthGapAtPress": 74,
+    "witnesses": 9,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 292,
+   "statementsPerSec": 507,
+   "writeStatementsPerSec": 222,
+   "kbReadPerSec": 1617,
+   "primaryBusyPct": 8.9,
+   "avgQueueWaitMs": 11.7,
+   "stateBytes": 30421
+  },
+  "counts": {
+   "ws.connect": 128,
+   "client.frame.http": 49,
+   "client.live.ready": 128,
+   "client.frame.live": 9020,
+   "client.resend": 80,
+   "client.act.live": 3,
+   "client.frame.action": 3,
+   "client.reconnects": 99
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 16,
+   "framesPerSec": 44
+  }
+ },
+ {
+  "scenario": "p29-iso29-d170-adverse",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   30,
+   15
+  ],
+  "loss": 0.02,
+  "hide": {
+   "client": 5,
+   "from": 6000,
+   "to": 11000
+  },
+  "reconnect": {
+   "client": 7,
+   "at": 12000
+  },
+  "ackMs": {
+   "p50": 127.1,
+   "p95": 444.1,
+   "max": 2159.7
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 339,
+   "p95": 511,
+   "max": 7523
+  },
+  "observer": {
+   "frameJumpPxMax": 11.3,
+   "frameJumpPxP99": 7.7,
+   "stalledMovingFramesPct": 11.5,
+   "displayErrorPx": {
+    "p50": 80.7,
+    "p95": 154.2
+   },
+   "displayDelayMs": {
+    "p50": 518,
+    "p95": 796.2,
+    "max": 4420.6
+   },
+   "trajectoryErrorPx": {
+    "p50": 4.5,
+    "p95": 46.5,
+    "max": 287.9
+   },
+   "missingWhileVisiblePct": 0.1,
+   "vanishEvents": 1
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 206,
+    "pressToConfirmMs": 206,
+    "firstPressAt": 8104,
+    "victimSeesDeathMs": 279,
+    "observersSeeBodyP50": 370,
+    "observersSeeBodyMax": 3372,
+    "truthGapAtPress": 40,
+    "witnesses": 22,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 218,
+    "pressToConfirmMs": 218,
+    "firstPressAt": 11671,
+    "victimSeesDeathMs": 336,
+    "observersSeeBodyP50": 316,
+    "observersSeeBodyMax": 7394,
+    "truthGapAtPress": 61,
+    "witnesses": 13,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 261,
+    "pressToConfirmMs": 261,
+    "firstPressAt": 15625,
+    "victimSeesDeathMs": 323,
+    "observersSeeBodyP50": 338,
+    "observersSeeBodyMax": 3439,
+    "truthGapAtPress": 70,
+    "witnesses": 14,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 269,
+   "statementsPerSec": 473,
+   "writeStatementsPerSec": 207,
+   "kbReadPerSec": 1626,
+   "primaryBusyPct": 8.8,
+   "avgQueueWaitMs": 4.1,
+   "stateBytes": 30438
+  },
+  "counts": {
+   "ws.connect": 30,
+   "vanish.event": 1,
+   "client.frame.http": 57,
+   "client.live.ready": 30,
+   "client.frame.live": 8125,
+   "client.frame.stale": 257,
+   "client.act.live": 3,
+   "client.frame.action": 3,
+   "client.resend": 1,
+   "client.reconnects": 1
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 15,
+   "framesPerSec": 45
+  }
+ }
+]
