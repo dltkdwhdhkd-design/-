@@ -1,0 +1,2134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>롤러코스터 설계 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 시뮬레이션 무대(장면 + 계기판)가 주인공, 오른쪽은 설계 노트 패널. 좁은 화면에서는 위아래로 쌓인다.
+   Color: 놀이공원 레일의 빨강(accent) + 철골 노랑, 에너지 4색은 위치(파랑)·운동(초록)·열(주황)·전기(보라)로 고정. */
+:root{
+  --bg:#E8EEEC; --surface:#FFFFFF; --surface-2:#F3F6F5; --ink:#15201D; --muted:#56645F; --line:#D2DCD8;
+  --accent:#D3263A; --accent-ink:#FFFFFF; --accent-soft:#FBE3E6; --steel:#2B3A45; --support:#E3A81B;
+  --pe:#2F6FDB; --ke:#1E9E5A; --heat:#EE7B22; --elec:#8B5CF6;
+  --ok:#1D8049; --ok-bg:#E2F3E9; --bad:#C42727; --bad-bg:#FBE5E5; --warn:#9A6A12; --warn-bg:#FCF1D8;
+  --font-display:"Black Han Sans","IBM Plex Sans KR",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1412; --surface:#161E1B; --surface-2:#1D2723; --ink:#E2EBE7; --muted:#97A6A0; --line:#2B3732;
+    --accent:#EE4352; --accent-ink:#FFFFFF; --accent-soft:#3A1C20; --steel:#9AA9B5; --support:#C99A1A;
+    --pe:#5D95F6; --ke:#3CC27A; --heat:#FF9A45; --elec:#A98BFF;
+    --ok:#52C584; --ok-bg:#15301F; --bad:#FF7070; --bad-bg:#3A1A1A; --warn:#E8B04A; --warn-bg:#33290F;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1412; --surface:#161E1B; --surface-2:#1D2723; --ink:#E2EBE7; --muted:#97A6A0; --line:#2B3732;
+  --accent:#EE4352; --accent-ink:#FFFFFF; --accent-soft:#3A1C20; --steel:#9AA9B5; --support:#C99A1A;
+  --pe:#5D95F6; --ke:#3CC27A; --heat:#FF9A45; --elec:#A98BFF;
+  --ok:#52C584; --ok-bg:#15301F; --bad:#FF7070; --bad-bg:#3A1A1A; --warn:#E8B04A; --warn-bg:#33290F;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{max-width:1500px;margin:0 auto;padding-inline:16px;padding-block:14px 40px;display:grid;gap:12px}
+.topbar{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 20px}
+.brand{min-width:0}
+.brand h1{font-family:var(--font-display);font-weight:400;font-size:clamp(24px,3.2vw,32px);line-height:1.1;margin:0;letter-spacing:.01em;text-wrap:balance}
+.brand h1 .mark{color:var(--accent)}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.preset-pick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.preset-pick label{font-size:12px;color:var(--muted);letter-spacing:.04em}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 392px;gap:12px;align-items:start}
+@media (max-width:1100px){.main{grid-template-columns:minmax(0,1fr)}}
+.col{display:grid;gap:12px;min-width:0}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;min-width:0}
+
+/* stage */
+.stage{overflow:hidden}
+.scene-wrap{position:relative;height:clamp(300px,48vh,580px);touch-action:none;user-select:none;-webkit-user-select:none}
+.scene-wrap canvas{display:block;width:100%;height:100%}
+.scene-wrap.tool-add{cursor:crosshair}
+.stage-tools{position:absolute;top:10px;right:10px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:calc(100% - 20px)}
+.chip{appearance:none;border:1px solid var(--line);background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;line-height:1.3}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.chip:hover{border-color:var(--muted)}
+.stage-hint{position:absolute;left:10px;bottom:10px;max-width:calc(100% - 20px);font-size:12px;color:var(--ink);background:color-mix(in srgb,var(--surface) 85%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:8px;padding:4px 9px;pointer-events:none}
+
+.verdict-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.28);padding:18px 18px 16px;display:grid;gap:10px}
+.verdict-card .stamp{font-family:var(--font-display);font-size:28px;line-height:1.1;margin:0}
+.verdict-card .stamp.ok{color:var(--ok)}
+.verdict-card .stamp.bad{color:var(--bad)}
+.verdict-card p{margin:0;color:var(--muted)}
+.verdict-card ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.verdict-card .row{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+
+/* instrument strip */
+.gauges{display:grid;grid-template-columns:auto auto auto auto minmax(220px,1fr);gap:0;border-top:1px solid var(--line);background:var(--surface-2)}
+.gauge{padding:9px 16px;border-right:1px solid var(--line);display:grid;gap:1px;min-width:0}
+.gauge .lbl{font-size:11px;color:var(--muted);letter-spacing:.06em}
+.gauge .val{font-family:var(--font-mono);font-weight:600;font-size:22px;line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap}
+.gauge .val small{font-size:12px;font-weight:500;color:var(--muted);margin-left:3px}
+.gauge .sub{font-family:var(--font-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.gauge .val.bad{color:var(--bad)}
+.energy-gauge{padding:9px 16px;display:grid;gap:5px;min-width:0}
+.ebar{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--line)}
+.ebar span{display:block;height:100%;transition:width .08s linear}
+.ebar .pe,.dot.pe{background:var(--pe)} .ebar .ke,.dot.ke{background:var(--ke)} .ebar .heat,.dot.heat{background:var(--heat)} .ebar .elec,.dot.elec{background:var(--elec)}
+.evals{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--muted)}
+.evals b{font-family:var(--font-mono);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:0}
+.conv{font-size:13px;font-weight:600}
+.mech{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;font-size:12px;color:var(--muted)}
+.mech b{font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.mech-note{color:var(--ok);font-weight:600}
+.mech-note.warn{color:var(--heat)}
+@media (max-width:760px){
+  .gauges{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .gauge{padding:8px 10px}
+  .gauge:nth-child(4){border-right:0}
+  .gauge .val{font-size:18px}
+  .energy-gauge{grid-column:1/-1;border-top:1px solid var(--line);padding:8px 10px}
+}
+
+/* toolbar */
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 12px}
+.tgroup{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tgroup .tlabel{font-size:11px;color:var(--muted);letter-spacing:.06em;margin-right:2px}
+.sep{width:1px;align-self:stretch;background:var(--line)}
+@media (max-width:640px){.sep{display:none}}
+
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.2}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.small{padding:5px 9px;font-size:12px}
+.btn svg{width:14px;height:14px;flex:none}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);flex-wrap:wrap}
+.seg button{appearance:none;border:0;background:transparent;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.seg button:disabled{opacity:.45;cursor:not-allowed}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+
+/* chart */
+.chart-card{padding:10px 12px 12px;display:grid;gap:8px}
+.chart-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.chart-head h2{font-size:14px;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.legend .ln{display:inline-block;width:14px;height:0;border-top:2px solid currentColor;vertical-align:middle;margin-right:4px}
+.legend .ln.dash{border-top-style:dashed}
+.chart-wrap{position:relative;height:210px}
+.chart-wrap canvas{display:block;width:100%;height:100%}
+.chart-tip{position:absolute;top:6px;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.12);white-space:nowrap;font-variant-numeric:tabular-nums}
+.chart-tip b{font-family:var(--font-mono)}
+
+/* side panel */
+.side{position:sticky;top:12px;display:grid;max-height:calc(100vh - 24px);overflow:hidden;grid-template-rows:auto minmax(0,1fr)}
+@media (max-width:1100px){.side{position:static;max-height:none}}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--line)}
+.tabs button{appearance:none;border:0;background:transparent;padding:11px 6px;font-weight:700;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;color:var(--muted);display:inline-flex;justify-content:center;align-items:center;gap:6px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{font-family:var(--font-mono);font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;background:var(--surface-2);color:var(--muted)}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.panel{overflow:auto;padding:4px 16px 18px;min-height:0}
+.psec{display:grid;gap:9px;padding-block:14px;border-bottom:1px solid var(--line)}
+.psec:last-child{border-bottom:0}
+.psec>*{min-width:0}
+.steps>li{min-width:0}
+.psec h3{margin:0;font-size:13px;letter-spacing:.02em;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.psec h3 .note{font-weight:500;color:var(--muted);font-size:12px}
+.hint{margin:0;font-size:12px;color:var(--muted)}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.field{display:grid;gap:3px;min-width:0}
+.field>span{font-size:12px;color:var(--muted)}
+.inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden}
+.inp input{border:0;background:transparent;padding:6px 8px;width:100%;min-width:0;font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.inp input:focus{outline:none}
+.inp:focus-within{border-color:var(--accent)}
+.inp em{font-style:normal;font-size:12px;color:var(--muted);padding-right:8px;white-space:nowrap}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.stat-list{display:grid;grid-template-columns:1fr auto;gap:5px 12px;margin:0;font-size:13px}
+.stat-list dt{color:var(--muted)}
+.stat-list dd{margin:0;font-family:var(--font-mono);font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.stat-list.rubric{grid-template-columns:auto minmax(0,1fr)}
+.stat-list.rubric dt{font-weight:700;color:var(--ink)}
+.stat-list.rubric dd{font-family:var(--font-body);font-weight:400;text-align:left;color:var(--muted)}
+textarea.code{width:100%;min-height:70px;resize:vertical;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:7px 8px;font-family:var(--font-mono);font-size:11px;line-height:1.4}
+details.howto summary{cursor:pointer;font-weight:700;font-size:13px}
+details.howto ol{margin:8px 0 0;padding-left:18px;display:grid;gap:4px;font-size:13px}
+
+.verdict{border-radius:10px;padding:12px 14px;display:grid;gap:4px}
+.verdict.ok{background:var(--ok-bg)}
+.verdict.bad{background:var(--bad-bg)}
+.verdict strong{font-family:var(--font-display);font-weight:400;font-size:22px;line-height:1.15}
+.verdict.ok strong{color:var(--ok)}
+.verdict.bad strong{color:var(--bad)}
+.verdict span{font-size:13px}
+.checks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.checks li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;padding:8px 10px;border-radius:8px;background:var(--surface-2);border-left:3px solid var(--line)}
+.checks li.ok{border-left-color:var(--ok)}
+.checks li.bad{border-left-color:var(--bad);background:var(--bad-bg)}
+.checks li.na{opacity:.7}
+.checks .ic{font-family:var(--font-mono);font-weight:700;font-size:13px;line-height:1.5}
+.checks li.ok .ic{color:var(--ok)} .checks li.bad .ic{color:var(--bad)} .checks li.na .ic{color:var(--muted)}
+.checks .t{font-weight:600;font-size:13px}
+.checks .d{font-size:12px;color:var(--muted)}
+.checks li.bad .d{color:var(--ink)}
+.meter{display:grid;grid-template-columns:64px minmax(0,1fr) 40px;gap:8px;align-items:center;font-size:13px}
+.meter .track{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.meter .fill{height:100%;background:var(--accent);border-radius:4px}
+.meter b{font-family:var(--font-mono);text-align:right}
+
+.pred{display:grid;gap:8px}
+.pred .field>span{color:var(--ink);font-size:13px}
+.pred-res{display:grid;gap:6px}
+.pred-res div{font-size:13px;padding:7px 10px;border-radius:8px;background:var(--surface-2)}
+.pred-res .good{background:var(--ok-bg)} .pred-res .near{background:var(--warn-bg)} .pred-res .off{background:var(--bad-bg)}
+details.sol>summary{cursor:pointer;font-weight:700;font-size:13px;padding:8px 10px;border:1px dashed var(--line);border-radius:8px}
+details.sol[open]>summary{margin-bottom:10px}
+.steps{margin:0;padding-left:20px;display:grid;gap:12px;font-size:13px}
+.steps p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.eq{font-family:var(--font-mono);font-size:12px;background:var(--surface-2);border-radius:6px;padding:6px 8px;margin-top:4px;overflow-x:auto;white-space:nowrap;font-variant-numeric:tabular-nums}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table.pts{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+table.pts th,table.pts td{padding:6px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+table.pts th:first-child,table.pts td:first-child{text-align:left}
+table.pts th{font-weight:600;color:var(--muted);background:var(--surface-2);font-size:11px}
+table.pts tr:last-child td{border-bottom:0}
+table.pts td.bad{color:var(--bad);font-weight:700}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:9px 14px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20;max-width:calc(100% - 32px)}
+.foot{font-size:12px;color:var(--muted);margin:0}
+@media (prefers-reduced-motion: reduce){.ebar span{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>롤러코스터 <span class="mark">설계</span> 시뮬레이터</h1>
+      <p>중3 과학 · 역학적 에너지 전환과 보존 · 레일을 직접 설계하고 운행해 보세요</p>
+    </div>
+    <div class="preset-pick">
+      <label for="presetSel">예시 코스</label>
+      <select id="presetSel" class="btn" aria-label="예시 코스 선택"></select>
+      <button class="btn" id="presetLoad" type="button">불러오기</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="col">
+      <section class="card stage" aria-label="롤러코스터 장면">
+        <div class="scene-wrap" id="sceneWrap">
+          <canvas id="scene" aria-label="롤러코스터 레일과 열차 장면. 점을 끌어 레일 모양을 바꿀 수 있습니다." role="img"></canvas>
+          <div class="stage-tools">
+            <button class="chip" id="energyLineBtn" type="button" aria-pressed="true">에너지 높이선</button>
+            <button class="chip" id="followBtn" type="button" aria-pressed="true">열차 따라가기</button>
+            <button class="chip" id="fitBtn" type="button">전체 보기</button>
+          </div>
+          <div class="stage-hint" id="stageHint">점을 끌어 레일 모양을 바꾸세요</div>
+          <div class="verdict-card" id="verdictCard" hidden>
+            <p class="stamp" id="vStamp">운행 성공</p>
+            <p id="vMsg"></p>
+            <ul id="vList"></ul>
+            <div class="row">
+              <button class="btn" type="button" id="vClose">닫기</button>
+              <button class="btn" type="button" id="vReview">안전 검토 보기</button>
+              <button class="btn primary" type="button" id="vAgain">다시 운행</button>
+            </div>
+          </div>
+        </div>
+        <div class="gauges" aria-live="off">
+          <div class="gauge"><span class="lbl">속력</span><span class="val" id="gSpeed">0.0<small>km/h</small></span><span class="sub" id="gSpeedMs">0.0 m/s</span></div>
+          <div class="gauge"><span class="lbl">높이</span><span class="val" id="gH">0.0<small>m</small></span><span class="sub" id="gS">이동 0 m</span></div>
+          <div class="gauge"><span class="lbl">수직 G</span><span class="val" id="gG">1.00</span><span class="sub" id="gGsub">평소 몸무게</span></div>
+          <div class="gauge"><span class="lbl">시간</span><span class="val" id="gT">0.0<small>s</small></span><span class="sub" id="gState">대기 중</span></div>
+          <div class="energy-gauge">
+            <div class="ebar" aria-hidden="true"><span class="pe" id="ebPE"></span><span class="ke" id="ebKE"></span><span class="heat" id="ebHeat"></span><span class="elec" id="ebElec"></span></div>
+            <div class="evals"><span><i class="dot pe"></i>위치 <b id="evPE">0</b></span><span><i class="dot ke"></i>운동 <b id="evKE">0</b></span><span><i class="dot heat"></i>열 <b id="evHeat">0</b></span><span><i class="dot elec"></i>전기 <b id="evElec">0</b></span><span>(kJ)</span></div>
+            <div class="mech"><span>역학적 에너지 = 위치 + 운동</span><b id="evMech">0</b><span>kJ</span><span class="mech-note" id="evMechNote"></span></div>
+            <div class="conv" id="gConv">정거장에서 출발을 기다리는 중</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card toolbar" aria-label="운행과 편집 도구">
+        <div class="tgroup">
+          <button class="btn primary" id="runBtn" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg><span>운행 시작</span></button>
+          <button class="btn" id="resetBtn" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor"/></svg>처음으로</button>
+        </div>
+        <div class="tgroup"><span class="tlabel">배속</span>
+          <div class="seg" id="rateSeg"><button type="button" data-rate="0.5">0.5×</button><button type="button" data-rate="1" aria-pressed="true">1×</button><button type="button" data-rate="2">2×</button><button type="button" data-rate="4">4×</button></div>
+          <label class="chk"><input type="checkbox" id="ffChk" checked>리프트 빨리 감기</label>
+        </div>
+        <span class="sep" aria-hidden="true"></span>
+        <div class="tgroup"><span class="tlabel">편집</span>
+          <div class="seg" id="toolSeg"><button type="button" data-tool="move" aria-pressed="true">점 이동</button><button type="button" data-tool="add">점 추가</button><button type="button" data-tool="del">점 삭제</button></div>
+          <button class="btn small" id="undoBtn" type="button">실행 취소</button>
+        </div>
+      </section>
+
+      <section class="card chart-card" aria-label="그래프">
+        <div class="chart-head">
+          <div class="seg" id="chartSeg"><button type="button" data-chart="energy" aria-pressed="true">에너지</button><button type="button" data-chart="speed">속력·높이</button><button type="button" data-chart="g">수직 G</button></div>
+          <div class="legend" id="chartLegend"></div>
+        </div>
+        <div class="chart-wrap" id="chartWrap">
+          <canvas id="chart" role="img" aria-label="이동 거리에 따른 에너지, 속력, G 그래프"></canvas>
+          <div class="chart-tip" id="chartTip" hidden></div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="card side" aria-label="설계 노트">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-design" aria-controls="panel-design" aria-selected="true" type="button">설계</button>
+        <button role="tab" id="tab-review" aria-controls="panel-review" aria-selected="false" type="button">안전 검토 <span class="badge" id="reviewBadge">-</span></button>
+        <button role="tab" id="tab-calc" aria-controls="panel-calc" aria-selected="false" type="button">계산 노트</button>
+      </div>
+
+      <div class="panel" id="panel-design" role="tabpanel" aria-labelledby="tab-design">
+        <section class="psec">
+          <details class="howto">
+            <summary>사용 방법</summary>
+            <ol>
+              <li>장면의 흰 점을 끌어서 레일의 높이와 위치를 바꿉니다.</li>
+              <li>점을 누르면 아래에서 그 점부터 다음 점까지의 <b>구간 종류</b>(일반 레일 · 체인 리프트 · 자석 브레이크 · 정거장)를 정할 수 있습니다.</li>
+              <li>보라색 점선은 <b>역학적 에너지 높이</b>(h + v²/2g)입니다. 레일이 이 선보다 높아지면 열차는 넘어가지 못합니다.</li>
+              <li><b>운행 시작</b>을 눌러 열차를 달려 보고, <b>안전 검토</b>와 <b>계산 노트</b>에서 결과를 확인합니다.</li>
+              <li>설계는 이 브라우저에 자동 저장됩니다.</li>
+            </ol>
+          </details>
+        </section>
+
+        <section class="psec" id="pointSec">
+          <h3>선택한 점 <span class="note" id="ptIdx">점을 눌러 선택하세요</span></h3>
+          <div class="fields">
+            <label class="field"><span>가로 위치 x</span><span class="inp"><input id="ptX" type="number" step="0.5" inputmode="decimal"><em>m</em></span></label>
+            <label class="field"><span>높이 h</span><span class="inp"><input id="ptY" type="number" step="0.5" min="0" max="150" inputmode="decimal"><em>m</em></span></label>
+          </div>
+          <div class="field"><span>이 점 → 다음 점 구간 종류</span>
+            <div class="seg" id="segSeg"><button type="button" data-seg="0">일반 레일</button><button type="button" data-seg="1">체인 리프트</button><button type="button" data-seg="2">자석 브레이크</button><button type="button" data-seg="3">정거장</button></div>
+          </div>
+          <div class="row">
+            <label class="field" style="flex:1 1 120px"><span>루프 높이</span><span class="inp"><input id="loopH" type="number" value="22" min="8" max="45" step="1" inputmode="decimal"><em>m</em></span></label>
+            <button class="btn small" id="addLoopBtn" type="button" style="align-self:end">이 점 뒤에 루프 넣기</button>
+            <button class="btn small" id="delPtBtn" type="button" style="align-self:end">이 점 삭제</button>
+          </div>
+          <label class="chk"><input type="checkbox" id="snapChk" checked>0.5 m 단위로 맞추기</label>
+        </section>
+
+        <section class="psec">
+          <h3>열차 <span class="note" id="massOut">총 질량 0 kg</span></h3>
+          <div class="fields">
+            <label class="field"><span>차량 수</span><span class="inp"><input id="cars" type="number" min="1" max="8" step="1"><em>량</em></span></label>
+            <label class="field"><span>차량 1량 질량</span><span class="inp"><input id="carMass" type="number" min="100" max="3000" step="50"><em>kg</em></span></label>
+            <label class="field"><span>1량당 승객 수</span><span class="inp"><input id="riders" type="number" min="0" max="4" step="1"><em>명</em></span></label>
+            <label class="field"><span>승객 1명 질량</span><span class="inp"><input id="riderMass" type="number" min="20" max="150" step="5"><em>kg</em></span></label>
+          </div>
+        </section>
+
+        <section class="psec">
+          <h3>운행 조건</h3>
+          <div class="fields">
+            <label class="field"><span>체인 리프트 속력</span><span class="inp"><input id="liftSpeed" type="number" min="1" max="8" step="0.5"><em>m/s</em></span></label>
+            <label class="field"><span>브레이크 감속도</span><span class="inp"><input id="brakeDecel" type="number" min="1" max="12" step="0.5"><em>m/s²</em></span></label>
+          </div>
+          <label class="chk"><input type="checkbox" id="frictionChk">마찰과 공기 저항 고려하기</label>
+          <label class="field" id="muField"><span>바퀴 마찰 계수 μ</span><span class="inp"><input id="mu" type="number" min="0.001" max="0.1" step="0.005"><em>(0.005~0.05)</em></span></label>
+          <p class="hint">마찰을 끄면 역학적 에너지가 완벽히 보존됩니다(이상적인 경우). 켜면 에너지 일부가 열에너지로 바뀝니다.</p>
+        </section>
+
+        <section class="psec">
+          <h3>설계 수치</h3>
+          <dl class="stat-list" id="summaryDl"></dl>
+        </section>
+
+        <section class="psec">
+          <h3>설계 저장·불러오기</h3>
+          <p class="hint">설계 코드를 복사해 두면 다른 기기에서도 그대로 불러올 수 있습니다.</p>
+          <textarea class="code" id="codeBox" spellcheck="false" aria-label="설계 코드"></textarea>
+          <div class="row">
+            <button class="btn small" id="copyCodeBtn" type="button">설계 코드 복사</button>
+            <button class="btn small" id="loadCodeBtn" type="button">코드로 불러오기</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-review" role="tabpanel" aria-labelledby="tab-review" hidden>
+        <section class="psec">
+          <div class="verdict" id="verdictBox"></div>
+          <p class="hint">설계를 바꿀 때마다 자동으로 다시 검사합니다. 기준은 이 시뮬레이터가 정한 학교 수업용 안전 기준입니다.</p>
+        </section>
+        <section class="psec">
+          <h3>안전 기준 검사</h3>
+          <ul class="checks" id="checkList"></ul>
+        </section>
+        <section class="psec">
+          <h3>탑승객 반응 <span class="note">게임 요소 · 채점과 무관</span></h3>
+          <div id="ratings" class="pred"></div>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-calc" role="tabpanel" aria-labelledby="tab-calc" hidden>
+        <section class="psec">
+          <h3>수행평가 기준과 이 화면</h3>
+          <dl class="stat-list rubric">
+            <dt>과학적 원리 이해</dt><dd>에너지 그래프 · 에너지 높이선 · 계기판의 에너지 전환 설명</dd>
+            <dt>설계의 타당성</dt><dd>안전 검토 탭 (완주 · 속력 · G · 브레이크)</dd>
+            <dt>계산 및 추론</dt><dd>아래 나의 예측 → 풀이 과정 → 지점별 표</dd>
+          </dl>
+        </section>
+        <section class="psec pred">
+          <h3>나의 예측 <span class="note">먼저 직접 계산해 보세요</span></h3>
+          <p class="hint" id="predInfo"></p>
+          <label class="field"><span id="predPELabel">① 리프트 정상의 위치 에너지</span><span class="inp"><input id="predPE" type="number" inputmode="decimal" placeholder="예: 1160000"><em>J</em></span></label>
+          <label class="field"><span id="predVLabel">② 가장 낮은 지점의 속력 (최고 속력)</span><span class="inp"><input id="predV" type="number" step="0.1" inputmode="decimal" placeholder="예: 27.1"><em>m/s</em></span></label>
+          <label class="field" id="predV2Field"><span id="predV2Label">③ 두 번째 언덕 정상의 속력</span><span class="inp"><input id="predV2" type="number" step="0.1" inputmode="decimal"><em>m/s</em></span></label>
+          <div class="row"><button class="btn primary small" id="checkPredBtn" type="button">내 계산 확인하기</button></div>
+          <div class="pred-res" id="predRes"></div>
+        </section>
+        <section class="psec">
+          <details class="sol" id="solDetails">
+            <summary>풀이 과정 보기 (역학적 에너지 보존)</summary>
+            <ol class="steps" id="solSteps"></ol>
+          </details>
+        </section>
+        <section class="psec">
+          <h3>지점별 에너지 <span class="note">이론 = 마찰 없음</span></h3>
+          <div class="table-wrap"><table class="pts" id="ptsTable"></table></div>
+        </section>
+        <section class="psec">
+          <h3>보고서용 설계 요약</h3>
+          <textarea class="code" id="reportBox" spellcheck="false" style="min-height:160px" aria-label="설계 요약"></textarea>
+          <div class="row"><button class="btn small" id="copyReportBtn" type="button">요약 복사</button></div>
+        </section>
+      </div>
+    </aside>
+  </div>
+  <p class="foot">g = 9.8 m/s² · 위치 에너지의 기준면은 지면(높이 0 m) · 열차는 질량 중심 한 점으로 계산합니다.</p>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+'use strict';
+/* =========================================================
+   물리 엔진
+   ========================================================= */
+const G = 9.8;
+const DS = 0.25;
+const NORMAL = 0, LIFT = 1, BRAKE = 2, STATION = 3;
+const SEG_NAME = ['일반 레일', '체인 리프트', '자석 브레이크', '정거장'];
+const CAR_LEN = 3.0;
+const LIMITS = { maxV: 120 / 3.6, maxG: 5.0, minG: -1.5, stationV: 5, endV: 3 };
+
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+
+// centripetal Catmull-Rom: 점을 지나는 부드러운 곡선 (곡선이 꼬이지 않음)
+function crInto(p0, p1, p2, p3, t, o) {
+  const d01 = Math.max(1e-4, Math.sqrt(Math.hypot(p1.x - p0.x, p1.y - p0.y)));
+  const d12 = Math.max(1e-4, Math.sqrt(Math.hypot(p2.x - p1.x, p2.y - p1.y)));
+  const d23 = Math.max(1e-4, Math.sqrt(Math.hypot(p3.x - p2.x, p3.y - p2.y)));
+  const t0 = 0, t1 = d01, t2 = t1 + d12, t3 = t2 + d23;
+  const tt = t1 + (t2 - t1) * t;
+  const a1x = ((t1 - tt) * p0.x + (tt - t0) * p1.x) / (t1 - t0), a1y = ((t1 - tt) * p0.y + (tt - t0) * p1.y) / (t1 - t0);
+  const a2x = ((t2 - tt) * p1.x + (tt - t1) * p2.x) / (t2 - t1), a2y = ((t2 - tt) * p1.y + (tt - t1) * p2.y) / (t2 - t1);
+  const a3x = ((t3 - tt) * p2.x + (tt - t2) * p3.x) / (t3 - t2), a3y = ((t3 - tt) * p2.y + (tt - t2) * p3.y) / (t3 - t2);
+  const b1x = ((t2 - tt) * a1x + (tt - t0) * a2x) / (t2 - t0), b1y = ((t2 - tt) * a1y + (tt - t0) * a2y) / (t2 - t0);
+  const b2x = ((t3 - tt) * a2x + (tt - t1) * a3x) / (t3 - t1), b2y = ((t3 - tt) * a2y + (tt - t1) * a3y) / (t3 - t1);
+  o.x = ((t2 - tt) * b1x + (tt - t1) * b2x) / (t2 - t1);
+  o.y = ((t2 - tt) * b1y + (tt - t1) * b2y) / (t2 - t1);
+  return o;
+}
+
+function smooth(a, w) {
+  const N = a.length, out = new Float64Array(N);
+  let sum = 0, cnt = 0;
+  for (let i = 0; i < Math.min(N, w); i++) { sum += a[i]; cnt++; }
+  for (let i = 0; i < N; i++) {
+    const add = i + w, rem = i - w - 1;
+    if (add < N) { sum += a[add]; cnt++; }
+    if (rem >= 0) { sum -= a[rem]; cnt--; }
+    out[i] = sum / cnt;
+  }
+  a.set(out);
+}
+
+// 조절점 → 0.25 m 간격 레일 표본 (위치, 기울기, 곡률, 구간 종류)
+function buildTrack(pts) {
+  const n = pts.length;
+  const rx = [], ry = [], rseg = [], rpi = [];
+  const tmp = { x: 0, y: 0 };
+  for (let i = 0; i < n - 1; i++) {
+    const p1 = pts[i], p2 = pts[i + 1];
+    const p0 = i > 0 ? pts[i - 1] : { x: 2 * p1.x - p2.x, y: 2 * p1.y - p2.y };
+    const p3 = i + 2 < n ? pts[i + 2] : { x: 2 * p2.x - p1.x, y: 2 * p2.y - p1.y };
+    const chord = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const steps = Math.max(6, Math.ceil(chord / 0.04));
+    for (let k = 0; k < steps; k++) {
+      crInto(p0, p1, p2, p3, k / steps, tmp);
+      rx.push(tmp.x); ry.push(tmp.y); rseg.push(p1.seg); rpi.push(i);
+    }
+  }
+  rx.push(pts[n - 1].x); ry.push(pts[n - 1].y); rseg.push(pts[n - 2].seg); rpi.push(n - 2);
+
+  const X = [rx[0]], Y = [ry[0]], SG = [rseg[0]], PI = [rpi[0]];
+  let acc = 0;
+  for (let j = 1; j < rx.length; j++) {
+    let ax = rx[j - 1], ay = ry[j - 1];
+    const bx = rx[j], by = ry[j];
+    let len = Math.hypot(bx - ax, by - ay);
+    while (acc + len >= DS && len > 0) {
+      const f = (DS - acc) / len;
+      ax += (bx - ax) * f; ay += (by - ay) * f;
+      X.push(ax); Y.push(ay); SG.push(rseg[j - 1]); PI.push(rpi[j - 1]);
+      len = Math.hypot(bx - ax, by - ay); acc = 0;
+    }
+    acc += len;
+  }
+  if (X.length < 3) { X.push(rx[rx.length - 1]); Y.push(ry[ry.length - 1]); SG.push(rseg[rseg.length - 1]); PI.push(rpi[rpi.length - 1]); }
+  const N = X.length;
+  const ang = new Float64Array(N), k = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    const a = Math.max(0, i - 1), b = Math.min(N - 1, i + 1);
+    ang[i] = Math.atan2(Y[b] - Y[a], X[b] - X[a]);
+  }
+  for (let i = 1; i < N; i++) {
+    let d = ang[i] - ang[i - 1];
+    while (d > Math.PI) { ang[i] -= 2 * Math.PI; d -= 2 * Math.PI; }
+    while (d < -Math.PI) { ang[i] += 2 * Math.PI; d += 2 * Math.PI; }
+  }
+  for (let i = 0; i < N; i++) {
+    const a = Math.max(0, i - 2), b = Math.min(N - 1, i + 2);
+    k[i] = b > a ? (ang[b] - ang[a]) / ((b - a) * DS) : 0;
+  }
+  smooth(k, 8); smooth(k, 8); // 약 4 m(열차 한 량 정도) 평균: 승객이 느끼는 G에 가깝게
+  const sin = new Float64Array(N), cos = new Float64Array(N);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < N; i++) {
+    sin[i] = Math.sin(ang[i]); cos[i] = Math.cos(ang[i]);
+    if (X[i] < minX) minX = X[i]; if (X[i] > maxX) maxX = X[i];
+    if (Y[i] < minY) minY = Y[i]; if (Y[i] > maxY) maxY = Y[i];
+  }
+  const seg = Uint8Array.from(SG), pi = Int16Array.from(PI);
+  let r = 0;
+  while (r < N - 1 && (seg[r] === LIFT || seg[r] === STATION)) r++;
+  let f = -1;
+  if (seg[N - 2] === STATION) { f = N - 2; while (f > 0 && seg[f - 1] === STATION) f--; if (f <= r) f = -1; }
+  let freeEnd = r;
+  while (freeEnd < N - 1 && seg[freeEnd] === NORMAL) freeEnd++;
+  const segMid = new Int32Array(n - 1).fill(-1), segFirst = new Int32Array(n - 1).fill(-1), segLast = new Int32Array(n - 1).fill(-1);
+  for (let i = 0; i < N; i++) { const q = pi[i]; if (segFirst[q] < 0) segFirst[q] = i; segLast[q] = i; }
+  for (let q = 0; q < n - 1; q++) if (segFirst[q] >= 0) segMid[q] = (segFirst[q] + segLast[q]) >> 1;
+  return {
+    N, X: Float64Array.from(X), Y: Float64Array.from(Y), ang, k, sin, cos, seg, pi, segMid,
+    length: (N - 1) * DS, releaseIdx: r, releaseS: r * DS, finalIdx: f, finalS: f >= 0 ? f * DS : -1,
+    freeEndIdx: freeEnd, minX, maxX, minY, maxY
+  };
+}
+
+function sampleTrack(T, s, o) {
+  let u = s / DS;
+  if (u < 0) u = 0; if (u > T.N - 1.0001) u = T.N - 1.0001;
+  const i = u | 0, f = u - i;
+  o.x = T.X[i] + (T.X[i + 1] - T.X[i]) * f;
+  o.y = T.Y[i] + (T.Y[i + 1] - T.Y[i]) * f;
+  o.ang = T.ang[i] + (T.ang[i + 1] - T.ang[i]) * f;
+  o.sin = Math.sin(o.ang); o.cos = Math.cos(o.ang);
+  o.k = T.k[i] + (T.k[i + 1] - T.k[i]) * f;
+  o.seg = T.seg[i]; o.i = i;
+  return o;
+}
+function heightAt(T, s) {
+  let u = s / DS;
+  if (u < 0) u = 0; if (u > T.N - 1.0001) u = T.N - 1.0001;
+  const i = u | 0;
+  return T.Y[i] + (T.Y[i + 1] - T.Y[i]) * (u - i);
+}
+function segAt(T, s) { return T.seg[clamp((s / DS) | 0, 0, T.N - 2)]; }
+
+function makeConfig(train, phys) {
+  const M = train.cars * (train.carMass + train.riders * train.riderMass);
+  const CdA = 1.0 + 0.25 * train.cars;
+  return {
+    M, cars: train.cars, riders: train.riders, trainLen: train.cars * CAR_LEN, friction: phys.friction, mu: phys.mu,
+    dragK: 0.5 * 1.2 * CdA / M, liftSpeed: phys.liftSpeed, stationSpeed: 2, brakeDecel: phys.brakeDecel, brakeMin: 2.0
+  };
+}
+
+function newSim(T, C) {
+  const s0 = Math.min(C.trainLen / 2 + 0.5, T.length / 2);
+  const h0 = heightAt(T, s0);
+  return {
+    s: s0, s0, v: 0, e: G * h0, t: 0, h: h0, G: 1, seg: T.seg[0], cos: 1, sin: 0, motorW: 0, heat: 0, elec: 0, E0: C.M * G * h0,
+    done: false, fail: null, failT: 0, released: T.releaseS <= s0, stationEntered: false, entryV: null,
+    stuck: 0, maxV: 0, maxVs: s0, maxG: 1, maxGs: s0, minG: 1, minGs: s0, inverted: false, minInvG: Infinity,
+    minInvGs: s0, airtime: 0, endV: null, success: false
+  };
+}
+
+// 한 단계 적분. 보존력(중력)은 역학적 에너지로 정확히 계산하고,
+// 비보존력(마찰·브레이크·모터)이 한 일은 열/전기/모터 에너지로 따로 기록한다.
+const SC = {};
+function stepSim(S, T, C, dt) {
+  if (S.done) return;
+  const p = sampleTrack(T, S.s, SC);
+  const v = S.v;
+  const Gn = p.cos + v * v * p.k / G;
+  S.G = Gn; S.seg = p.seg; S.h = p.y; S.cos = p.cos; S.sin = p.sin;
+  const dir = v > 1e-9 ? 1 : v < -1e-9 ? -1 : 0;
+  const sp = Math.abs(v);
+  let aF = 0, aB = 0, aT = 0;
+  if (C.friction && dir) aF = -(C.mu * G * Math.abs(Gn) + C.dragK * v * v) * dir;
+  if (p.seg === BRAKE && dir) aB = -C.brakeDecel * clamp((sp - C.brakeMin) / 0.6, 0, 1) * dir;
+  if (p.seg === STATION && T.finalS >= 0 && S.s >= T.finalS && v > C.stationSpeed) aT = -2.5 * clamp((v - C.stationSpeed) / 0.4, 0, 1);
+  const aNC = aF + aB + aT;
+  const aG = -G * p.sin;
+  let vN = v + (aG + aNC) * dt;
+  if (dir && Math.sign(vN) !== dir && aG * dir >= 0) vN = 0;
+  let sN = S.s + 0.5 * (v + vN) * dt;
+  const ds = sN - S.s;
+  S.e += aNC * ds;
+  S.heat += -C.M * (aF + aT) * ds;
+  S.elec += -C.M * aB * ds;
+  const hN = heightAt(T, sN);
+  const v2 = 2 * (S.e - G * hN);
+  if (v2 > 0.6 && vN * v > 0) vN = Math.sign(vN) * Math.sqrt(v2);
+  else S.e = 0.5 * vN * vN + G * hN;
+
+  const segN = segAt(T, sN);
+  if (segN === LIFT || segN === STATION || segN === BRAKE) {
+    const target = segN === LIFT ? C.liftSpeed : segN === STATION ? C.stationSpeed : C.brakeMin;
+    if (vN < target) {
+      const eN = 0.5 * target * target + G * hN;
+      S.motorW += C.M * (eN - S.e); S.e = eN; vN = target;
+    }
+  }
+  if (!S.released && sN >= T.releaseS) S.released = true;
+  if (S.released && !S.fail && v > 0 && vN <= 0 && segN === NORMAL) {
+    S.fail = { type: 'rollback', s: sN, h: hN, t: S.t, inverted: p.cos < 0 }; S.failT = S.t;
+  }
+  if (T.finalS >= 0 && !S.stationEntered && sN >= T.finalS) {
+    S.stationEntered = true; S.entryV = vN;
+    if (vN > LIMITS.stationV && !S.fail) { S.fail = { type: 'overspeed', s: sN, h: hN, v: vN, t: S.t }; S.failT = S.t; }
+  }
+  if (!S.fail) {
+    const a = Math.abs(vN);
+    if (a > S.maxV) { S.maxV = a; S.maxVs = sN; }
+    if (Gn > S.maxG) { S.maxG = Gn; S.maxGs = S.s; }
+    if (Gn < S.minG) { S.minG = Gn; S.minGs = S.s; }
+    if (p.cos < 0) { S.inverted = true; if (Gn < S.minInvG) { S.minInvG = Gn; S.minInvGs = S.s; } }
+    if (Gn < 0 && S.released) S.airtime += dt;
+  }
+  const sMin = Math.min(C.trainLen / 2, T.length / 2), sMax = Math.max(T.length - C.trainLen / 2, sMin);
+  if (sN < sMin) { sN = sMin; vN = 0; S.e = G * heightAt(T, sN); }
+  if (sN >= sMax) {
+    sN = sMax; S.endV = Math.abs(vN); S.done = true;
+    if (!S.fail) {
+      if (S.endV > LIMITS.endV) S.fail = { type: 'crash', s: sN, h: heightAt(T, sN), v: S.endV, t: S.t };
+      else S.success = true;
+    }
+    vN = 0;
+  }
+  S.s = sN; S.v = vN; S.t += dt;
+  if (Math.abs(vN) < 0.05 && !S.done) {
+    S.stuck += dt;
+    if (S.stuck > 4) { S.done = true; if (!S.fail) S.fail = { type: S.released ? 'stuck' : 'nostart', s: sN, h: hN, t: S.t }; }
+  } else S.stuck = 0;
+  if (S.fail && !S.done && S.t - S.failT > 7) S.done = true;
+  if (S.t > 600 && !S.done) { S.done = true; if (!S.fail) S.fail = { type: 'timeout', s: sN, h: hN, t: S.t }; }
+}
+
+function findExtrema(Y, a, b, th) {
+  const out = [];
+  if (b - a < 4) return out;
+  let up = null, cand = a, maxI = a, minI = a;
+  for (let i = a + 1; i <= b; i++) {
+    if (up === null) {
+      if (Y[i] > Y[maxI]) maxI = i;
+      if (Y[i] < Y[minI]) minI = i;
+      if (Y[maxI] - Y[minI] > th) {
+        up = maxI > minI;
+        if (up) { out.push({ i: minI, type: 'valley' }); cand = maxI; }
+        else { out.push({ i: maxI, type: 'hill' }); cand = minI; }
+      }
+      continue;
+    }
+    if (up) {
+      if (Y[i] > Y[cand]) cand = i;
+      else if (Y[cand] - Y[i] > th) { out.push({ i: cand, type: 'hill' }); up = false; cand = i; }
+    } else {
+      if (Y[i] < Y[cand]) cand = i;
+      else if (Y[i] - Y[cand] > th) { out.push({ i: cand, type: 'valley' }); up = true; cand = i; }
+    }
+  }
+  if (up !== null) out.push({ i: cand, type: up ? 'hill' : 'valley', end: true });
+  return out;
+}
+
+// 화면 없이 끝까지 한 번 운행해 보고 모든 지점의 기록을 남긴다
+function analyze(points, train, phys) {
+  const T = buildTrack(points);
+  const C = makeConfig(train, phys);
+  const S = newSim(T, C);
+  const N = T.N;
+  const rec = { v: new Float32Array(N).fill(NaN), G: new Float32Array(N).fill(NaN), heat: new Float32Array(N).fill(NaN),
+    elec: new Float32Array(N).fill(NaN), motor: new Float32Array(N).fill(NaN), t: new Float32Array(N).fill(NaN) };
+  let last = Math.floor(S.s / DS) - 1;
+  const dt = 1 / 240;
+  let guard = 0;
+  while (!S.done && guard < 240 * 620) {
+    stepSim(S, T, C, dt); guard++;
+    if (!S.fail) {
+      const i1 = Math.min(N - 1, Math.floor(S.s / DS));
+      for (let i = last + 1; i <= i1; i++) {
+        if (i < 0 || !Number.isNaN(rec.v[i])) continue;
+        rec.v[i] = S.v; rec.G[i] = S.G; rec.heat[i] = S.heat; rec.elec[i] = S.elec; rec.motor[i] = S.motorW; rec.t[i] = S.t;
+      }
+      if (i1 > last) last = i1;
+    }
+  }
+  const rIdx = T.releaseIdx;
+  const relSeg = rIdx > 0 ? T.seg[rIdx - 1] : NORMAL;
+  const vRel = rIdx > 0 ? (relSeg === LIFT ? C.liftSpeed : C.stationSpeed) : 0;
+  const eRef = 0.5 * vRel * vRel + G * T.Y[rIdx];
+  const theory = new Float32Array(N).fill(NaN);
+  let unreachIdx = -1;
+  for (let i = rIdx; i <= T.freeEndIdx && i < N; i++) {
+    const v2 = 2 * (eRef - G * T.Y[i]);
+    if (v2 < 0) { unreachIdx = i; break; }
+    theory[i] = Math.sqrt(v2);
+  }
+  const ext = findExtrema(T.Y, rIdx, Math.min(T.freeEndIdx, N - 1), 1.0);
+  return { T, C, S, rec, theory, eRef, vRel, unreachIdx, ext };
+}
+
+// 클로소이드 루프: 꼭대기로 갈수록 곡률이 커지는 물방울 모양 (실제 롤러코스터 루프 형태)
+function loopShape(nHalf) {
+  const M = 3000, half = 0.5, kmax = 2 * Math.PI / half;
+  let x = 0, y = 0;
+  const pts = [{ x: 0, y: 0 }];
+  const ds = half / M;
+  for (let i = 1; i <= M; i++) {
+    const s = (i - 0.5) * ds;
+    const th = kmax * half / 2 * Math.pow(s / half, 2);
+    x += Math.cos(th) * ds; y += Math.sin(th) * ds;
+    if (i === Math.round(pts.length * M / nHalf)) pts.push({ x, y });
+  }
+  const top = pts[pts.length - 1];
+  const all = pts.slice();
+  for (let i = pts.length - 2; i >= 0; i--) all.push({ x: 2 * top.x - pts[i].x, y: pts[i].y });
+  const H = top.y;
+  return { pts: all.map(q => ({ x: q.x / H, y: q.y / H })), exitX: 2 * top.x / H };
+}
+
+/* =========================================================
+   예시 코스
+   ========================================================= */
+const SEGC = { n: NORMAL, l: LIFT, b: BRAKE, s: STATION };
+const BASIC = [[0,2,'s'],[22,2,'l'],[30,4.5,'l'],[64,36,'l'],[74,40,'n'],[84,38.5,'n'],[106,16,'n'],[121,6,'n'],[135,3,'n'],[149,6.5,'n'],[163,14,'n'],[180,23,'n'],[194,26,'n'],[208,23,'n'],[224,13,'n'],[240,6,'n'],[254,4,'n'],[268,6.5,'n'],[282,12,'n'],[294,14,'n'],[306,12,'n'],[320,6,'n'],[334,3.5,'b'],[394,3.5,'s'],[420,3.5,'s']];
+const PRESETS = {
+  basic: { name: '기본 설계 (언덕 3개)', pts: BASIC },
+  loop: { name: '루프가 있는 설계', pts: [[0,2,'s'],[22,2,'l'],[30,4.5,'l'],[64,32,'l'],[74,36,'n'],[84,34.5,'n'],[106,14.4,'n'],[121,6,'n'],[136,3,'n'],[150,3,'n'],[157.9,3.2,'n'],[165.7,4.8,'n'],[172.3,9,'n'],[176,15.8,'n'],[174.5,23.4,'n'],[167.8,27,'n'],[161.1,23.4,'n'],[159.5,15.8,'n'],[163.2,9,'n'],[169.9,4.8,'n'],[177.6,3.2,'n'],[185.6,3,'n'],[201.6,3,'n'],[219.6,7,'n'],[237.6,13,'n'],[255.6,16,'n'],[273.6,13,'n'],[291.6,7,'n'],[307.6,3.5,'b'],[367.6,3.5,'s'],[393.6,3.5,'s']] },
+  failHill: { name: '실패 예시 ① 두 번째 언덕이 너무 높음', pts: [[0,2,'s'],[22,2,'l'],[30,4.5,'l'],[64,36,'l'],[74,40,'n'],[84,38.5,'n'],[106,16,'n'],[121,6,'n'],[135,3,'n'],[149,7,'n'],[163,20,'n'],[180,38,'n'],[194,43,'n'],[208,38,'n'],[224,18,'n'],[240,6,'n'],[254,4,'n'],[270,4,'b'],[330,4,'s'],[356,4,'s']] },
+  failG: { name: '실패 예시 ② 곡선이 너무 급함 (G 초과)', pts: [[0,2,'s'],[22,2,'l'],[30,4.5,'l'],[64,36,'l'],[74,40,'n'],[84,38.5,'n'],[98,16,'n'],[106,5,'n'],[112,3,'n'],[118,5,'n'],[126,16,'n'],[130,22,'n'],[142,26,'n'],[156,23,'n'],[172,13,'n'],[188,6,'n'],[202,4,'n'],[218,4,'b'],[278,4,'s'],[304,4,'s']] },
+  failBrake: { name: '실패 예시 ③ 브레이크 구간이 짧음', pts: BASIC.slice(0, 22).concat([[334,3.5,'b'],[350,3.5,'s'],[376,3.5,'s']]) },
+  small: { name: '작은 코스 (처음부터 만들기용)', pts: [[0,2,'s'],[22,2,'l'],[30,4.5,'l'],[54,24,'l'],[62,26,'n'],[72,23.5,'n'],[92,7,'n'],[106,3,'n'],[120,3,'b'],[170,3,'s'],[196,3,'s']] }
+};
+const DEFAULT_TRAIN = { cars: 4, carMass: 500, riders: 4, riderMass: 60 };
+const DEFAULT_PHYS = { friction: false, mu: 0.015, liftSpeed: 3, brakeDecel: 6 };
+function presetPoints(key) { return PRESETS[key].pts.map(([x, y, s]) => ({ x, y, seg: SEGC[s] })); }
+
+/* =========================================================
+   상태
+   ========================================================= */
+const state = {
+  points: presetPoints('basic'),
+  train: { ...DEFAULT_TRAIN },
+  phys: { ...DEFAULT_PHYS },
+  sel: 4, tool: 'move', snap: true, chartMode: 'energy', rate: 1, ff: true, follow: true, energyLine: true
+};
+let A = null, R = null, track = null;
+let live = null, running = false, paused = false;
+let sceneDirty = true, chartDirty = true, needsRebuild = false;
+let hoverS = null, hoverPt = -1;
+const undoStack = [];
+const view = { cx: 0, cy: 0, scale: 2, auto: true };
+let cw = 600, ch = 400, cdpr = 1, chartW = 600, chartH = 210;
+
+const $ = id => document.getElementById(id);
+const sceneCv = $('scene'), sctx = sceneCv.getContext('2d');
+const chartCv = $('chart'), cctx = chartCv.getContext('2d');
+
+/* =========================================================
+   숫자 표시
+   ========================================================= */
+function fmt(n, d = 1) {
+  if (!Number.isFinite(n)) return '-';
+  return n.toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function fmtJ(j) { return fmt(Math.round(j), 0) + ' J'; }
+function kJ(j) { return fmt(j / 1000, 0); }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+/* =========================================================
+   분석 → 검사 결과
+   ========================================================= */
+const round1 = v => Math.round(v * 10) / 10;
+function computeReport(A) {
+  const { T, C, S, rec, theory, ext } = A;
+  const rIdx = T.releaseIdx;
+  // 체인이 풀리는 곳은 조절점 위치와 같으므로 조절점 높이를 그대로 쓴다
+  const Hrel = rIdx > 0 && state.points[T.pi[rIdx]] ? state.points[T.pi[rIdx]].y : T.Y[rIdx];
+  const firstValley = ext.find(e => e.type === 'valley');
+  const lim = firstValley ? firstValley.i : Math.min(T.freeEndIdx, T.N - 1);
+  let crestIdx = rIdx;
+  for (let i = rIdx; i <= lim; i++) if (T.Y[i] > T.Y[crestIdx]) crestIdx = i;
+  let laterMax = -Infinity, laterIdx = -1;
+  if (firstValley) for (let i = firstValley.i; i <= T.freeEndIdx && i < T.N; i++) if (T.Y[i] > laterMax) { laterMax = T.Y[i]; laterIdx = i; }
+  let lowIdx = rIdx;
+  for (let i = rIdx; i <= T.freeEndIdx && i < T.N; i++) if (T.Y[i] < T.Y[lowIdx]) lowIdx = i;
+  const drop = firstValley ? T.Y[crestIdx] - T.Y[firstValley.i] : 0;
+  let loops = 0, inv = false;
+  for (let i = 0; i < T.N; i++) { const c = T.cos[i] < -0.3; if (c && !inv) loops++; inv = c; }
+  let brakeLen = 0, b0 = -1, b1 = -1;
+  for (let i = 0; i < T.N - 1; i++) if (T.seg[i] === BRAKE) { brakeLen += DS; if (b0 < 0) b0 = i; if (b1 < 0 || i === b1 + 1) b1 = i; }
+  // 풀이에 보이는 숫자(소수 첫째 자리)로 계산한 이론값
+  const vAt = h => { const v2 = A.vRel * A.vRel + 2 * G * (round1(Hrel) - round1(h)); return v2 >= 0 ? Math.sqrt(v2) : NaN; };
+  const vMaxT = vAt(T.Y[lowIdx]);
+  const hillRows = ext.filter(e => e.type === 'hill' && e.i > (firstValley ? firstValley.i : Infinity) && T.cos[e.i] > 0);
+  const secondHill = hillRows[0] || null;
+
+  const kmh = v => fmt(v * 3.6, 1);
+  const checks = [];
+  const startOK = rIdx > 0;
+  checks.push({ id: 'start', ok: startOK, t: '출발 장치가 있다', d: startOK ? `${SEG_NAME[T.seg[rIdx - 1]]}가 열차를 ${fmt(Hrel, 1)} m 높이까지 올려 줍니다.` : '첫 구간을 정거장이나 체인 리프트로 지정해야 열차가 출발합니다.' });
+  const finished = S.success;
+  let failText = '';
+  if (S.fail) {
+    const f = S.fail;
+    if (f.type === 'rollback') failText = f.inverted ? `루프 안쪽 ${fmt(f.h, 1)} m 높이에서 속력이 0이 되었습니다. 뒤집힌 채 멈추는 매우 위험한 상황입니다.` : `이동 거리 ${fmt(f.s, 0)} m 지점(높이 ${fmt(f.h, 1)} m)에서 속력이 0이 되어 뒤로 밀려났습니다.`;
+    else if (f.type === 'overspeed') failText = `정거장에 ${kmh(f.v)} km/h로 들어왔습니다. 브레이크 구간을 늘리거나 감속도를 높이세요.`;
+    else if (f.type === 'crash') failText = `레일 끝에 ${kmh(f.v)} km/h로 도착했습니다. 끝에 브레이크와 정거장이 필요합니다.`;
+    else if (f.type === 'nostart') failText = '열차가 출발하지 못했습니다. 첫 구간을 정거장이나 체인 리프트로 지정하세요.';
+    else if (f.type === 'stuck') failText = `이동 거리 ${fmt(f.s, 0)} m 지점에서 열차가 멈췄습니다.`;
+    else failText = '열차가 끝까지 가지 못했습니다.';
+  }
+  checks.push({ id: 'finish', ok: finished, t: '열차가 끝까지 안전하게 도착한다', d: finished ? `${fmt(S.t, 1)}초 만에 도착 정거장까지 운행했습니다.` : failText });
+  const firstOK = !firstValley || laterIdx < 0 || laterMax < Hrel;
+  checks.push({ id: 'first', ok: firstOK, t: '첫 언덕(리프트 정상)이 가장 높다', d: firstValley && laterIdx >= 0 ? `리프트 정상 ${fmt(Hrel, 1)} m · 그 뒤 가장 높은 곳 ${fmt(laterMax, 1)} m` : `리프트 정상 ${fmt(Hrel, 1)} m` });
+  checks.push({ id: 'speed', ok: S.maxV <= LIMITS.maxV, t: '최고 속력 120 km/h 이하', d: `최고 속력 ${kmh(S.maxV)} km/h (${fmt(S.maxV, 1)} m/s)` });
+  checks.push({ id: 'gmax', ok: S.maxG <= LIMITS.maxG, t: '몸이 눌리는 힘 5.0 G 이하', d: `최대 ${fmt(S.maxG, 2)} G · 이동 거리 ${fmt(S.maxGs, 0)} m 지점` + (S.maxG > LIMITS.maxG ? ' → 곡선을 더 완만하게(반지름을 크게) 하거나 속력을 줄이세요.' : '') });
+  checks.push({ id: 'gmin', ok: S.minG >= LIMITS.minG, t: '몸이 뜨는 힘 -1.5 G 이상', d: `최소 ${fmt(S.minG, 2)} G · 이동 거리 ${fmt(S.minGs, 0)} m 지점` + (S.minG < LIMITS.minG ? ' → 언덕 꼭대기를 더 둥글게 만드세요.' : '') });
+  if (S.inverted) checks.push({ id: 'loop', ok: S.minInvG > 0, t: '뒤집힌 곳에서도 좌석에 눌린다 (G > 0)', d: `루프 꼭대기 최소 ${fmt(S.minInvG, 2)} G` + (S.minInvG <= 0 ? ' → 루프에 들어가는 속력을 높이거나 루프를 낮추세요.' : '') });
+  else checks.push({ id: 'loop', ok: true, na: true, t: '뒤집힌 곳에서도 좌석에 눌린다', d: '루프가 없어 해당 없음' });
+  const entryOK = S.entryV !== null && S.entryV <= LIMITS.stationV;
+  checks.push({ id: 'brake', ok: entryOK, t: '정거장 진입 속력 18 km/h 이하', d: S.entryV !== null ? `정거장 진입 ${kmh(S.entryV)} km/h · 브레이크 구간 ${fmt(brakeLen, 0)} m` : (T.finalS < 0 ? '마지막 구간이 정거장이 아닙니다.' : '열차가 정거장에 도착하지 못했습니다.') });
+  checks.push({ id: 'ground', ok: T.minY >= 0, t: '레일이 땅 위에 있다', d: `가장 낮은 레일 높이 ${fmt(T.minY, 1)} m` });
+  const scored = checks.filter(c => !c.na);
+  const passed = scored.filter(c => c.ok).length;
+
+  const markers = [];
+  if (S.fail && S.fail.type === 'rollback') markers.push({ s: S.fail.s, a: '역주행', b: `높이 ${fmt(S.fail.h, 1)} m에서 속력 0` });
+  if (S.fail && S.fail.type === 'overspeed') markers.push({ s: S.fail.s, a: '정거장 과속', b: `${kmh(S.fail.v)} km/h` });
+  if (S.fail && S.fail.type === 'crash') markers.push({ s: S.fail.s, a: '충돌 위험', b: `${kmh(S.fail.v)} km/h` });
+  if (S.maxG > LIMITS.maxG) markers.push({ s: S.maxGs, a: `${fmt(S.maxG, 1)} G`, b: '눌리는 힘 초과' });
+  if (S.minG < LIMITS.minG) markers.push({ s: S.minGs, a: `${fmt(S.minG, 1)} G`, b: '몸이 너무 뜸' });
+  if (S.inverted && S.minInvG <= 0) markers.push({ s: S.minInvGs, a: '루프 속력 부족', b: `${fmt(S.minInvG, 2)} G` });
+  if (S.maxV > LIMITS.maxV) markers.push({ s: S.maxVs, a: `${kmh(S.maxV)} km/h`, b: '속력 제한 초과' });
+
+  // 지점별 표
+  const rows = [];
+  const push = (i, name) => {
+    const v = rec.v[i], th = theory[i];
+    rows.push({ i, name, h: T.Y[i], vT: th, vS: v, G: rec.G[i], PE: C.M * G * T.Y[i], KE: Number.isFinite(v) ? 0.5 * C.M * v * v : NaN });
+  };
+  push(rIdx, '리프트 정상');
+  let hn = 1, vn = 1;
+  for (const e of ext) {
+    if (e.i <= rIdx + 4) continue;
+    if (e.type === 'hill' && e.i <= crestIdx + 4 && Math.abs(T.Y[e.i] - Hrel) < 1) continue;
+    if (e.type === 'hill') push(e.i, T.cos[e.i] < 0 ? '루프 꼭대기' : (e.i === crestIdx ? '첫 언덕 꼭대기' : `언덕 ${++hn}`));
+    else push(e.i, `골짜기 ${vn++}`);
+  }
+  if (b0 >= 0) push(b0, '브레이크 진입');
+  const brakeIn = b0 >= 0 ? rec.v[b0] : NaN;
+  const brakeOut = b1 >= 0 ? rec.v[Math.min(T.N - 1, b1 + 1)] : NaN;
+
+  // 게임 요소: 흥미도·강렬도
+  const exc = clamp(0.045 * S.maxV * 3.6 + 0.07 * drop + 0.6 * S.airtime + 1.4 * loops + 0.002 * T.length + (hillRows.length * 0.3), 0, 10);
+  const inten = clamp(1.25 * Math.max(0, S.maxG - 1) + 1.6 * Math.max(0, -S.minG) + 0.025 * S.maxV * 3.6 + loops * 0.6, 0, 10);
+  return { Hrel, vAt, crestIdx, firstValley, laterMax, laterIdx, lowIdx, drop, loops, brakeLen, b0, b1, brakeIn, brakeOut,
+    vMaxT, hills: hillRows.length + 1, secondHill, checks, passed, total: scored.length, allPass: passed === scored.length,
+    failText, markers, rows, exc, inten };
+}
+
+/* =========================================================
+   다시 계산
+   ========================================================= */
+function rebuild() {
+  A = analyze(state.points, state.train, state.phys);
+  track = A.T;
+  R = computeReport(A);
+  renderPanels();
+  if (!running) updateGauges(null);
+  sceneDirty = chartDirty = true;
+  scheduleSave();
+}
+function designChanged() {
+  if (running || live) stopRun();
+  needsRebuild = true;
+}
+
+/* =========================================================
+   장면 그리기
+   ========================================================= */
+function isDark() {
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t === 'dark') return true;
+  if (t === 'light') return false;
+  return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+}
+const PAL = {
+  light: { skyTop: '#79BFEA', skyBot: '#DDF1FA', orb: '#FFE9A8', cloud: 'rgba(255,255,255,0.88)', hillFar: '#B9DAB4', hillNear: '#A0CD93',
+    ground: '#78B65A', groundDark: '#5C9843', tree: '#3E8A45', treeDark: '#2E6C36', trunk: '#7A5634', grid: 'rgba(20,50,70,0.14)',
+    gridLabel: '#24465A', labelBg: 'rgba(255,255,255,0.82)', rail: '#D3263A', railHi: '#FF7A86', spine: '#3A4652', tie: '#5A6672',
+    support: '#E3A81B', supportDark: '#B68412', chain: '#23272E', brake: '#C9691C', station: '#EDE6D6', stationWall: '#D9CFB8',
+    roof: '#2D5F8F', energy: '#7A3FE0', point: '#FFFFFF', pointStroke: '#15201D', sel: '#D3263A', car: '#D3263A', carDark: '#8E1424',
+    stripe: '#F6C445', skin: '#F2C9A0', shirt: '#2F6FDB', bad: '#E02424', text: '#15201D', textInv: '#FFFFFF', groundText: '#F4FAEF', star: null },
+  dark: { skyTop: '#070F25', skyBot: '#24325C', orb: '#E6ECF8', cloud: 'rgba(160,178,220,0.16)', hillFar: '#132C2A', hillNear: '#173729',
+    ground: '#1B3823', groundDark: '#122818', tree: '#1F4A2B', treeDark: '#163820', trunk: '#4A3524', grid: 'rgba(200,220,255,0.13)',
+    gridLabel: '#AFC4DE', labelBg: 'rgba(10,18,30,0.78)', rail: '#FF4D5B', railHi: '#FF97A0', spine: '#8D9BAA', tie: '#6E7B88',
+    support: '#C99A1A', supportDark: '#93700F', chain: '#CDD3DC', brake: '#E68A3E', station: '#3A3F48', stationWall: '#2E333B',
+    roof: '#5B8FC4', energy: '#B79CFF', point: '#161E1B', pointStroke: '#E2EBE7', sel: '#FF4D5B', car: '#FF4D5B', carDark: '#A3202C',
+    stripe: '#F6C445', skin: '#E8BC93', shirt: '#5D95F6', bad: '#FF6B6B', text: '#E2EBE7', textInv: '#15201D', groundText: '#C9D8C4', star: 'rgba(255,255,255,0.75)' }
+};
+function pal() { return isDark() ? PAL.dark : PAL.light; }
+
+function sx(x) { return (x - view.cx) * view.scale + cw / 2; }
+function sy(y) { return ch / 2 - (y - view.cy) * view.scale; }
+function wx(px) { return (px - cw / 2) / view.scale + view.cx; }
+function wy(py) { return (ch / 2 - py) / view.scale + view.cy; }
+
+function groundPx() { return Math.max(34, ch * 0.12); }
+function fitScale() {
+  const T = track;
+  const w = Math.max(20, T.maxX - T.minX), h = Math.max(10, T.maxY);
+  return Math.max(0.3, Math.min((cw - 48) / w, (ch - groundPx() - 64) / h));
+}
+function fitView(all) {
+  if (!track) return;
+  let sc = fitScale();
+  // 좁은 화면에서 전체를 넣으면 점을 잡기 어려우므로, 처음에는 출발 쪽을 적당히 확대해서 보여 준다
+  const comfy = Math.min((ch - groundPx() - 64) / Math.max(10, track.maxY), 2.6);
+  const narrow = !all && sc < 1.4 && comfy > sc;
+  if (narrow) sc = comfy;
+  view.scale = sc;
+  view.cx = narrow ? track.minX + (cw / 2 - 24) / sc : (track.minX + track.maxX) / 2;
+  view.cy = (ch / 2 - groundPx()) / sc;
+  view.auto = true;
+  sceneDirty = true;
+}
+
+function seeded(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+let decor = null;
+function buildDecor() {
+  const T = track, rnd = seeded(7);
+  const trees = [], clouds = [], stars = [];
+  const x0 = T.minX - 120, x1 = T.maxX + 120;
+  const blocked = [];
+  for (let i = 0; i < T.N - 1; i++) if (T.seg[i] === STATION) blocked.push(T.X[i]);
+  for (let x = x0; x < x1; x += 9 + rnd() * 16) {
+    if (blocked.some(b => Math.abs(b - x) < 6)) continue;
+    trees.push({ x, h: 5 + rnd() * 5, w: 0.8 + rnd() * 0.5, back: rnd() < 0.55 });
+  }
+  for (let i = 0; i < 14; i++) clouds.push({ x: x0 + rnd() * (x1 - x0 + 400), y: 45 + rnd() * 50, r: 4 + rnd() * 6 });
+  for (let i = 0; i < 90; i++) stars.push({ x: rnd(), y: rnd() * 0.75, r: 0.4 + rnd() * 1.1 });
+  decor = { trees, clouds, stars, key: T.minX + ':' + T.maxX };
+}
+
+let animT = 0;
+function drawScene() {
+  const ctx = sctx, T = track, P = pal();
+  ctx.setTransform(cdpr, 0, 0, cdpr, 0, 0);
+  if (!decor || decor.key !== T.minX + ':' + T.maxX) buildDecor();
+  const sc = view.scale;
+  const gY = sy(0);
+
+  // 하늘
+  const sky = ctx.createLinearGradient(0, 0, 0, Math.max(1, gY));
+  sky.addColorStop(0, P.skyTop); sky.addColorStop(1, P.skyBot);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
+  if (P.star) {
+    ctx.fillStyle = P.star;
+    for (const s of decor.stars) { ctx.beginPath(); ctx.arc(s.x * cw, s.y * Math.max(10, gY), s.r, 0, 7); ctx.fill(); }
+  }
+  // 해/달
+  ctx.fillStyle = P.orb; ctx.globalAlpha = 0.9;
+  ctx.beginPath(); ctx.arc(cw * 0.86, Math.min(gY * 0.22, 80), 22, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  // 구름 (시차)
+  ctx.fillStyle = P.cloud;
+  const csc = sc * 0.55, drift = animT * 1.2;
+  for (const c of decor.clouds) {
+    const span = (T.maxX - T.minX) + 640;
+    let cx = ((c.x + drift - T.minX + 320) % span) + T.minX - 320;
+    const px = cw / 2 + (cx - view.cx) * csc, py = gY - c.y * csc - 10;
+    const r = Math.max(6, c.r * csc);
+    ctx.beginPath(); ctx.ellipse(px, py, r * 2.2, r, 0, 0, 7); ctx.ellipse(px + r * 1.2, py - r * 0.5, r * 1.3, r * 0.9, 0, 0, 7); ctx.ellipse(px - r * 1.1, py - r * 0.2, r, r * 0.7, 0, 0, 7); ctx.fill();
+  }
+  // 먼 언덕 (시차)
+  const hsc = sc * 0.5;
+  ctx.fillStyle = P.hillFar;
+  ctx.beginPath(); ctx.moveTo(0, gY);
+  for (let px = 0; px <= cw + 8; px += 8) {
+    const u = (px - cw / 2) / hsc + view.cx * 0.5;
+    const h = 16 + 9 * Math.sin(u / 41) + 6 * Math.sin(u / 17 + 1.3) + 3 * Math.sin(u / 7.3);
+    ctx.lineTo(px, gY - h * hsc);
+  }
+  ctx.lineTo(cw, gY); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = P.hillNear;
+  ctx.beginPath(); ctx.moveTo(0, gY);
+  for (let px = 0; px <= cw + 8; px += 8) {
+    const u = (px - cw / 2) / (sc * 0.75) + view.cx * 0.75;
+    const h = 5 + 4 * Math.sin(u / 23 + 2) + 2.5 * Math.sin(u / 9.1);
+    ctx.lineTo(px, gY - h * sc * 0.75);
+  }
+  ctx.lineTo(cw, gY); ctx.closePath(); ctx.fill();
+
+  // 높이 격자
+  const step = niceStep(40 / sc * 1.6);
+  ctx.lineWidth = 1; ctx.strokeStyle = P.grid; ctx.font = '600 11px "IBM Plex Sans KR", system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  const topY = wy(0);
+  for (let h = step; h <= topY + step; h += step) {
+    const y = Math.round(sy(h)) + 0.5;
+    if (y < 0 || y > gY) continue;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
+  }
+  // 나무 (뒤쪽)
+  for (const t of decor.trees) if (t.back) drawTree(ctx, P, t, 0.85);
+  // 지면
+  const grd = ctx.createLinearGradient(0, gY, 0, ch);
+  grd.addColorStop(0, P.ground); grd.addColorStop(1, P.groundDark);
+  ctx.fillStyle = grd; ctx.fillRect(0, gY, cw, ch - gY);
+  ctx.fillStyle = P.groundDark; ctx.fillRect(0, gY, cw, 2);
+
+  drawSupports(ctx, P);
+  drawStations(ctx, P);
+  for (const t of decor.trees) if (!t.back) drawTree(ctx, P, t, 1);
+  drawGLimitsGlow(ctx, P);
+  drawTrack(ctx, P);
+  if (state.energyLine) drawEnergyLine(ctx, P);
+  if (!running) drawAnnotations(ctx, P);
+  drawMarkers(ctx, P);
+  drawTrain(ctx, P);
+  if (!running) drawPoints(ctx, P);
+  if (hoverS !== null) drawHover(ctx, P);
+
+  // 격자 라벨 (맨 위에)
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '600 11px "IBM Plex Mono", ui-monospace, monospace';
+  for (let h = step; h <= topY + step; h += step) {
+    const y = sy(h);
+    if (y < 12 || y > gY - 6) continue;
+    const label = h + ' m';
+    const w = ctx.measureText(label).width + 8;
+    ctx.fillStyle = P.labelBg; ctx.fillRect(4, y - 8, w, 16);
+    ctx.fillStyle = P.gridLabel; ctx.fillText(label, 8, y);
+  }
+  // 가로 거리 눈금
+  const xstep = niceStep(90 / sc);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillStyle = P.groundText;
+  for (let x = Math.ceil(wx(0) / xstep) * xstep; x <= wx(cw); x += xstep) {
+    const px = sx(x);
+    ctx.fillRect(px - 0.5, gY + 2, 1, 5);
+    ctx.fillText(fmt(Math.round(x) || 0, 0) + ' m', px, gY + 8);
+  }
+}
+
+function niceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-9))));
+  const f = raw / p;
+  return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p;
+}
+
+function drawTree(ctx, P, t, a) {
+  const px = sx(t.x), gy = sy(0), sc = view.scale;
+  if (px < -40 || px > cw + 40) return;
+  const h = t.h * sc, w = Math.max(3, t.h * 0.42 * t.w * sc);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = P.trunk; ctx.fillRect(px - Math.max(1, 0.25 * sc), gy - h * 0.45, Math.max(2, 0.5 * sc), h * 0.45);
+  ctx.fillStyle = t.back ? P.treeDark : P.tree;
+  ctx.beginPath(); ctx.ellipse(px, gy - h * 0.62, w, h * 0.4, 0, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawSupports(ctx, P) {
+  const T = track, sc = view.scale, gy = sy(0);
+  const every = Math.round((sc < 3 ? 10 : 5) / DS);
+  ctx.lineCap = 'butt';
+  for (let i = 0; i < T.N; i += every) {
+    if (T.cos[i] < 0.5 || T.Y[i] < 1.4 || T.seg[i] === STATION) continue;
+    // 아래로 다른 레일이 지나가면(루프 안쪽 등) 생략
+    const x = T.X[i], y = T.Y[i] - 0.6;
+    const px = sx(x), py = sy(y);
+    if (px < -20 || px > cw + 20) continue;
+    const hgt = y;
+    const spread = sc < 3 ? 0 : Math.min(hgt * 0.07, 2.2) * sc;
+    ctx.strokeStyle = P.support; ctx.lineWidth = Math.max(1.2, 0.32 * sc);
+    ctx.beginPath();
+    if (spread === 0) { ctx.moveTo(px, py); ctx.lineTo(px, gy); }
+    else { ctx.moveTo(px, py); ctx.lineTo(px - spread, gy); ctx.moveTo(px, py); ctx.lineTo(px + spread, gy); }
+    ctx.stroke();
+    if (sc > 2.5 && hgt > 8) {
+      // 두 다리 사이의 가로·대각 보강재 (높이 yy에서 다리 사이 반폭 = spread × (1 − yy/hgt))
+      ctx.strokeStyle = P.supportDark; ctx.lineWidth = Math.max(0.8, 0.14 * sc);
+      ctx.beginPath();
+      let side = 1;
+      for (let yy = 4; yy < hgt - 3; yy += 4) {
+        const o1 = spread * (1 - yy / hgt), o2 = spread * (1 - Math.min(hgt, yy + 4) / hgt);
+        ctx.moveTo(px - o1, sy(yy)); ctx.lineTo(px + o1, sy(yy));
+        ctx.moveTo(px - side * o1, sy(yy)); ctx.lineTo(px + side * o2, sy(yy + 4));
+        side = -side;
+      }
+      ctx.stroke();
+    }
+  }
+}
+
+function drawStations(ctx, P) {
+  const T = track, sc = view.scale;
+  const blocks = segRuns(STATION);
+  blocks.forEach(([a, b], bi) => {
+    let x0 = Infinity, x1 = -Infinity, ys = 0;
+    for (let i = a; i <= b; i++) { x0 = Math.min(x0, T.X[i]); x1 = Math.max(x1, T.X[i]); ys += T.Y[i]; }
+    const y = ys / (b - a + 1);
+    const px0 = sx(x0 - 1), px1 = sx(x1 + 1), floor = sy(y - 0.7), gy = sy(0), roof = sy(y + 4.6);
+    ctx.fillStyle = P.stationWall; ctx.fillRect(px0, floor, px1 - px0, gy - floor);
+    ctx.fillStyle = P.station; ctx.fillRect(px0, floor - Math.max(1, 0.25 * sc), px1 - px0, Math.max(2, 0.5 * sc));
+    ctx.fillStyle = P.roof;
+    ctx.beginPath(); ctx.moveTo(px0 - 1.2 * sc, roof); ctx.lineTo(px1 + 1.2 * sc, roof); ctx.lineTo(px1 + 0.4 * sc, roof - 1.0 * sc); ctx.lineTo(px0 - 0.4 * sc, roof - 1.0 * sc); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = P.supportDark;
+    const posts = Math.max(2, Math.round((x1 - x0) / 7));
+    for (let k = 0; k <= posts; k++) { const px = px0 + (px1 - px0) * k / posts; ctx.fillRect(px - Math.max(0.6, 0.12 * sc), roof, Math.max(1.2, 0.24 * sc), floor - roof); }
+    if (sc > 1.6) {
+      ctx.font = `700 ${Math.round(clamp(sc * 1.1, 10, 14))}px "IBM Plex Sans KR", system-ui, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = P.text;
+      const label = bi === 0 && a === 0 ? '승강장 · 출발' : (b >= T.N - 2 ? '승강장 · 도착' : '정거장');
+      ctx.fillStyle = P.labelBg; const w = ctx.measureText(label).width + 10; ctx.fillRect((px0 + px1) / 2 - w / 2, roof - 1.1 * sc - 18, w, 17);
+      ctx.fillStyle = P.text; ctx.fillText(label, (px0 + px1) / 2, roof - 1.1 * sc - 3);
+    }
+  });
+}
+
+function trackPath(ctx, off, a, b, step) {
+  const T = track;
+  ctx.beginPath();
+  for (let i = a; i <= b; i += step) {
+    const x = T.X[i] + T.sin[i] * off, y = T.Y[i] - T.cos[i] * off;
+    if (i === a) ctx.moveTo(sx(x), sy(y)); else ctx.lineTo(sx(x), sy(y));
+  }
+  const x = T.X[b] + T.sin[b] * off, y = T.Y[b] - T.cos[b] * off;
+  ctx.lineTo(sx(x), sy(y));
+}
+function segRuns(code) {
+  const T = track, out = [];
+  let st = -1;
+  for (let i = 0; i < T.N; i++) {
+    const on = i < T.N - 1 && T.seg[i] === code;
+    if (on && st < 0) st = i;
+    if (!on && st >= 0) { out.push([st, i]); st = -1; }
+  }
+  return out;
+}
+function drawTrack(ctx, P) {
+  const T = track, sc = view.scale;
+  const step = sc < 1.5 ? 4 : sc < 4 ? 2 : 1;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // 아래 뼈대
+  ctx.strokeStyle = P.spine; ctx.lineWidth = Math.max(2, 0.42 * sc);
+  trackPath(ctx, 0.55, 0, T.N - 1, step); ctx.stroke();
+  // 연결 침목
+  if (sc >= 4) {
+    ctx.strokeStyle = P.tie; ctx.lineWidth = Math.max(1, 0.12 * sc); ctx.beginPath();
+    for (let i = 0; i < T.N; i += 6) {
+      ctx.moveTo(sx(T.X[i]), sy(T.Y[i])); ctx.lineTo(sx(T.X[i] + T.sin[i] * 0.55), sy(T.Y[i] - T.cos[i] * 0.55));
+    }
+    ctx.stroke();
+  }
+  // 브레이크 핀
+  ctx.strokeStyle = P.brake; ctx.lineWidth = Math.max(3, 0.55 * sc);
+  for (const [a, b] of segRuns(BRAKE)) { trackPath(ctx, 0.55, a, b, step); ctx.stroke(); }
+  if (sc >= 2.2) {
+    ctx.lineWidth = Math.max(1, 0.18 * sc); ctx.beginPath();
+    for (const [a, b] of segRuns(BRAKE)) for (let i = a; i <= b; i += 3) {
+      ctx.moveTo(sx(T.X[i] + T.sin[i] * 0.3), sy(T.Y[i] - T.cos[i] * 0.3)); ctx.lineTo(sx(T.X[i] + T.sin[i] * 1.0), sy(T.Y[i] - T.cos[i] * 1.0));
+    }
+    ctx.stroke();
+  }
+  // 레일
+  ctx.strokeStyle = P.rail; ctx.lineWidth = Math.max(2.4, 0.3 * sc);
+  trackPath(ctx, 0, 0, T.N - 1, step); ctx.stroke();
+  if (sc >= 3) { ctx.strokeStyle = P.railHi; ctx.lineWidth = Math.max(1, 0.08 * sc); trackPath(ctx, -0.08, 0, T.N - 1, step); ctx.stroke(); }
+  // 체인
+  if (sc >= 1.2) {
+    ctx.strokeStyle = P.chain; ctx.lineWidth = Math.max(1.2, 0.16 * sc);
+    ctx.setLineDash([Math.max(2, 0.35 * sc), Math.max(2, 0.3 * sc)]);
+    ctx.lineDashOffset = -animT * state.phys.liftSpeed * sc;
+    for (const [a, b] of segRuns(LIFT)) { trackPath(ctx, 0.28, a, b, step); ctx.stroke(); }
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+  }
+  // 구간 이름표
+  if (!running && sc >= 1.0) {
+    ctx.font = '700 11px "IBM Plex Sans KR", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const done = new Set();
+    for (const code of [LIFT, BRAKE]) for (const [a, b] of segRuns(code)) {
+      const i = (a + b) >> 1, key = code + ':' + a;
+      if (done.has(key)) continue; done.add(key);
+      const px = sx(T.X[i] + T.sin[i] * 3.2), py = sy(T.Y[i] - T.cos[i] * 3.2) + 6;
+      const label = SEG_NAME[code];
+      const w = ctx.measureText(label).width + 10;
+      ctx.fillStyle = P.labelBg; ctx.fillRect(px - w / 2, py - 9, w, 18);
+      ctx.fillStyle = code === LIFT ? P.text : P.brake; ctx.fillText(label, px, py);
+    }
+  }
+}
+
+function drawGLimitsGlow(ctx, P) {
+  if (!A) return;
+  const T = track, g = A.rec.G, sc = view.scale;
+  ctx.strokeStyle = P.bad; ctx.globalAlpha = 0.35; ctx.lineWidth = Math.max(8, 1.6 * sc); ctx.lineCap = 'round';
+  let st = -1;
+  for (let i = 0; i <= T.N; i++) {
+    const bad = i < T.N && Number.isFinite(g[i]) && (g[i] > LIMITS.maxG || g[i] < LIMITS.minG);
+    if (bad && st < 0) st = i;
+    if (!bad && st >= 0) { trackPath(ctx, 0, st, Math.min(T.N - 1, i), 1); ctx.stroke(); st = -1; }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawEnergyLine(ctx, P) {
+  if (!A) return;
+  const T = track, v = A.rec.v;
+  ctx.strokeStyle = P.energy; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  let pen = false;
+  for (let i = 0; i < T.N; i += 2) {
+    if (!Number.isFinite(v[i])) { pen = false; continue; }
+    const hE = T.Y[i] + v[i] * v[i] / (2 * G);
+    const px = sx(T.X[i]), py = sy(hE);
+    if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py);
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+  // 이름표는 첫 골짜기 위쪽(리프트 정상 이름표와 겹치지 않는 곳)에 단다
+  const i = R && R.firstValley ? R.firstValley.i : T.releaseIdx;
+  if (Number.isFinite(v[i])) {
+    const hE = T.Y[i] + v[i] * v[i] / (2 * G);
+    const px = sx(T.X[i]) + 14, py = sy(hE) - 12;
+    ctx.font = '700 11px "IBM Plex Sans KR", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const label = `역학적 에너지 높이 ${fmt(hE, 1)} m`;
+    const w = ctx.measureText(label).width + 10;
+    ctx.fillStyle = P.labelBg; ctx.fillRect(px - 5, py - 9, w, 18);
+    ctx.fillStyle = P.energy; ctx.fillText(label, px, py);
+  }
+}
+
+function drawAnnotations(ctx, P) {
+  if (!R || !R.firstValley) return;
+  const T = track, c = R.crestIdx, v = R.firstValley.i;
+  const xV = T.X[v] + 4;
+  const pTop = sy(T.Y[c]), pBot = sy(T.Y[v]), px = sx(xV);
+  ctx.strokeStyle = P.text; ctx.globalAlpha = 0.55; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(sx(T.X[c]), pTop); ctx.lineTo(px + 6, pTop); ctx.stroke(); ctx.setLineDash([]);
+  ctx.globalAlpha = 0.85; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(px, pTop); ctx.lineTo(px, pBot);
+  ctx.moveTo(px - 4, pTop + 6); ctx.lineTo(px, pTop); ctx.lineTo(px + 4, pTop + 6);
+  ctx.moveTo(px - 4, pBot - 6); ctx.lineTo(px, pBot); ctx.lineTo(px + 4, pBot - 6); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.font = '700 11px "IBM Plex Sans KR", system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const label = `첫 낙하 ${fmt(R.drop, 1)} m`;
+  const w = ctx.measureText(label).width + 10, ly = (pTop + pBot) / 2;
+  ctx.fillStyle = P.labelBg; ctx.fillRect(px + 6, ly - 9, w, 18);
+  ctx.fillStyle = P.text; ctx.fillText(label, px + 11, ly);
+  // 언덕·골짜기 높이
+  ctx.font = '600 10px "IBM Plex Mono", ui-monospace, monospace'; ctx.textAlign = 'center';
+  for (const r of R.rows) {
+    const i = r.i, up = T.cos[i] >= 0 ? 1 : -1;
+    const isHill = r.name.indexOf('골짜기') < 0;
+    const off = (isHill ? 2.6 : -2.2) * up;
+    const px2 = sx(T.X[i] - T.sin[i] * off), py2 = sy(T.Y[i] + T.cos[i] * off) + (isHill ? -4 : 6);
+    const t = fmt(r.h, 1) + ' m';
+    const w2 = ctx.measureText(t).width + 8;
+    ctx.fillStyle = P.labelBg; ctx.fillRect(px2 - w2 / 2, py2 - 7, w2, 14);
+    ctx.fillStyle = P.gridLabel; ctx.fillText(t, px2, py2);
+  }
+}
+
+function drawMarkers(ctx, P) {
+  if (!R) return;
+  const T = track, pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+  for (const m of R.markers) {
+    const p = sampleTrack(T, m.s, {});
+    const px = sx(p.x), py = sy(p.y);
+    ctx.strokeStyle = P.bad; ctx.lineWidth = 2.5;
+    ctx.globalAlpha = 0.5 + 0.5 * pulse;
+    ctx.beginPath(); ctx.arc(px, py, 10 + 4 * pulse, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.font = '700 12px "IBM Plex Sans KR", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const w = Math.max(ctx.measureText(m.a).width, ctx.measureText(m.b).width * 0.9) + 14;
+    const by = py - 44;
+    ctx.fillStyle = P.bad; roundRect(ctx, px - w / 2, by - 15, w, 32, 6); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(px - 5, by + 17); ctx.lineTo(px + 5, by + 17); ctx.lineTo(px, by + 23); ctx.fill();
+    ctx.fillStyle = '#FFFFFF'; ctx.fillText(m.a, px, by - 5);
+    ctx.font = '500 10px "IBM Plex Sans KR", system-ui, sans-serif'; ctx.fillText(m.b, px, by + 8);
+  }
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function drawPoints(ctx, P) {
+  const pts = state.points;
+  for (let i = 0; i < pts.length; i++) {
+    const px = sx(pts[i].x), py = sy(pts[i].y);
+    const sel = i === state.sel, hov = i === hoverPt;
+    ctx.beginPath(); ctx.arc(px, py, sel ? 8 : hov ? 7.5 : 6, 0, 7);
+    ctx.fillStyle = sel ? P.sel : P.point; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = sel ? P.point : P.pointStroke; ctx.stroke();
+    if (sel && running === false) { ctx.beginPath(); ctx.arc(px, py, 13, 0, 7); ctx.strokeStyle = P.sel; ctx.globalAlpha = 0.4; ctx.stroke(); ctx.globalAlpha = 1; }
+  }
+  const i = hoverPt >= 0 ? hoverPt : state.sel;
+  if (i >= 0 && i < pts.length) {
+    const p = pts[i];
+    const px = sx(p.x), py = sy(p.y);
+    ctx.font = '700 12px "IBM Plex Mono", ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const t = `h ${fmt(p.y, 1)} m · x ${fmt(p.x, 1)} m`;
+    const w = ctx.measureText(t).width + 14;
+    const by = py + 26 < ch - 10 ? py + 26 : py - 26;
+    ctx.fillStyle = P.text; roundRect(ctx, px - w / 2, by - 11, w, 22, 6); ctx.fill();
+    ctx.fillStyle = P.textInv; ctx.fillText(t, px, by);
+  }
+}
+
+function drawHover(ctx, P) {
+  const p = sampleTrack(track, hoverS, {});
+  const px = sx(p.x), py = sy(p.y);
+  ctx.strokeStyle = P.text; ctx.globalAlpha = 0.5; ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, ch); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  ctx.fillStyle = P.energy; ctx.beginPath(); ctx.arc(px, py, 6, 0, 7); ctx.fill();
+  ctx.strokeStyle = P.point; ctx.lineWidth = 2; ctx.stroke();
+}
+
+function drawTrain(ctx, P) {
+  if (!A) return;
+  const T = track, C = A.C, sc = view.scale;
+  const S = live || { s: A.S.s0, v: 0, G: 1 };
+  const L = C.trainLen;
+  const armsUp = S.G < 0.6 || (S.v > 15 && S.sin < -0.25);
+  const rows = Math.min(2, Math.ceil(C.riders / 2));
+  const o = {};
+  for (let c = 0; c < C.cars; c++) {
+    const s = S.s + L / 2 - CAR_LEN * (c + 0.5);
+    sampleTrack(T, s, o);
+    ctx.save();
+    ctx.translate(sx(o.x), sy(o.y));
+    ctx.rotate(-o.ang);
+    ctx.scale(sc, -sc);
+    // 바퀴
+    ctx.fillStyle = P.spine;
+    ctx.beginPath(); ctx.arc(-0.85, 0.12, 0.2, 0, 7); ctx.arc(0.85, 0.12, 0.2, 0, 7); ctx.fill();
+    ctx.fillRect(-1.25, 0.18, 2.5, 0.22);
+    // 몸체
+    ctx.fillStyle = P.car;
+    ctx.beginPath();
+    if (c === 0) { ctx.moveTo(-1.3, 0.4); ctx.lineTo(1.25, 0.4); ctx.quadraticCurveTo(1.75, 0.55, 1.45, 1.15); ctx.lineTo(1.0, 1.15); ctx.lineTo(0.85, 0.95); ctx.lineTo(-1.3, 0.95); }
+    else { ctx.moveTo(-1.3, 0.4); ctx.lineTo(1.3, 0.4); ctx.lineTo(1.3, 0.95); ctx.lineTo(-1.3, 0.95); }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = P.stripe; ctx.fillRect(-1.3, 0.58, c === 0 ? 2.65 : 2.6, 0.13);
+    // 좌석 등받이
+    ctx.fillStyle = P.carDark;
+    ctx.fillRect(-1.2, 0.95, 0.22, 0.75); ctx.fillRect(-0.05, 0.95, 0.22, 0.75);
+    // 승객
+    for (let r = 0; r < rows; r++) {
+      const x = r === 0 ? 0.55 : -0.6;
+      ctx.strokeStyle = P.shirt; ctx.lineWidth = 0.3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, 1.0); ctx.lineTo(x, 1.5); ctx.stroke();
+      ctx.strokeStyle = P.skin; ctx.lineWidth = 0.13;
+      ctx.beginPath();
+      if (armsUp) { ctx.moveTo(x, 1.45); ctx.lineTo(x + 0.15, 2.2); ctx.moveTo(x, 1.45); ctx.lineTo(x - 0.12, 2.15); }
+      else { ctx.moveTo(x, 1.4); ctx.lineTo(x + 0.4, 1.15); }
+      ctx.stroke();
+      ctx.fillStyle = P.skin; ctx.beginPath(); ctx.arc(x, 1.78, 0.25, 0, 7); ctx.fill();
+    }
+    ctx.restore();
+  }
+  if (sc < 3.5) {
+    const p = sampleTrack(T, S.s, o);
+    ctx.strokeStyle = P.car; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y + 1), Math.max(12, L * sc * 0.6), 0, 7); ctx.stroke();
+  }
+}
+
+/* =========================================================
+   그래프
+   ========================================================= */
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+const chartPad = { l: 62, r: 50, t: 12, b: 26 };
+function chartX(s) { return chartPad.l + (s / track.length) * (chartW - chartPad.l - chartPad.r); }
+function chartS(px) { return clamp((px - chartPad.l) / (chartW - chartPad.l - chartPad.r), 0, 1) * track.length; }
+
+function drawChart() {
+  const ctx = cctx, T = track, rec = A.rec, C = A.C;
+  ctx.setTransform(cdpr, 0, 0, cdpr, 0, 0);
+  ctx.clearRect(0, 0, chartW, chartH);
+  const ink = cssVar('--ink'), muted = cssVar('--muted'), line = cssVar('--line');
+  const cPE = cssVar('--pe'), cKE = cssVar('--ke'), cHeat = cssVar('--heat'), cElec = cssVar('--elec'), cBad = cssVar('--bad'), cOK = cssVar('--ok-bg');
+  const x0 = chartPad.l, x1 = chartW - chartPad.r, y0 = chartH - chartPad.b, y1 = chartPad.t;
+  let iA = -1, iB = -1;
+  for (let i = 0; i < T.N; i++) if (Number.isFinite(rec.v[i])) { if (iA < 0) iA = i; iB = i; }
+  const legend = $('chartLegend');
+  ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace';
+  const yAxis = (max, min, unit, side) => {
+    const st = niceStep((max - min) / 4);
+    ctx.fillStyle = muted; ctx.textBaseline = 'middle'; ctx.textAlign = side === 'l' ? 'right' : 'left';
+    ctx.strokeStyle = line; ctx.lineWidth = 1;
+    for (let v = Math.ceil(min / st) * st; v <= max + 1e-9; v += st) {
+      const y = y0 - (v - min) / (max - min) * (y0 - y1);
+      if (side === 'l') { ctx.beginPath(); ctx.moveTo(x0, Math.round(y) + 0.5); ctx.lineTo(x1, Math.round(y) + 0.5); ctx.stroke(); }
+      ctx.fillText(fmt(v, st < 1 ? 1 : 0), side === 'l' ? x0 - 6 : x1 + 6, y);
+    }
+    ctx.save(); ctx.translate(side === 'l' ? 11 : chartW - 9, (y0 + y1) / 2); ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center'; ctx.fillText(unit, 0, 0); ctx.restore();
+  };
+  const xAxis = () => {
+    const st = niceStep(T.length / 6);
+    ctx.fillStyle = muted; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let s = 0; s <= T.length; s += st) ctx.fillText(fmt(s, 0), chartX(s), y0 + 6);
+    ctx.textAlign = 'left'; ctx.fillText('거리(m)', 2, y0 + 6);
+  };
+  const path = (fn, a, b) => {
+    ctx.beginPath(); let pen = false;
+    for (let i = a; i <= b; i++) {
+      const v = fn(i);
+      if (!Number.isFinite(v)) { pen = false; continue; }
+      const px = chartX(i * DS), py = v;
+      if (!pen) { ctx.moveTo(px, py); pen = true; } else ctx.lineTo(px, py);
+    }
+  };
+  const area = (fnTop, color, a, b, ymap) => {
+    if (a < 0) return;
+    ctx.beginPath(); ctx.moveTo(chartX(a * DS), ymap(0));
+    for (let i = a; i <= b; i++) ctx.lineTo(chartX(i * DS), ymap(fnTop(i)));
+    ctx.lineTo(chartX(b * DS), ymap(0)); ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+  };
+
+  if (state.chartMode === 'energy') {
+    legend.innerHTML = `<span><i class="dot pe"></i>위치 에너지</span><span><i class="dot ke"></i>운동 에너지</span><span><i class="dot heat"></i>열에너지</span><span><i class="dot elec"></i>전기 에너지</span><span style="color:${ink}"><i class="ln"></i>역학적 에너지 (위치+운동)</span><span style="color:${muted}"><i class="ln dash"></i>넣어 준 에너지 합</span>`;
+    const M = C.M, E0 = A.S.E0;
+    const pe = i => M * G * T.Y[i] / 1000, ke = i => 0.5 * M * rec.v[i] * rec.v[i] / 1000;
+    const ht = i => Math.max(0, rec.heat[i]) / 1000, el = i => Math.max(0, rec.elec[i]) / 1000;
+    let max = 1;
+    for (let i = iA; i >= 0 && i <= iB; i++) max = Math.max(max, (E0 + rec.motor[i]) / 1000, pe(i) + ke(i) + ht(i) + el(i));
+    max *= 1.08;
+    const ym = v => y0 - v / max * (y0 - y1);
+    yAxis(max, 0, '에너지 (kJ)', 'l');
+    if (iA >= 0) {
+      area(i => pe(i) + ke(i) + ht(i) + el(i), cElec, iA, iB, ym);
+      area(i => pe(i) + ke(i) + ht(i), cHeat, iA, iB, ym);
+      area(i => pe(i) + ke(i), cKE, iA, iB, ym);
+      area(i => pe(i), cPE, iA, iB, ym);
+      ctx.strokeStyle = muted; ctx.lineWidth = 1.4; ctx.setLineDash([6, 4]);
+      path(i => ym((E0 + rec.motor[i]) / 1000), iA, iB); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = ink; ctx.lineWidth = 2;
+      path(i => ym(pe(i) + ke(i)), iA, iB); ctx.stroke();
+    }
+  } else if (state.chartMode === 'speed') {
+    legend.innerHTML = `<span style="color:${cKE}"><i class="ln"></i>속력 (시뮬레이션)</span><span style="color:${ink}"><i class="ln dash"></i>속력 이론값 (마찰 없음)</span><span><i class="dot" style="background:${line}"></i>레일 높이 (오른쪽 축)</span><span style="color:${cBad}"><i class="ln dash"></i>속력 제한</span>`;
+    let vmax = LIMITS.maxV * 1.08;
+    for (let i = iA; i >= 0 && i <= iB; i++) vmax = Math.max(vmax, rec.v[i] * 1.08);
+    const hmax = Math.max(10, T.maxY * 1.1);
+    const yv = v => y0 - v / vmax * (y0 - y1), yh = h => y0 - h / hmax * (y0 - y1);
+    ctx.globalAlpha = 0.6; area(i => Math.max(0, T.Y[i]), line, 0, T.N - 1, yh); ctx.globalAlpha = 1;
+    yAxis(vmax, 0, '속력 (m/s)', 'l');
+    yAxis(hmax, 0, '높이 (m)', 'r');
+    ctx.strokeStyle = cBad; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(x0, yv(LIMITS.maxV)); ctx.lineTo(x1, yv(LIMITS.maxV)); ctx.stroke();
+    ctx.strokeStyle = ink; ctx.lineWidth = 1.4; ctx.setLineDash([6, 4]);
+    path(i => yv(A.theory[i]), 0, T.N - 1); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = cKE; ctx.lineWidth = 2.2;
+    if (iA >= 0) { path(i => yv(rec.v[i]), iA, iB); ctx.stroke(); }
+  } else {
+    legend.innerHTML = `<span style="color:${cPE}"><i class="ln"></i>수직 G</span><span><i class="dot" style="background:${cOK};border:1px solid ${line}"></i>안전 범위 -1.5 ~ 5.0 G</span><span style="color:${ink}"><i class="ln dash"></i>1 G (평소)</span>`;
+    let gmax = 6, gmin = -2;
+    for (let i = iA; i >= 0 && i <= iB; i++) { gmax = Math.max(gmax, rec.G[i] + 0.5); gmin = Math.min(gmin, rec.G[i] - 0.5); }
+    const yg = g => y0 - (g - gmin) / (gmax - gmin) * (y0 - y1);
+    ctx.fillStyle = cOK; ctx.fillRect(x0, yg(LIMITS.maxG), x1 - x0, yg(LIMITS.minG) - yg(LIMITS.maxG));
+    yAxis(gmax, gmin, '수직 G', 'l');
+    ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(x0, yg(1)); ctx.lineTo(x1, yg(1)); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = cPE; ctx.lineWidth = 2;
+    if (iA >= 0) { path(i => yg(rec.G[i]), iA, iB); ctx.stroke(); }
+    ctx.fillStyle = cBad;
+    for (let i = iA; i >= 0 && i <= iB; i += 2) if (rec.G[i] > LIMITS.maxG || rec.G[i] < LIMITS.minG) { ctx.beginPath(); ctx.arc(chartX(i * DS), yg(rec.G[i]), 2.2, 0, 7); ctx.fill(); }
+  }
+  xAxis();
+  ctx.strokeStyle = muted; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x0, y0 + 0.5); ctx.lineTo(x1, y0 + 0.5); ctx.stroke();
+  // 현재 위치
+  const cur = live ? live.s : null;
+  if (cur !== null) {
+    ctx.strokeStyle = cssVar('--accent'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(chartX(cur), y1); ctx.lineTo(chartX(cur), y0); ctx.stroke();
+  }
+  if (hoverS !== null) {
+    ctx.strokeStyle = ink; ctx.globalAlpha = 0.6; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(chartX(hoverS), y1); ctx.lineTo(chartX(hoverS), y0); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+}
+
+function showChartTip(px) {
+  const tip = $('chartTip');
+  const s = chartS(px), i = clamp(Math.round(s / DS), 0, track.N - 1);
+  hoverS = s;
+  const rec = A.rec, M = A.C.M, v = rec.v[i];
+  let html = `<div>이동 거리 <b>${fmt(s, 0)} m</b> · 높이 <b>${fmt(track.Y[i], 1)} m</b></div>`;
+  if (Number.isFinite(v)) {
+    html += `<div>속력 <b>${fmt(v, 1)} m/s</b> (${fmt(v * 3.6, 0)} km/h) · <b>${fmt(rec.G[i], 2)} G</b></div>`;
+    html += `<div style="color:var(--pe)">위치 E <b>${kJ(M * G * track.Y[i])} kJ</b></div><div style="color:var(--ke)">운동 E <b>${kJ(0.5 * M * v * v)} kJ</b></div>`;
+    if (rec.heat[i] > 1) html += `<div style="color:var(--heat)">열 E <b>${kJ(rec.heat[i])} kJ</b></div>`;
+    if (rec.elec[i] > 1) html += `<div style="color:var(--elec)">전기 E <b>${kJ(rec.elec[i])} kJ</b></div>`;
+  } else html += '<div>열차가 도달하지 못한 구간</div>';
+  tip.innerHTML = html; tip.hidden = false;
+  const w = tip.offsetWidth;
+  tip.style.left = (px + 14 + w < chartW ? px + 14 : px - 14 - w) + 'px';
+  sceneDirty = chartDirty = true;
+}
+
+/* =========================================================
+   계기판
+   ========================================================= */
+function convText(S) {
+  if (!S) return '정거장에서 출발을 기다리는 중';
+  if (S.done) return S.success ? '도착! 정거장에서 정지했습니다' : '운행이 멈췄습니다';
+  const fr = state.phys.friction ? ' · 일부는 마찰로 열에너지' : '';
+  if (S.seg === LIFT && S.v <= state.phys.liftSpeed + 0.05) return '체인 리프트 모터: 전기 에너지 → 위치 에너지';
+  if (S.seg === STATION) return S.s < track.releaseS ? '정거장 바퀴가 열차를 밀어 출발시키는 중' : '도착 정거장으로 들어가는 중';
+  if (S.seg === BRAKE && S.v > A.C.brakeMin + 0.05) return '자석 브레이크: 운동 에너지 → 전기 에너지 (전자기 유도)';
+  const climb = S.v * S.sin;
+  if (S.cos < 0) return '루프 안: 뒤집힌 채 원운동 중' + fr;
+  if (climb < -0.6) return '내려가는 중: 위치 에너지 → 운동 에너지' + fr;
+  if (climb > 0.6) return '올라가는 중: 운동 에너지 → 위치 에너지' + fr;
+  return '높이가 거의 그대로: 역학적 에너지 유지' + fr;
+}
+function gLabel(g) {
+  if (g > LIMITS.maxG) return '너무 강하게 눌림';
+  if (g > 2) return `몸무게 ${fmt(g, 1)}배로 눌림`;
+  if (g > 0.6) return '평소 몸무게 정도';
+  if (g >= 0) return '몸이 가벼워짐';
+  if (g >= LIMITS.minG) return '몸이 뜸 (에어타임)';
+  return '너무 심하게 뜸';
+}
+function updateGauges(S) {
+  const C = A.C;
+  const s = S || { s: A.S.s0, v: 0, G: 1, t: 0, h: heightAt(track, A.S.s0), heat: 0, elec: 0, motorW: 0 };
+  const v = Math.abs(s.v);
+  $('gSpeed').innerHTML = `${fmt(v * 3.6, 1)}<small>km/h</small>`;
+  $('gSpeed').classList.toggle('bad', v > LIMITS.maxV);
+  $('gSpeedMs').textContent = `${fmt(v, 1)} m/s`;
+  $('gH').innerHTML = `${fmt(s.h, 1)}<small>m</small>`;
+  $('gS').textContent = `이동 ${fmt(Math.max(0, s.s - A.S.s0), 0)} m`;
+  $('gG').textContent = fmt(s.G, 2);
+  $('gG').classList.toggle('bad', s.G > LIMITS.maxG || s.G < LIMITS.minG);
+  $('gGsub').textContent = gLabel(s.G);
+  $('gT').innerHTML = `${fmt(s.t, 1)}<small>s</small>`;
+  $('gState').textContent = !S ? '대기 중' : S.done ? (S.success ? '도착' : '정지') : paused ? '일시정지' : '운행 중';
+  const PE = C.M * G * s.h, KE = 0.5 * C.M * v * v, heat = Math.max(0, s.heat), elec = Math.max(0, s.elec);
+  const full = Math.max(1, A.S.E0 + A.S.motorW, PE + KE + heat + elec);
+  $('ebPE').style.width = (PE / full * 100) + '%';
+  $('ebKE').style.width = (KE / full * 100) + '%';
+  $('ebHeat').style.width = (heat / full * 100) + '%';
+  $('ebElec').style.width = (elec / full * 100) + '%';
+  $('evPE').textContent = kJ(PE); $('evKE').textContent = kJ(KE); $('evHeat').textContent = kJ(heat); $('evElec').textContent = kJ(elec);
+  $('evMech').textContent = kJ(PE + KE);
+  const note = $('evMechNote');
+  if (!S || !S.released) { note.textContent = S ? '모터가 에너지를 넣는 중' : ''; note.className = 'mech-note warn'; }
+  else if (S.seg === BRAKE && v > A.C.brakeMin + 0.05) { note.textContent = '브레이크에서 감소 중'; note.className = 'mech-note warn'; }
+  else if (state.phys.friction) { note.textContent = '마찰 때문에 조금씩 감소'; note.className = 'mech-note warn'; }
+  else { note.textContent = '보존되는 중 (일정)'; note.className = 'mech-note'; }
+  $('gConv').textContent = convText(S);
+}
+
+/* =========================================================
+   패널
+   ========================================================= */
+function renderPanels() {
+  const T = track, C = A.C, S = A.S;
+  // 선택한 점
+  const p = state.points[state.sel];
+  const has = !!p;
+  $('ptIdx').textContent = has ? `${state.sel + 1}번 점 / 전체 ${state.points.length}개` : '점을 눌러 선택하세요';
+  for (const id of ['ptX', 'ptY', 'delPtBtn', 'addLoopBtn', 'loopH']) $(id).disabled = !has;
+  if (has) {
+    if (document.activeElement !== $('ptX')) $('ptX').value = +p.x.toFixed(2);
+    if (document.activeElement !== $('ptY')) $('ptY').value = +p.y.toFixed(2);
+  } else { $('ptX').value = ''; $('ptY').value = ''; }
+  const last = state.sel === state.points.length - 1;
+  document.querySelectorAll('#segSeg button').forEach(b => {
+    b.disabled = !has || last;
+    b.setAttribute('aria-pressed', String(has && !last && +b.dataset.seg === p.seg));
+  });
+  // 열차
+  $('massOut').textContent = `총 질량 ${fmt(C.M, 0)} kg`;
+  // 설계 수치
+  const kmh = v => fmt(v * 3.6, 1);
+  const rows = [
+    ['레일 전체 길이', `${fmt(T.length, 0)} m`],
+    ['리프트 정상 높이', `${fmt(R.Hrel, 1)} m`],
+    ['첫 낙하 높이', `${fmt(R.drop, 1)} m`],
+    ['언덕 수 · 루프 수', `${R.hills}개 · ${R.loops}개`],
+    ['예상 최고 속력 (마찰 없음)', `${fmt(R.vMaxT, 1)} m/s (${kmh(R.vMaxT)} km/h)`],
+    ['시뮬레이션 최고 속력', `${fmt(S.maxV, 1)} m/s`],
+    ['최대 G · 최소 G', `${fmt(S.maxG, 2)} · ${fmt(S.minG, 2)}`],
+    ['브레이크 구간 길이', `${fmt(R.brakeLen, 0)} m`],
+    ['운행 시간', `${fmt(S.t, 1)} s`]
+  ];
+  $('summaryDl').innerHTML = rows.map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('');
+  if (document.activeElement !== $('codeBox')) $('codeBox').value = exportCode();
+
+  // 안전 검토
+  const vb = $('verdictBox');
+  vb.className = 'verdict ' + (R.allPass ? 'ok' : 'bad');
+  vb.innerHTML = R.allPass
+    ? `<strong>운행 승인</strong><span>안전 기준 ${R.total}개를 모두 통과했습니다. 최고 ${kmh(S.maxV)} km/h, 최대 ${fmt(S.maxG, 1)} G.</span>`
+    : `<strong>설계 수정 필요</strong><span>${R.total}개 중 ${R.passed}개 통과. 빨간 항목을 고쳐 보세요. 장면에도 문제 위치가 표시됩니다.</span>`;
+  $('checkList').innerHTML = R.checks.map(c => `<li class="${c.na ? 'na' : c.ok ? 'ok' : 'bad'}"><span class="ic">${c.na ? '–' : c.ok ? '✓' : '✕'}</span><div><div class="t">${esc(c.t)}</div><div class="d">${esc(c.d)}</div></div></li>`).join('');
+  const badge = $('reviewBadge');
+  badge.textContent = `${R.passed}/${R.total}`;
+  badge.className = 'badge ' + (R.allPass ? 'ok' : 'bad');
+  const excMsg = R.exc > 7 ? '“정말 짜릿해요! 또 탈래요!”' : R.exc > 4.5 ? '“재밌어요. 조금 더 스릴 있으면 좋겠어요.”' : '“조금 심심해요.”';
+  const intMsg = R.inten > 8 ? '“너무 무서워서 못 타겠어요…”' : R.inten > 5 ? '“꽤 강렬해요!”' : '“편안하게 탈 수 있어요.”';
+  $('ratings').innerHTML = `<div class="meter"><span>흥미도</span><span class="track"><span class="fill" style="width:${R.exc * 10}%"></span></span><b>${fmt(R.exc, 1)}</b></div>
+    <div class="meter"><span>강렬도</span><span class="track"><span class="fill" style="width:${R.inten * 10}%;background:var(--heat)"></span></span><b>${fmt(R.inten, 1)}</b></div>
+    <p class="hint">탑승객: ${excMsg} ${intMsg}</p>`;
+
+  renderCalc();
+}
+
+function renderCalc() {
+  const T = track, C = A.C, S = A.S, M = C.M;
+  const H1 = round1(R.Hrel), v1 = A.vRel, hLow = round1(T.Y[R.lowIdx]);
+  $('predInfo').textContent = `기준: 열차 질량 ${fmt(M, 0)} kg, 리프트 정상 높이 ${fmt(H1, 1)} m, 체인 속력 ${fmt(v1, 1)} m/s, 가장 낮은 지점 ${fmt(hLow, 1)} m, g = 9.8 m/s², 마찰 없음`;
+  const sh = R.secondHill;
+  $('predV2Field').hidden = !sh;
+  if (sh) $('predV2Label').textContent = `③ 두 번째 언덕 정상(높이 ${fmt(T.Y[sh.i], 1)} m)의 속력`;
+
+  // 풀이
+  const Ep = M * G * H1, Ek = 0.5 * M * v1 * v1, E = Ep + Ek;
+  const steps = [];
+  steps.push(`<li><b>열차 전체 질량</b><div class="eq">m = (${fmt(state.train.carMass, 0)} kg + ${state.train.riders}명 × ${fmt(state.train.riderMass, 0)} kg) × ${state.train.cars}량 = ${fmt(M, 0)} kg</div></li>`);
+  steps.push(`<li><b>리프트 정상의 위치 에너지</b> (체인이 풀리는 곳, 높이 h<sub>1</sub> = ${fmt(H1, 1)} m)<div class="eq">E<sub>p</sub> = mgh = ${fmt(M, 0)} × 9.8 × ${fmt(H1, 1)} = ${fmtJ(Ep)}</div></li>`);
+  steps.push(`<li><b>리프트 정상의 운동 에너지</b> (체인 속력 v<sub>1</sub> = ${fmt(v1, 1)} m/s)<div class="eq">E<sub>k</sub> = ½mv² = ½ × ${fmt(M, 0)} × ${fmt(v1, 1)}² = ${fmtJ(Ek)}</div></li>`);
+  steps.push(`<li><b>역학적 에너지</b><div class="eq">E = E<sub>p</sub> + E<sub>k</sub> = ${fmtJ(E)}</div><p>마찰이 없으면 이 값이 브레이크 전까지 일정하게 보존됩니다.</p></li>`);
+  steps.push(`<li><b>가장 낮은 지점(h<sub>2</sub> = ${fmt(hLow, 1)} m)의 속력 = 최고 속력</b><div class="eq">mgh<sub>1</sub> + ½mv<sub>1</sub>² = mgh<sub>2</sub> + ½mv<sub>2</sub>²</div><div class="eq">v<sub>2</sub> = √(v<sub>1</sub>² + 2g(h<sub>1</sub> − h<sub>2</sub>)) = √(${fmt(v1, 1)}² + 2 × 9.8 × ${fmt(H1 - hLow, 1)}) = ${fmt(R.vMaxT, 1)} m/s (${fmt(R.vMaxT * 3.6, 1)} km/h)</div><p>양쪽의 m이 약분되므로 속력은 열차 질량과 관계없습니다. 질량을 바꿔서 확인해 보세요.</p></li>`);
+  if (sh) {
+    const h = round1(T.Y[sh.i]), v = R.vAt(h);
+    steps.push(`<li><b>두 번째 언덕 정상(h = ${fmt(h, 1)} m)의 속력</b><div class="eq">v = √(${fmt(v1, 1)}² + 2 × 9.8 × (${fmt(H1, 1)} − ${fmt(h, 1)})) = ${Number.isFinite(v) ? fmt(v, 1) + ' m/s' : '계산 불가 (리프트보다 높음)'}</div><p>${h < H1 ? '언덕이 리프트 정상보다 낮아서 운동 에너지가 남아 있으므로 넘어갈 수 있습니다.' : '언덕이 역학적 에너지 높이보다 높아서 넘어갈 수 없습니다.'}</p></li>`);
+  }
+  const loopRow = R.rows.find(r => r.name === '루프 꼭대기');
+  if (loopRow) {
+    const rTop = 1 / Math.max(1e-6, Math.abs(T.k[loopRow.i]));
+    steps.push(`<li><b>루프 꼭대기(h = ${fmt(loopRow.h, 1)} m, 곡률 반지름 약 ${fmt(rTop, 1)} m)</b><div class="eq">v = √(${fmt(v1, 1)}² + 2 × 9.8 × (${fmt(H1, 1)} − ${fmt(loopRow.h, 1)})) = ${fmt(R.vAt(loopRow.h), 1)} m/s</div><div class="eq">떨어지지 않으려면 v ≥ √(g·r) = √(9.8 × ${fmt(rTop, 1)}) = ${fmt(Math.sqrt(G * rTop), 1)} m/s</div><p>꼭대기 속력이 이 값보다 커야 승객이 좌석에 눌린 채로 루프를 돕니다.</p></li>`);
+  }
+  if (R.b0 >= 0 && Number.isFinite(R.brakeIn)) {
+    const vi = R.brakeIn, vo = Number.isFinite(R.brakeOut) ? R.brakeOut : C.brakeMin;
+    const Ee = 0.5 * M * (vi * vi - vo * vo);
+    const hours = Ee / 10 / 3600;
+    steps.push(`<li><b>자석 브레이크: 운동 에너지 → 전기 에너지</b><div class="eq">½m(v<sub>들어올 때</sub>² − v<sub>나갈 때</sub>²) = ½ × ${fmt(M, 0)} × (${fmt(vi, 1)}² − ${fmt(vo, 1)}²) = ${fmtJ(Ee)}</div><p>레일 옆 자석과 열차의 금속판(코일) 사이에서 전자기 유도로 유도 전류가 흐르며 열차가 느려집니다. 이 에너지면 10 W LED 전구를 약 ${fmt(hours, 1)}시간 켤 수 있습니다.${state.phys.friction ? ' (마찰이 있으면 일부는 열에너지가 됩니다)' : ''}</p></li>`);
+  }
+  const liftW = S.motorW;
+  steps.push(`<li><b>체인 리프트와 바퀴(모터)가 한 일</b><div class="eq">W = ${fmtJ(liftW)}</div><p>모터가 전기 에너지를 써서 열차를 끌어올려 위치 에너지를 만들어 줍니다. 처음 정거장에서의 위치 에너지(${fmtJ(S.E0)})와 합한 것이 열차가 가진 모든 에너지입니다.</p></li>`);
+  if (state.phys.friction) {
+    const pct = S.heat / Math.max(1, S.E0 + S.motorW) * 100;
+    steps.push(`<li><b>마찰과 공기 저항으로 생긴 열에너지</b><div class="eq">${fmtJ(S.heat)} (넣어 준 에너지의 ${fmt(pct, 1)}%)</div><p>마찰이 있으면 역학적 에너지가 조금씩 줄어들어 뒤쪽 언덕은 이론값보다 느리게 지나갑니다. 그래도 에너지 전체(역학적 + 열 + 전기)는 보존됩니다.</p></li>`);
+  }
+  $('solSteps').innerHTML = steps.join('');
+
+  // 표
+  const head = '<tr><th>지점</th><th>높이 (m)</th><th>위치 E (kJ)</th><th>운동 E (kJ)</th><th>속력 이론 (m/s)</th><th>속력 시뮬 (m/s)</th><th>G</th></tr>';
+  const body = R.rows.map(r => {
+    const gBad = Number.isFinite(r.G) && (r.G > LIMITS.maxG || r.G < LIMITS.minG);
+    return `<tr><td>${r.name}</td><td>${fmt(r.h, 1)}</td><td>${kJ(r.PE)}</td><td>${Number.isFinite(r.KE) ? kJ(r.KE) : '-'}</td><td>${Number.isFinite(r.vT) ? fmt(r.vT, 1) : '-'}</td><td>${Number.isFinite(r.vS) ? fmt(r.vS, 1) : '도달 못함'}</td><td class="${gBad ? 'bad' : ''}">${fmt(r.G, 2)}</td></tr>`;
+  }).join('');
+  $('ptsTable').innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
+  if (document.activeElement !== $('reportBox')) $('reportBox').value = reportText();
+}
+
+function reportText() {
+  const T = track, C = A.C, S = A.S, M = C.M;
+  const kmh = v => fmt(v * 3.6, 1);
+  const lines = [];
+  lines.push('[롤러코스터 설계 요약]');
+  lines.push('■ 설계 수치');
+  lines.push(`- 레일 전체 길이: ${fmt(T.length, 0)} m`);
+  lines.push(`- 리프트 정상 높이: ${fmt(R.Hrel, 1)} m / 첫 낙하 높이: ${fmt(R.drop, 1)} m`);
+  lines.push(`- 언덕 ${R.hills}개, 루프 ${R.loops}개`);
+  lines.push(`- 열차: ${state.train.cars}량, 총 질량 ${fmt(M, 0)} kg (차량 ${fmt(state.train.carMass, 0)} kg, 1량당 승객 ${state.train.riders}명 × ${fmt(state.train.riderMass, 0)} kg)`);
+  lines.push(`- 체인 리프트 속력 ${fmt(state.phys.liftSpeed, 1)} m/s, 브레이크 감속도 ${fmt(state.phys.brakeDecel, 1)} m/s², 브레이크 구간 ${fmt(R.brakeLen, 0)} m`);
+  lines.push(`- 마찰·공기 저항: ${state.phys.friction ? `고려함 (μ = ${state.phys.mu})` : '고려하지 않음 (이상적인 경우)'}`);
+  lines.push('■ 지점별 에너지');
+  for (const r of R.rows) lines.push(`- ${r.name}: 높이 ${fmt(r.h, 1)} m, 위치 E ${kJ(r.PE)} kJ, 운동 E ${Number.isFinite(r.KE) ? kJ(r.KE) : '-'} kJ, 속력 ${Number.isFinite(r.vS) ? fmt(r.vS, 1) : '-'} m/s, ${fmt(r.G, 2)} G`);
+  lines.push('■ 시뮬레이션 결과');
+  lines.push(`- 운행 결과: ${S.success ? '도착 정거장까지 완주' : '실패 - ' + R.failText}`);
+  lines.push(`- 최고 속력: ${fmt(S.maxV, 1)} m/s (${kmh(S.maxV)} km/h), 이론값 ${fmt(R.vMaxT, 1)} m/s`);
+  lines.push(`- 최대 G ${fmt(S.maxG, 2)}, 최소 G ${fmt(S.minG, 2)}`);
+  if (S.entryV !== null) lines.push(`- 정거장 진입 속력: ${fmt(S.entryV, 1)} m/s`);
+  lines.push(`- 브레이크에서 만든 전기 에너지: ${kJ(S.elec)} kJ` + (state.phys.friction ? `, 마찰로 생긴 열에너지: ${kJ(S.heat)} kJ` : ''));
+  lines.push(`■ 안전 검토: ${R.total}개 중 ${R.passed}개 통과`);
+  for (const c of R.checks) if (!c.na) lines.push(`- [${c.ok ? '통과' : '미통과'}] ${c.t} (${c.d})`);
+  return lines.join('\n');
+}
+
+function checkPrediction() {
+  const T = track, M = A.C.M;
+  const out = [];
+  const judge = (label, val, truth, unit, d) => {
+    if (!Number.isFinite(val)) return;
+    const err = Math.abs(val - truth) / Math.max(1e-9, Math.abs(truth)) * 100;
+    const cls = err <= 3 ? 'good' : err <= 10 ? 'near' : 'off';
+    const msg = err <= 3 ? '정확해요!' : err <= 10 ? '거의 맞아요. 반올림이나 단위를 확인해 보세요.' : '차이가 커요. 풀이 과정을 다시 확인해 보세요.';
+    out.push(`<div class="${cls}"><b>${label}</b> · 내 값 ${fmt(val, d)} ${unit} / 시뮬레이터 ${fmt(truth, d)} ${unit} · 오차 ${fmt(err, 1)}% · ${msg}</div>`);
+  };
+  judge('① 위치 에너지', parseFloat($('predPE').value), M * G * round1(R.Hrel), 'J', 0);
+  judge('② 최고 속력', parseFloat($('predV').value), R.vMaxT, 'm/s', 1);
+  if (R.secondHill) {
+    const truth = R.vAt(T.Y[R.secondHill.i]), val = parseFloat($('predV2').value);
+    if (Number.isFinite(truth)) judge('③ 두 번째 언덕 속력', val, truth, 'm/s', 1);
+    else if (Number.isFinite(val)) out.push('<div class="off"><b>③ 두 번째 언덕 속력</b> · 이 언덕은 리프트 정상보다 높아서 역학적 에너지가 부족합니다. 열차는 이 언덕을 넘지 못합니다.</div>');
+  }
+  $('predRes').innerHTML = out.length ? out.join('') : '<div>예측값을 하나 이상 입력하세요.</div>';
+}
+
+/* =========================================================
+   운행
+   ========================================================= */
+function setRunUI() {
+  const b = $('runBtn');
+  const icon = running && !paused
+    ? '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="2.5" width="3" height="11" fill="currentColor"/><rect x="9.5" y="2.5" width="3" height="11" fill="currentColor"/></svg>'
+    : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>';
+  const label = running ? (paused ? '계속' : '일시정지') : '운행 시작';
+  b.innerHTML = icon + `<span>${label}</span>`;
+  document.querySelectorAll('#toolSeg button').forEach(x => x.disabled = running);
+  $('undoBtn').disabled = running || undoStack.length === 0;
+  updateHint();
+}
+function startRun() {
+  if (needsRebuild) { rebuild(); needsRebuild = false; }
+  live = newSim(track, A.C);
+  running = true; paused = false;
+  $('verdictCard').hidden = true;
+  hoverS = null; $('chartTip').hidden = true;
+  setRunUI();
+}
+function stopRun() {
+  running = false; paused = false; live = null;
+  $('verdictCard').hidden = true;
+  if (A) updateGauges(null);
+  setRunUI();
+  sceneDirty = chartDirty = true;
+}
+function finishRun() {
+  running = false; paused = false;
+  setRunUI();
+  const S = live, kmh = v => fmt(v * 3.6, 1);
+  const stamp = $('vStamp');
+  const fails = R.checks.filter(c => !c.ok && !c.na);
+  if (S.success && fails.length === 0) {
+    stamp.textContent = '운행 성공'; stamp.className = 'stamp ok';
+    $('vMsg').textContent = `안전 기준 ${R.total}개를 모두 통과했습니다. 최고 ${kmh(S.maxV)} km/h · 최대 ${fmt(S.maxG, 1)} G · ${fmt(S.t, 1)}초`;
+  } else if (S.success) {
+    stamp.textContent = '도착했지만 안전 기준 미달'; stamp.className = 'stamp bad';
+    $('vMsg').textContent = '열차는 끝까지 갔지만, 승객이 위험한 구간이 있습니다.';
+  } else {
+    stamp.textContent = '운행 실패'; stamp.className = 'stamp bad';
+    $('vMsg').textContent = R.failText;
+  }
+  $('vList').innerHTML = fails.filter(c => c.id !== 'finish').map(c => `<li><b>${esc(c.t)}</b> · ${esc(c.d)}</li>`).join('');
+  $('verdictCard').hidden = false;
+  updateGauges(S);
+}
+
+/* =========================================================
+   편집
+   ========================================================= */
+function snapshot() { return JSON.stringify({ p: state.points, t: state.train, ph: state.phys }); }
+function pushUndo() {
+  undoStack.push(snapshot());
+  if (undoStack.length > 60) undoStack.shift();
+  $('undoBtn').disabled = running || undoStack.length === 0;
+}
+function undo() {
+  if (running || !undoStack.length) return;
+  const d = JSON.parse(undoStack.pop());
+  state.points = d.p; state.train = d.t; state.phys = d.ph;
+  state.sel = Math.min(state.sel, state.points.length - 1);
+  syncInputs(); designChanged();
+  $('undoBtn').disabled = undoStack.length === 0;
+  toast('되돌렸습니다');
+}
+function snapV(v) { return state.snap ? Math.round(v * 2) / 2 : Math.round(v * 100) / 100; }
+function selectPoint(i) { state.sel = i; renderPanels(); sceneDirty = true; }
+function deletePoint(i) {
+  if (state.points.length <= 4) { toast('레일에는 점이 4개 이상 있어야 합니다'); return; }
+  pushUndo();
+  state.points.splice(i, 1);
+  state.sel = Math.min(i, state.points.length - 1);
+  designChanged();
+}
+function insertLoop(i, H) {
+  const pts = state.points;
+  if (i >= pts.length - 1) { toast('마지막 점 뒤에는 루프를 넣을 수 없습니다'); return; }
+  H = clamp(H || 22, 8, 45);
+  pushUndo();
+  const sh = loopShape(6);
+  const p = pts[i];
+  const lead = 8;
+  const add = [{ x: p.x + lead, y: p.y, seg: NORMAL }];
+  for (const q of sh.pts.slice(1)) add.push({ x: +(p.x + lead + q.x * H).toFixed(2), y: +(p.y + q.y * H).toFixed(2), seg: NORMAL });
+  const shift = lead + sh.exitX * H + 8;
+  // 루프 출구 점이 원래 이 점의 구간 종류를 이어받는다
+  add.push({ x: +(p.x + shift).toFixed(2), y: p.y, seg: p.seg });
+  p.seg = NORMAL;
+  for (let k = i + 1; k < pts.length; k++) pts[k].x += shift + 4;
+  pts.splice(i + 1, 0, ...add);
+  state.sel = i + 1;
+  designChanged();
+  view.auto = true; needsFit = true;
+  toast(`높이 ${fmt(H, 0)} m 루프를 넣었습니다. 안전 검토에서 루프 꼭대기 G를 확인하세요`);
+}
+
+/* =========================================================
+   포인터 (끌기·확대)
+   ========================================================= */
+const wrap = $('sceneWrap');
+let drag = null;
+const ptrs = new Map();
+let pinch = null;
+function localXY(e) { const r = sceneCv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function hitPoint(x, y) {
+  let best = -1, bd = 16;
+  state.points.forEach((p, i) => { const d = Math.hypot(sx(p.x) - x, sy(p.y) - y); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function nearestSample(x, y) {
+  const T = track; let best = -1, bd = Infinity;
+  for (let i = 0; i < T.N; i += 2) { const d = Math.hypot(sx(T.X[i]) - x, sy(T.Y[i]) - y); if (d < bd) { bd = d; best = i; } }
+  return { i: best, d: bd };
+}
+sceneCv.addEventListener('pointerdown', e => {
+  const { x, y } = localXY(e);
+  sceneCv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x, y });
+  if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), scale: view.scale, wx: wx((a.x + b.x) / 2), wy: wy((a.y + b.y) / 2) };
+    drag = null; return;
+  }
+  const hit = running ? -1 : hitPoint(x, y);
+  if (!running && state.tool === 'del' && hit >= 0) { deletePoint(hit); return; }
+  if (hit >= 0) { selectPoint(hit); drag = { type: 'pt', i: hit, pushed: false, x0: x, y0: y }; return; }
+  if (!running && state.tool === 'add') {
+    const ns = nearestSample(x, y);
+    if (ns.d < 28) {
+      pushUndo();
+      const pi = track.pi[ns.i];
+      state.points.splice(pi + 1, 0, { x: snapV(track.X[ns.i]), y: Math.max(0, snapV(track.Y[ns.i])), seg: state.points[pi].seg });
+      state.sel = pi + 1;
+      designChanged();
+      drag = { type: 'pt', i: pi + 1, pushed: true, x0: x, y0: y };
+      return;
+    }
+  }
+  drag = { type: 'pan', x0: x, y0: y, cx: view.cx, cy: view.cy };
+});
+sceneCv.addEventListener('pointermove', e => {
+  const { x, y } = localXY(e);
+  if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x, y });
+  if (pinch && ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    view.scale = clamp(pinch.scale * d / Math.max(1, pinch.d), 0.3, 60);
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    view.cx = pinch.wx - (mx - cw / 2) / view.scale;
+    view.cy = pinch.wy - (ch / 2 - my) / view.scale;
+    view.auto = false; state.follow = false; syncToggles(); sceneDirty = true; return;
+  }
+  if (!drag) {
+    const h = running ? -1 : hitPoint(x, y);
+    if (h !== hoverPt) { hoverPt = h; sceneDirty = true; }
+    sceneCv.style.cursor = h >= 0 ? (state.tool === 'del' ? 'not-allowed' : 'grab') : (state.tool === 'add' && !running ? 'crosshair' : 'default');
+    return;
+  }
+  if (drag.type === 'pt') {
+    if (!drag.pushed) { if (Math.hypot(x - drag.x0, y - drag.y0) < 3) return; pushUndo(); drag.pushed = true; }
+    const p = state.points[drag.i];
+    p.x = snapV(wx(x)); p.y = clamp(snapV(wy(y)), 0, 150);
+    sceneCv.style.cursor = 'grabbing';
+    designChanged();
+  } else if (drag.type === 'pan') {
+    view.cx = drag.cx - (x - drag.x0) / view.scale;
+    view.cy = drag.cy + (y - drag.y0) / view.scale;
+    if (Math.hypot(x - drag.x0, y - drag.y0) > 3) { view.auto = false; if (running && state.follow) { state.follow = false; syncToggles(); } }
+    sceneDirty = true;
+  }
+});
+function endPtr(e) {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch = null;
+  if (drag && drag.type === 'pt') renderPanels();
+  drag = null;
+}
+sceneCv.addEventListener('pointerup', endPtr);
+sceneCv.addEventListener('pointercancel', endPtr);
+sceneCv.addEventListener('pointerleave', () => { if (hoverPt !== -1) { hoverPt = -1; sceneDirty = true; } });
+sceneCv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const { x, y } = localXY(e);
+  const bx = wx(x), by = wy(y);
+  view.scale = clamp(view.scale * Math.exp(-e.deltaY * 0.0015), 0.3, 60);
+  view.cx = bx - (x - cw / 2) / view.scale;
+  view.cy = by - (ch / 2 - y) / view.scale;
+  view.auto = false;
+  if (running && state.follow) { state.follow = false; syncToggles(); }
+  sceneDirty = true;
+}, { passive: false });
+
+const chartWrapEl = $('chartWrap');
+chartCv.addEventListener('pointermove', e => { const r = chartCv.getBoundingClientRect(); showChartTip(e.clientX - r.left); });
+chartCv.addEventListener('pointerdown', e => { const r = chartCv.getBoundingClientRect(); showChartTip(e.clientX - r.left); });
+chartCv.addEventListener('pointerleave', () => { hoverS = null; $('chartTip').hidden = true; sceneDirty = chartDirty = true; });
+
+/* =========================================================
+   입력 연결
+   ========================================================= */
+function syncInputs() {
+  $('cars').value = state.train.cars; $('carMass').value = state.train.carMass; $('riders').value = state.train.riders; $('riderMass').value = state.train.riderMass;
+  $('liftSpeed').value = state.phys.liftSpeed; $('brakeDecel').value = state.phys.brakeDecel; $('frictionChk').checked = state.phys.friction; $('mu').value = state.phys.mu;
+  $('muField').hidden = !state.phys.friction;
+  $('snapChk').checked = state.snap; $('ffChk').checked = state.ff;
+  syncToggles();
+}
+function syncToggles() {
+  $('followBtn').setAttribute('aria-pressed', String(state.follow));
+  $('energyLineBtn').setAttribute('aria-pressed', String(state.energyLine));
+  document.querySelectorAll('#toolSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool)));
+  document.querySelectorAll('#rateSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.rate === state.rate)));
+  document.querySelectorAll('#chartSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.chart === state.chartMode)));
+}
+function updateHint() {
+  const h = $('stageHint');
+  if (running) h.textContent = '운행 중 · 빈 곳을 끌면 화면 이동, 휠·두 손가락으로 확대';
+  else if (state.tool === 'add') h.textContent = '레일 위를 눌러 새 점을 추가하세요';
+  else if (state.tool === 'del') h.textContent = '지울 점을 누르세요';
+  else h.textContent = '흰 점을 끌어 레일 모양을 바꾸세요 · 빈 곳을 끌면 화면 이동';
+}
+function bindNum(id, getObj, key, min, max, isInt) {
+  $(id).addEventListener('change', () => {
+    const obj = getObj();
+    let v = parseFloat($(id).value);
+    if (!Number.isFinite(v)) { $(id).value = obj[key]; return; }
+    v = clamp(isInt ? Math.round(v) : v, min, max);
+    pushUndo(); obj[key] = v; $(id).value = v; designChanged();
+  });
+}
+// 예시를 불러오거나 되돌리면 state.train / state.phys 객체가 바뀌므로 항상 최신 객체를 꺼내 쓴다
+const trainObj = () => state.train, physObj = () => state.phys;
+bindNum('cars', trainObj, 'cars', 1, 8, true);
+bindNum('carMass', trainObj, 'carMass', 100, 3000);
+bindNum('riders', trainObj, 'riders', 0, 4, true);
+bindNum('riderMass', trainObj, 'riderMass', 20, 150);
+bindNum('liftSpeed', physObj, 'liftSpeed', 1, 8);
+bindNum('brakeDecel', physObj, 'brakeDecel', 1, 12);
+bindNum('mu', physObj, 'mu', 0.001, 0.1);
+$('frictionChk').addEventListener('change', () => { pushUndo(); state.phys.friction = $('frictionChk').checked; $('muField').hidden = !state.phys.friction; designChanged(); });
+$('snapChk').addEventListener('change', () => { state.snap = $('snapChk').checked; });
+$('ffChk').addEventListener('change', () => { state.ff = $('ffChk').checked; });
+$('ptX').addEventListener('change', () => { const p = state.points[state.sel]; const v = parseFloat($('ptX').value); if (!p || !Number.isFinite(v)) return; pushUndo(); p.x = clamp(v, -500, 3000); designChanged(); });
+$('ptY').addEventListener('change', () => { const p = state.points[state.sel]; const v = parseFloat($('ptY').value); if (!p || !Number.isFinite(v)) return; pushUndo(); p.y = clamp(v, 0, 150); designChanged(); });
+document.querySelectorAll('#segSeg button').forEach(b => b.addEventListener('click', () => {
+  const p = state.points[state.sel]; if (!p) return;
+  pushUndo(); p.seg = +b.dataset.seg; designChanged();
+}));
+$('delPtBtn').addEventListener('click', () => { if (state.sel >= 0) deletePoint(state.sel); });
+$('addLoopBtn').addEventListener('click', () => { if (state.sel >= 0) insertLoop(state.sel, parseFloat($('loopH').value)); });
+document.querySelectorAll('#toolSeg button').forEach(b => b.addEventListener('click', () => { state.tool = b.dataset.tool; syncToggles(); updateHint(); wrap.classList.toggle('tool-add', state.tool === 'add'); }));
+document.querySelectorAll('#rateSeg button').forEach(b => b.addEventListener('click', () => { state.rate = +b.dataset.rate; syncToggles(); }));
+document.querySelectorAll('#chartSeg button').forEach(b => b.addEventListener('click', () => { state.chartMode = b.dataset.chart; syncToggles(); chartDirty = true; }));
+$('undoBtn').addEventListener('click', undo);
+$('runBtn').addEventListener('click', () => {
+  if (!running) { startRun(); if (state.follow) view.auto = false; }
+  else { paused = !paused; setRunUI(); }
+});
+$('resetBtn').addEventListener('click', () => { stopRun(); });
+$('followBtn').addEventListener('click', () => { state.follow = !state.follow; syncToggles(); if (!state.follow && running) {} sceneDirty = true; });
+$('energyLineBtn').addEventListener('click', () => { state.energyLine = !state.energyLine; syncToggles(); sceneDirty = true; });
+$('fitBtn').addEventListener('click', () => { state.follow = false; syncToggles(); fitView(true); });
+$('vClose').addEventListener('click', () => { $('verdictCard').hidden = true; });
+$('vAgain').addEventListener('click', () => { startRun(); });
+$('vReview').addEventListener('click', () => { $('verdictCard').hidden = true; showTab('review'); document.querySelector('.side').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+$('checkPredBtn').addEventListener('click', checkPrediction);
+
+function showTab(name) {
+  for (const t of ['design', 'review', 'calc']) {
+    $('tab-' + t).setAttribute('aria-selected', String(t === name));
+    $('panel-' + t).hidden = t !== name;
+  }
+}
+for (const t of ['design', 'review', 'calc']) $('tab-' + t).addEventListener('click', () => showTab(t));
+
+// 예시 코스
+const presetSel = $('presetSel');
+presetSel.innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
+$('presetLoad').addEventListener('click', () => {
+  const k = presetSel.value;
+  pushUndo();
+  state.points = presetPoints(k);
+  state.train = { ...DEFAULT_TRAIN }; state.phys = { ...DEFAULT_PHYS };
+  state.sel = Math.min(4, state.points.length - 1);
+  syncInputs(); designChanged(); needsFit = true;
+  toast(`'${PRESETS[k].name}'을 불러왔습니다. 실행 취소로 이전 설계에 돌아갈 수 있어요`);
+});
+
+// 키보드
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+  else if (e.key === 'Delete' && state.sel >= 0 && !running) { e.preventDefault(); deletePoint(state.sel); }
+});
+
+/* =========================================================
+   저장·복사
+   ========================================================= */
+const SAVE_KEY = 'coasterSim.v1';
+let saveTimer = 0;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem(SAVE_KEY, snapshot()); } catch (e) { /* 저장 불가 환경 */ } }, 400);
+}
+function exportCode() {
+  return JSON.stringify({ v: 1, p: state.points.map(p => [+p.x.toFixed(2), +p.y.toFixed(2), p.seg]), t: state.train, ph: state.phys });
+}
+function applyDesign(d) {
+  const pts = (d.p || []).map(q => Array.isArray(q) ? { x: +q[0], y: +q[1], seg: +q[2] | 0 } : { x: +q.x, y: +q.y, seg: +q.seg | 0 });
+  if (pts.length < 4 || pts.some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.seg < 0 || p.seg > 3)) throw new Error('bad');
+  state.points = pts;
+  state.train = { ...DEFAULT_TRAIN, ...(d.t || {}) };
+  state.phys = { ...DEFAULT_PHYS, ...(d.ph || {}) };
+  state.sel = Math.min(state.sel, pts.length - 1);
+}
+async function copyText(text, box) {
+  try { await navigator.clipboard.writeText(text); toast('복사했습니다'); }
+  catch (e) { box.focus(); box.select(); toast('텍스트를 선택했어요. Ctrl+C(또는 길게 눌러 복사)로 복사하세요'); }
+}
+$('copyCodeBtn').addEventListener('click', () => { const t = exportCode(); $('codeBox').value = t; copyText(t, $('codeBox')); });
+$('loadCodeBtn').addEventListener('click', () => {
+  try { const d = JSON.parse($('codeBox').value); pushUndo(); applyDesign(d); syncInputs(); designChanged(); needsFit = true; toast('설계를 불러왔습니다'); }
+  catch (e) { toast('설계 코드를 읽을 수 없습니다. 복사한 코드 전체를 붙여 넣었는지 확인하세요'); }
+});
+$('copyReportBtn').addEventListener('click', () => copyText($('reportBox').value, $('reportBox')));
+
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2800);
+}
+
+/* =========================================================
+   크기·반복
+   ========================================================= */
+let needsFit = true;
+function resize() {
+  cdpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = sceneCv.getBoundingClientRect();
+  cw = Math.max(50, r.width); ch = Math.max(50, r.height);
+  sceneCv.width = Math.round(cw * cdpr); sceneCv.height = Math.round(ch * cdpr);
+  const r2 = chartCv.getBoundingClientRect();
+  chartW = Math.max(50, r2.width); chartH = Math.max(50, r2.height);
+  chartCv.width = Math.round(chartW * cdpr); chartCv.height = Math.round(chartH * cdpr);
+  if (view.auto) needsFit = true;
+  sceneDirty = chartDirty = true;
+}
+new ResizeObserver(resize).observe(wrap);
+new ResizeObserver(resize).observe(chartWrapEl);
+if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { sceneDirty = chartDirty = true; });
+new MutationObserver(() => { sceneDirty = chartDirty = true; }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+let lastT = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  if (needsRebuild) { needsRebuild = false; rebuild(); }
+  if (needsFit && track) { needsFit = false; fitView(); }
+  let moving = false;
+  if (running && !paused && live) {
+    let simDt = dt * state.rate;
+    if (state.ff && (live.seg === LIFT || live.seg === STATION) && !live.fail) simDt *= 4;
+    const steps = Math.max(1, Math.ceil(simDt * 240)), h = simDt / steps;
+    for (let i = 0; i < steps && !live.done; i++) stepSim(live, track, A.C, h);
+    animT += simDt;
+    updateGauges(live);
+    if (live.done) finishRun();
+    chartDirty = true; moving = true;
+  }
+  if (live && state.follow && running) {
+    const p = sampleTrack(track, live.s, {});
+    const target = clamp(cw / 85, fitScale(), 30);
+    const k = Math.min(1, dt * 3);
+    view.scale += (target - view.scale) * k;
+    const minCy = (ch / 2 - groundPx()) / view.scale;
+    view.cx += (p.x - view.cx) * k;
+    view.cy += (Math.max(p.y, minCy) - view.cy) * k;
+    moving = true;
+  }
+  if (R && R.markers.length) moving = true;
+  if (sceneDirty || moving) { if (track) drawScene(); sceneDirty = false; }
+  if (chartDirty && A) { drawChart(); chartDirty = false; }
+  requestAnimationFrame(frame);
+}
+
+function start(data) {
+  let loaded = false;
+  const src = data && data.p ? data : null;
+  try {
+    const d = src || JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (d) { applyDesign(d); loaded = true; }
+  } catch (e) { /* 저장된 설계 없음 */ }
+  if (!loaded) { state.points = presetPoints('basic'); }
+  syncInputs();
+  resize();
+  rebuild();
+  setRunUI();
+  wrap.classList.toggle('tool-add', state.tool === 'add');
+  requestAnimationFrame(frame);
+}
+window.claude?.hot?.snapshot?.(() => ({ p: state.points, t: state.train, ph: state.phys }));
+if (window.claude?.hot?.ready) window.claude.hot.ready(start); else start(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
