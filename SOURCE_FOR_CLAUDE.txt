@@ -1,6 +1,6 @@
 NIGHTFALL SOURCE SNAPSHOT
 BASE: e9cb18602a22c8d278056214f497d94bfb5e0d44 (v21) + v22 local changes (not deployed)
-+ v23 figure model rework (lib/doll-character.ts, see REPORT_V23_MODEL_KO.md)
++ v23 figure model rework and matching first-person arm (lib/doll-character.ts, lib/scene3d.ts; see REPORT_V23_MODEL_KO.md)
 Read REPORT_V22_KO.md and START_HERE_KO.md first. Binary assets, screenshots and the pnpm lockfile are in the ZIP.
 
 
@@ -10698,13 +10698,16 @@ const LOOKS:Look[]=[
 const SHOES=[['#30323f','#e6dfd2'],['#5a3a2b','#e9dcc6'],['#f1ece3','#b9b2a6'],['#7b3f4c','#efe5d8']];
 const IRIS=['#806052','#5395ab','#947b52','#679c86','#a26f8d','#8b78b4','#5e95b6','#a17c53','#7e9c74','#9b7ab3','#679d99','#bb875e','#a58097','#7d9eb8','#9296c5','#708da6'];
 
-export function createDoll(index:number){
- const id=((index%16)+16)%16,[coat,hairBase,accent,skinBase,pants]=AVATAR_3D[id],look=LOOKS[id],root=new T.Group(),head=new T.Group(),arms:T.Group[]=[],legs:T.Group[]=[];
- root.name='doll-'+id;head.name='head';root.add(head);head.scale.setScalar(DOLL.headScale);head.position.y=DOLL.headY-LEGACY_HEAD_Y*DOLL.headScale;
- // Figure paint: skin a touch warmer, very dark hair lifted so its sculpted form still reads.
- const skinLight=new T.Color(skinBase).getHSL(hsl,T.SRGBColorSpace).l,fair=T.MathUtils.smoothstep(skinLight,.5,.72),skin=shift(skinBase,0,.1*fair,-.01*fair),hairLight=new T.Color(hairBase).getHSL(hsl,T.SRGBColorSpace).l,hair=shift(hairBase,Math.max(0,.15-hairLight),.02);
+// Figure paint: skin a touch warmer, very dark hair lifted so its sculpted form still reads.
+// AVATAR_3D itself stays as authored (the 2D UI uses it); only the figures are repainted.
+function figurePaint(id:number){
+ const [coat,hairBase,accent,skinBase,pants]=AVATAR_3D[id],fair=T.MathUtils.smoothstep(new T.Color(skinBase).getHSL(hsl,T.SRGBColorSpace).l,.5,.72),hairLight=new T.Color(hairBase).getHSL(hsl,T.SRGBColorSpace).l;
+ return{coat,accent,pants,fair,hairLight,skin:shift(skinBase,0,.1*fair,-.01*fair),hair:shift(hairBase,Math.max(0,.15-hairLight),.02)};}
+const KNIFE={grip:'#393040',guard:'#c4d6dd',blade:'#dde8ed'};
+// Every piece is baked into its joint group's buffers with a vertex colour (shade() may vary
+// it per vertex); bake() then makes one mesh per joint group and material kind.
+function kit(){
  const parts=new Map<T.Object3D,Record<Kind,T.BufferGeometry[]>>();
- // Every piece is baked into its joint group's buffers with a vertex colour (shade() may vary it per vertex).
  const add=(g:T.Object3D,source:T.BufferGeometry,m:T.Matrix4|null,c:T.ColorRepresentation,kind:Kind='matte',shade?:Shade)=>{
   const geo=source.clone();if(m)geo.applyMatrix4(m);geo.deleteAttribute('uv');if(!geo.index){const n=geo.attributes.position.count;geo.setIndex(Array.from({length:n},(_,i)=>i));}
   if(!geo.attributes.normal)geo.computeVertexNormals();base.set(c);const pos=geo.attributes.position,nor=geo.attributes.normal,n=pos.count,rgb=new Float32Array(n*3);
@@ -10715,6 +10718,13 @@ export function createDoll(index:number){
  const box=(g:T.Object3D,x:number,y:number,z:number,sx:number,sy:number,sz:number,c:T.ColorRepresentation,rz=0,kind:Kind='matte')=>add(g,ROUNDED,at(x,y,z,sx,sy,sz,0,0,rz),c,kind);
  const ring=(g:T.Object3D,x:number,y:number,z:number,r:number,tube:number,c:T.ColorRepresentation,sz=1,rx=Math.PI/2,arc=Math.PI*2,ry=0)=>add(g,new T.TorusGeometry(r,tube,6,20,arc),at(x,y,z,1,sz,1,rx,ry,0),c);
  const rod=(g:T.Object3D,a:T.Vector3,b:T.Vector3,r:number,c:T.ColorRepresentation)=>{const d=b.clone().sub(a);add(g,CYLINDER,new T.Matrix4().compose(a.clone().add(b).multiplyScalar(.5),new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),d.clone().normalize()),new T.Vector3(r,d.length(),r)),c,'gloss');};
+ const bake=()=>{for(const [group,kinds] of parts)for(const [kind,list] of Object.entries(kinds) as [Kind,T.BufferGeometry[]][]){if(!list.length)continue;const merged=mergeGeometries(list,false)!;list.forEach(g=>g.dispose());merged.computeBoundingSphere();group.add(new T.Mesh(merged,kind==='paint'?PAINT:kind==='gloss'?GLOSS:MATTE));}parts.clear();};
+ return{add,at,ball,box,ring,rod,bake};}
+
+export function createDoll(index:number){
+ const id=((index%16)+16)%16,look=LOOKS[id],root=new T.Group(),head=new T.Group(),arms:T.Group[]=[],legs:T.Group[]=[];
+ root.name='doll-'+id;head.name='head';root.add(head);head.scale.setScalar(DOLL.headScale);head.position.y=DOLL.headY-LEGACY_HEAD_Y*DOLL.headScale;
+ const {coat,accent,pants,skin,fair,hair,hairLight}=figurePaint(id),{add,at,ball,box,ring,rod,bake}=kit();
  // Flat shapes laid onto a surface z=surface(x,y), subdivided so they bend with it. Face paint
  // is unlit like figure paint; clothing decals are lit and face outwards (-z).
  const lay=(g:T.Object3D,shape:T.Vector2[],c:T.ColorRepresentation|((x:number,y:number,o:T.Color)=>void),cx:number,cy:number,surface:(x:number,y:number)=>number,lift:number,kind:Kind='paint',mirror=1,fine=.03)=>{
@@ -10833,13 +10843,38 @@ export function createDoll(index:number){
   legs.push(leg);
  }
  const knife=new T.Group();knife.name='knife';
- box(knife,.04,-.33,-.035,.045,.13,.045,'#393040');box(knife,.04,-.40,-.035,.14,.022,.065,'#c4d6dd');
- add(knife,new T.ConeGeometry(.05,.28,3),at(.04,-.555,-.035,1,1,1,0,0,Math.PI),'#dde8ed','gloss');
+ box(knife,.04,-.33,-.035,.045,.13,.045,KNIFE.grip);box(knife,.04,-.40,-.035,.14,.022,.065,KNIFE.guard);
+ add(knife,new T.ConeGeometry(.05,.28,3),at(.04,-.555,-.035,1,1,1,0,0,Math.PI),KNIFE.blade,'gloss');
  knife.visible=false;arms[1].add(knife);
- // ---- bake: one mesh per joint group and material kind --------------------------------------
- for(const [group,kinds] of parts)for(const [kind,list] of Object.entries(kinds) as [Kind,T.BufferGeometry[]][]){if(!list.length)continue;const merged=mergeGeometries(list,false)!;list.forEach(g=>g.dispose());merged.computeBoundingSphere();group.add(new T.Mesh(merged,kind==='paint'?PAINT:kind==='gloss'?GLOSS:MATTE));}
+ bake();
  const shadow=new T.Mesh(SHADOW_GEO,SHADOW);shadow.name='shadow';shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;root.add(shadow);
  return{root,head,arms,legs,knife,shadow,dispose(){root.traverse(o=>{if(o instanceof T.Mesh&&o.geometry!==SHADOW_GEO)o.geometry.dispose();});}};
+}
+
+// The player's own forearm in first person (camera space, reaching in from the lower right):
+// the figures' sleeve with its cuff band and a mitten hand, in the player's own figure paint,
+// so it matches how everyone else sees that character. The forearm pivots at VIEW_WRIST and
+// runs back through VIEW_SHOULDER; VIEW_HAND (the mitten centre) is the device-reach contact
+// point, and aim() swings the whole forearm so the long sleeve always comes from the shoulder.
+const VIEW_FOREARM=new T.Vector3(-.075,.21,-.17).normalize();
+export const VIEW_HAND=new T.Vector3(.28,-.15,-.55),VIEW_WRIST=VIEW_HAND.clone().addScaledVector(VIEW_FOREARM,-.072),VIEW_SHOULDER=VIEW_WRIST.clone().addScaledVector(VIEW_FOREARM,-.37);
+const VIEW_SLEEVE=new T.LatheGeometry([[0,-.95],[.11,-.95],[.096,-.42],[.086,-.24],[.075,-.07],[.077,-.066],[.08,-.06],[.08,-.012],[.072,.006],[0,.008]].map(([r,y])=>new T.Vector2(r,y)),20),VIEW_MITTEN=new T.SphereGeometry(1,24,18);
+for(const g of [VIEW_SLEEVE,VIEW_MITTEN])SHARED.add(g);
+export function createViewArm(index:number){
+ const id=((index%16)+16)%16,{coat,accent,skin}=figurePaint(id),{add,at,box,bake}=kit(),arm=new T.Group(),fore=new T.Group(),knife=new T.Group();
+ // Forearm frame: y along the arm towards the fingers, z the back of the hand (towards the eye), thumb on -x.
+ const side=new T.Vector3(1,0,0).addScaledVector(VIEW_FOREARM,-VIEW_FOREARM.x).normalize();
+ fore.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(side,VIEW_FOREARM,new T.Vector3().crossVectors(side,VIEW_FOREARM)));fore.position.copy(VIEW_WRIST);arm.add(fore);
+ const rest=fore.quaternion.clone(),turn=new T.Quaternion();
+ add(fore,VIEW_SLEEVE,null,coat,'matte',(p,_n,c)=>{if(p.y>-.064)c.set(accent);});
+ // Mitten: one smooth rounded paddle with the thumb on the inner side, like the figures' hands.
+ add(fore,VIEW_MITTEN,at(0,.072,.002,.062,.076,.05),skin);add(fore,VIEW_MITTEN,at(-.056,.052,.016,.024,.036,.026,0,0,.55),skin);
+ box(knife,VIEW_HAND.x,-.1,VIEW_HAND.z,.055,.18,.055,KNIFE.grip);box(knife,VIEW_HAND.x,.02,VIEW_HAND.z,.17,.03,.07,KNIFE.guard);add(knife,new T.ConeGeometry(.058,.42,3),at(VIEW_HAND.x,.23,VIEW_HAND.z,1,1,1),KNIFE.blade,'gloss');
+ bake();
+ return{avatar:id,arm,knife,
+  // Point the forearm along `direction` (shoulder to wrist), or back to rest without one.
+  aim(direction?:T.Vector3){fore.quaternion.copy(rest);if(direction)fore.quaternion.premultiply(turn.setFromUnitVectors(VIEW_FOREARM,direction));},
+  dispose(){for(const g of [arm,knife]){g.removeFromParent();g.traverse(o=>{if(o instanceof T.Mesh)o.geometry.dispose();});}}};
 }
 
 
@@ -12442,9 +12477,8 @@ import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js'
 import {mapFor,roomFloors,ventsFor,emergencyFor,repairFor,distance,sight,type Point} from './map';
 import {floorEdges} from './map-render';
 import {securityConsole,communicationsConsole} from './surveillance';
-import {createDoll,DOLL} from './doll-character';
+import {createDoll,createViewArm,DOLL,VIEW_HAND,VIEW_SHOULDER,VIEW_WRIST} from './doll-character';
 import {stageLights} from './doll-stage';
-import {AVATAR_3D} from './first-person';
 import type {View} from './game';
 import type {FieldSnapshot,Effect} from './field';
 export type SceneFrame={room:View;own:Point;people:FieldSnapshot['people'];bodies:FieldSnapshot['bodies'];effects:(Effect&{seenAt:number})[];radius:number;now:number;moving:boolean;sound:boolean;reach?:Reach|null};
@@ -12498,21 +12532,22 @@ export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:b
  function puppet(avatar:number,name:string){const doll=createDoll(avatar),l=label(name,'#dcece7',1.3,.24);l.position.y=DOLL.labelY;doll.root.add(l);scene.add(doll.root);return{...doll,last:{x:NaN,y:NaN},phase:0,label:l,caption:name,avatar};}
  let latestData:SceneFrame|null=null;const raycaster=new T.Raycaster();raycaster.far=2.65;
  function pickDevice(x=0,y=0){const data=latestData;if(!data)return null;const r=data.room,f=r.field,me=r.players.find(p=>p.id===r.me);if(r.host||r.paused||!f||f.watching||f.vent)return null;camera.updateMatrixWorld();scene.updateMatrixWorld();raycaster.setFromCamera(new T.Vector2(x,y),camera);for(const hit of raycaster.intersectObjects(deviceMeshes,false)){const target=deviceTargets.get(hit.object)!;if(distance(data.own,target.point)>100||!sight(data.own,target.point,config))continue;if(target.action==='taskStart'){if(!f.tasks.some(t=>t.station===target.station&&!t.done))continue;}else if(!me?.alive)continue;if(target.action==='emergency'&&(!f.emergenciesLeft||f.meetingAt>r.serverNow||f.lightsUntil>r.serverNow))continue;if(target.action==='cameraStart'&&(f.commsUntil>r.serverNow||f.invisibleUntil>r.serverNow))continue;if(target.action==='repair'&&f.lightsUntil<=r.serverNow)continue;if(target.action==='commsRepair'&&f.commsUntil<=r.serverNow)continue;return target;}return null;}
- const hand=new T.Group();camera.add(hand);
- // Own forearm reaching forward from the lower right (sleeve, cuff, mitten). The mitten centre
- // (.28,-.15,-.55) is the contact point used by the device-reach animation below.
- const forearm=new T.Vector3(-.075,.21,-.17).normalize(),alongArm=(m:T.Mesh)=>{m.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),forearm);return m;};
- alongArm(box(hand,.33,-.31,-.43,.11,.3,.12,'#35475e')).name='sleeve';alongArm(box(hand,.295,-.21,-.515,.128,.045,.132,'#7fa3b8')).name='cuff';
- ball(hand,.28,-.15,-.55,.064,.06,.072,'#dfb08b').name='palm';ball(hand,.24,-.162,-.58,.026,.038,.03,'#dfb08b').name='thumb';const heldKnife=new T.Group();hand.add(heldKnife);box(heldKnife,.28,-.1,-.55,.055,.18,.055,'#36303a');box(heldKnife,.28,.02,-.55,.17,.03,.07,'#899da5');const blade=new T.Mesh(new T.ConeGeometry(.058,.42,3),mat('#dce9ee'));blade.position.set(.28,.23,-.55);heldKnife.add(blade);
- const reachArm=new T.Mesh(new T.CylinderGeometry(.072,.11,1,12),mat('#35475e'));reachArm.visible=false;camera.add(reachArm);const armStart=new T.Vector3(.42,-.48,-.26),armEnd=new T.Vector3(),armDirection=new T.Vector3(),upAxis=new T.Vector3(0,1,0);
+ const hand=new T.Group(),heldKnife=new T.Group();camera.add(hand);hand.add(heldKnife);
+ // Own forearm reaching forward from the lower right: the figures' sleeve, cuff band and mitten
+ // in the player's own figure paint (createViewArm), rebuilt when the avatar changes. VIEW_HAND
+ // (the mitten centre) is the contact point used by the device-reach animation below; while
+ // reaching, the forearm swings so its sleeve still runs back through VIEW_SHOULDER.
+ let ownArm:ReturnType<typeof createViewArm>|undefined;
+ const dressArm=(avatar:number)=>{if(ownArm?.avatar===((avatar%16)+16)%16)return;ownArm?.dispose();ownArm=createViewArm(avatar);hand.add(ownArm.arm);heldKnife.add(ownArm.knife);};
+ const armDirection=new T.Vector3();
  let last=0,step=0;let audio:AudioContext|undefined;const stepTimes=new Map<string,number>();
  const enableAudio=()=>{try{audio||=new AudioContext();void audio.resume();}catch{}};
  const footstep=(id:string,p:Point,own:Point,yaw:number,time:number)=>{if(!audio||audio.state!=='running'||time-(stepTimes.get(id)||0)<340)return;stepTimes.set(id,time);const dist=distance(p,own);if(dist>220||!sight(p,own,config))return;const ctx=audio,o=ctx.createOscillator(),g=ctx.createGain(),pan=ctx.createStereoPanner();o.type='triangle';o.frequency.setValueAtTime(95,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(38,ctx.currentTime+.075);g.gain.setValueAtTime(.035*(1-dist/240),ctx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.09);pan.pan.value=Math.max(-1,Math.min(1,((p.x-own.x)*Math.cos(yaw)+(p.y-own.y)*Math.sin(yaw))/150));o.connect(g).connect(pan).connect(ctx.destination);o.start();o.stop(ctx.currentTime+.1);};
 
  function update(data:SceneFrame,look:Look,follow:string){const dt=Math.min(.05,(data.now-last)/1000||.016);last=data.now;latestData=data;const r=data.room,focus=r.host&&follow?data.people.find(p=>p.id===follow):null,own=focus||data.own;camera.position.set(own.x*U,1.43,own.y*U);camera.rotation.set(-look.pitch,-look.yaw,0);camera.updateMatrixWorld();
   const fog=scene.fog as T.Fog;fog.near=Math.max(1,data.radius*U*.65);fog.far=Math.max(2.5,data.radius*U*1.15);if(r.host){fog.near=18;fog.far=65;}
-  if(data.sound&&data.moving&&!r.paused)footstep('own',own,own,look.yaw,data.now);step+=data.moving?dt*9:0;hand.visible=!r.host&&!!r.players.find(p=>p.id===r.me)?.alive;const ownAvatar=r.players.find(p=>p.id===r.me)?.avatar||0;const sleeveColor=AVATAR_3D[ownAvatar%16];for(const part of hand.children)if(part instanceof T.Mesh)part.material=mat(part.name==='sleeve'?sleeveColor[0]:part.name==='cuff'?sleeveColor[2]:sleeveColor[3]);
-  const attack=data.effects.find(e=>e.actor===r.me&&['attack','blocked'].includes(e.kind)&&data.now-e.seenAt<620);const age=attack?(data.now-attack.seenAt)/620:0;heldKnife.visible=!!attack;hand.position.set(0,data.moving?Math.sin(step)*.012:0,attack?-Math.sin(age*Math.PI)*.42:0);hand.rotation.x=attack?Math.sin(age*Math.PI)*-.8:0;const reach=data.reach,amount=reach?reachAmount(data.now-reach.started):0;if(reach&&amount>0&&!attack){const t=reach.target,contact=camera.worldToLocal(new T.Vector3(t.point.x*U,t.height,t.point.y*U));hand.position.set((contact.x-.28)*amount,(contact.y+.15)*amount,(contact.z+.55)*amount);hand.rotation.x=0;}reachArm.visible=amount>0&&!attack&&hand.visible;if(reachArm.visible){armEnd.copy(hand.position).add(new T.Vector3(.28,-.15,-.55));armDirection.subVectors(armEnd,armStart);reachArm.position.copy(armStart).add(armEnd).multiplyScalar(.5);reachArm.scale.y=armDirection.length();reachArm.quaternion.setFromUnitVectors(upAxis,armDirection.normalize());reachArm.material=mat(sleeveColor[0]);}redButton.position.y=1.01-(reach?.target.action==='emergency'?.065*amount:0);
+  if(data.sound&&data.moving&&!r.paused)footstep('own',own,own,look.yaw,data.now);step+=data.moving?dt*9:0;hand.visible=!r.host&&!!r.players.find(p=>p.id===r.me)?.alive;const ownAvatar=r.players.find(p=>p.id===r.me)?.avatar||0;dressArm(ownAvatar);
+  const attack=data.effects.find(e=>e.actor===r.me&&['attack','blocked'].includes(e.kind)&&data.now-e.seenAt<620);const age=attack?(data.now-attack.seenAt)/620:0;heldKnife.visible=!!attack;hand.position.set(0,data.moving?Math.sin(step)*.012:0,attack?-Math.sin(age*Math.PI)*.42:0);hand.rotation.x=attack?Math.sin(age*Math.PI)*-.8:0;const reach=data.reach,amount=reach?reachAmount(data.now-reach.started):0;if(reach&&amount>0&&!attack){const t=reach.target,contact=camera.worldToLocal(new T.Vector3(t.point.x*U,t.height,t.point.y*U));hand.position.subVectors(contact,VIEW_HAND).multiplyScalar(amount);hand.rotation.x=0;}ownArm?.aim(amount>0&&!attack?armDirection.copy(hand.position).add(VIEW_WRIST).sub(VIEW_SHOULDER).normalize():undefined);redButton.position.y=1.01-(reach?.target.action==='emergency'?.065*amount:0);
   for(const [id,s] of stations){const task=r.field?.tasks.find(t=>t.station===id),near=distance(own,s.pos)<150;s.label.visible=!!task&&!task.done&&near&&sight(own,s.pos,config);s.screen.material=mat(task?.done?'#477267':task?'#6ce6bf':'#446572');}
   const visible=new Set<string>();for(const p of data.people){if(p.id===r.me&&!r.host||p.id===focus?.id||p.vented||p.invisible||!p.alive)continue;visible.add(p.id);let actor=puppets.get(p.id);const caption=p.speech&&p.speech.until>r.serverNow?p.name+' · '+p.speech.text:p.name;
    if(!actor||actor.avatar!==p.avatar){if(actor)removePuppet(actor);actor=puppet(p.avatar,caption);puppets.set(p.id,actor);}if(actor.caption!==caption){const old=actor.label;actor.root.remove(old);disposeLabel(old);actor.label=label(caption,'#e6f6ee',Math.min(3.6,.9+caption.length*.08),.28);actor.label.position.y=DOLL.labelY;actor.root.add(actor.label);actor.caption=caption;}

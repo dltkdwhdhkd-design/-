@@ -70,13 +70,16 @@ const LOOKS:Look[]=[
 const SHOES=[['#30323f','#e6dfd2'],['#5a3a2b','#e9dcc6'],['#f1ece3','#b9b2a6'],['#7b3f4c','#efe5d8']];
 const IRIS=['#806052','#5395ab','#947b52','#679c86','#a26f8d','#8b78b4','#5e95b6','#a17c53','#7e9c74','#9b7ab3','#679d99','#bb875e','#a58097','#7d9eb8','#9296c5','#708da6'];
 
-export function createDoll(index:number){
- const id=((index%16)+16)%16,[coat,hairBase,accent,skinBase,pants]=AVATAR_3D[id],look=LOOKS[id],root=new T.Group(),head=new T.Group(),arms:T.Group[]=[],legs:T.Group[]=[];
- root.name='doll-'+id;head.name='head';root.add(head);head.scale.setScalar(DOLL.headScale);head.position.y=DOLL.headY-LEGACY_HEAD_Y*DOLL.headScale;
- // Figure paint: skin a touch warmer, very dark hair lifted so its sculpted form still reads.
- const skinLight=new T.Color(skinBase).getHSL(hsl,T.SRGBColorSpace).l,fair=T.MathUtils.smoothstep(skinLight,.5,.72),skin=shift(skinBase,0,.1*fair,-.01*fair),hairLight=new T.Color(hairBase).getHSL(hsl,T.SRGBColorSpace).l,hair=shift(hairBase,Math.max(0,.15-hairLight),.02);
+// Figure paint: skin a touch warmer, very dark hair lifted so its sculpted form still reads.
+// AVATAR_3D itself stays as authored (the 2D UI uses it); only the figures are repainted.
+function figurePaint(id:number){
+ const [coat,hairBase,accent,skinBase,pants]=AVATAR_3D[id],fair=T.MathUtils.smoothstep(new T.Color(skinBase).getHSL(hsl,T.SRGBColorSpace).l,.5,.72),hairLight=new T.Color(hairBase).getHSL(hsl,T.SRGBColorSpace).l;
+ return{coat,accent,pants,fair,hairLight,skin:shift(skinBase,0,.1*fair,-.01*fair),hair:shift(hairBase,Math.max(0,.15-hairLight),.02)};}
+const KNIFE={grip:'#393040',guard:'#c4d6dd',blade:'#dde8ed'};
+// Every piece is baked into its joint group's buffers with a vertex colour (shade() may vary
+// it per vertex); bake() then makes one mesh per joint group and material kind.
+function kit(){
  const parts=new Map<T.Object3D,Record<Kind,T.BufferGeometry[]>>();
- // Every piece is baked into its joint group's buffers with a vertex colour (shade() may vary it per vertex).
  const add=(g:T.Object3D,source:T.BufferGeometry,m:T.Matrix4|null,c:T.ColorRepresentation,kind:Kind='matte',shade?:Shade)=>{
   const geo=source.clone();if(m)geo.applyMatrix4(m);geo.deleteAttribute('uv');if(!geo.index){const n=geo.attributes.position.count;geo.setIndex(Array.from({length:n},(_,i)=>i));}
   if(!geo.attributes.normal)geo.computeVertexNormals();base.set(c);const pos=geo.attributes.position,nor=geo.attributes.normal,n=pos.count,rgb=new Float32Array(n*3);
@@ -87,6 +90,13 @@ export function createDoll(index:number){
  const box=(g:T.Object3D,x:number,y:number,z:number,sx:number,sy:number,sz:number,c:T.ColorRepresentation,rz=0,kind:Kind='matte')=>add(g,ROUNDED,at(x,y,z,sx,sy,sz,0,0,rz),c,kind);
  const ring=(g:T.Object3D,x:number,y:number,z:number,r:number,tube:number,c:T.ColorRepresentation,sz=1,rx=Math.PI/2,arc=Math.PI*2,ry=0)=>add(g,new T.TorusGeometry(r,tube,6,20,arc),at(x,y,z,1,sz,1,rx,ry,0),c);
  const rod=(g:T.Object3D,a:T.Vector3,b:T.Vector3,r:number,c:T.ColorRepresentation)=>{const d=b.clone().sub(a);add(g,CYLINDER,new T.Matrix4().compose(a.clone().add(b).multiplyScalar(.5),new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),d.clone().normalize()),new T.Vector3(r,d.length(),r)),c,'gloss');};
+ const bake=()=>{for(const [group,kinds] of parts)for(const [kind,list] of Object.entries(kinds) as [Kind,T.BufferGeometry[]][]){if(!list.length)continue;const merged=mergeGeometries(list,false)!;list.forEach(g=>g.dispose());merged.computeBoundingSphere();group.add(new T.Mesh(merged,kind==='paint'?PAINT:kind==='gloss'?GLOSS:MATTE));}parts.clear();};
+ return{add,at,ball,box,ring,rod,bake};}
+
+export function createDoll(index:number){
+ const id=((index%16)+16)%16,look=LOOKS[id],root=new T.Group(),head=new T.Group(),arms:T.Group[]=[],legs:T.Group[]=[];
+ root.name='doll-'+id;head.name='head';root.add(head);head.scale.setScalar(DOLL.headScale);head.position.y=DOLL.headY-LEGACY_HEAD_Y*DOLL.headScale;
+ const {coat,accent,pants,skin,fair,hair,hairLight}=figurePaint(id),{add,at,ball,box,ring,rod,bake}=kit();
  // Flat shapes laid onto a surface z=surface(x,y), subdivided so they bend with it. Face paint
  // is unlit like figure paint; clothing decals are lit and face outwards (-z).
  const lay=(g:T.Object3D,shape:T.Vector2[],c:T.ColorRepresentation|((x:number,y:number,o:T.Color)=>void),cx:number,cy:number,surface:(x:number,y:number)=>number,lift:number,kind:Kind='paint',mirror=1,fine=.03)=>{
@@ -205,11 +215,36 @@ export function createDoll(index:number){
   legs.push(leg);
  }
  const knife=new T.Group();knife.name='knife';
- box(knife,.04,-.33,-.035,.045,.13,.045,'#393040');box(knife,.04,-.40,-.035,.14,.022,.065,'#c4d6dd');
- add(knife,new T.ConeGeometry(.05,.28,3),at(.04,-.555,-.035,1,1,1,0,0,Math.PI),'#dde8ed','gloss');
+ box(knife,.04,-.33,-.035,.045,.13,.045,KNIFE.grip);box(knife,.04,-.40,-.035,.14,.022,.065,KNIFE.guard);
+ add(knife,new T.ConeGeometry(.05,.28,3),at(.04,-.555,-.035,1,1,1,0,0,Math.PI),KNIFE.blade,'gloss');
  knife.visible=false;arms[1].add(knife);
- // ---- bake: one mesh per joint group and material kind --------------------------------------
- for(const [group,kinds] of parts)for(const [kind,list] of Object.entries(kinds) as [Kind,T.BufferGeometry[]][]){if(!list.length)continue;const merged=mergeGeometries(list,false)!;list.forEach(g=>g.dispose());merged.computeBoundingSphere();group.add(new T.Mesh(merged,kind==='paint'?PAINT:kind==='gloss'?GLOSS:MATTE));}
+ bake();
  const shadow=new T.Mesh(SHADOW_GEO,SHADOW);shadow.name='shadow';shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;root.add(shadow);
  return{root,head,arms,legs,knife,shadow,dispose(){root.traverse(o=>{if(o instanceof T.Mesh&&o.geometry!==SHADOW_GEO)o.geometry.dispose();});}};
+}
+
+// The player's own forearm in first person (camera space, reaching in from the lower right):
+// the figures' sleeve with its cuff band and a mitten hand, in the player's own figure paint,
+// so it matches how everyone else sees that character. The forearm pivots at VIEW_WRIST and
+// runs back through VIEW_SHOULDER; VIEW_HAND (the mitten centre) is the device-reach contact
+// point, and aim() swings the whole forearm so the long sleeve always comes from the shoulder.
+const VIEW_FOREARM=new T.Vector3(-.075,.21,-.17).normalize();
+export const VIEW_HAND=new T.Vector3(.28,-.15,-.55),VIEW_WRIST=VIEW_HAND.clone().addScaledVector(VIEW_FOREARM,-.072),VIEW_SHOULDER=VIEW_WRIST.clone().addScaledVector(VIEW_FOREARM,-.37);
+const VIEW_SLEEVE=new T.LatheGeometry([[0,-.95],[.11,-.95],[.096,-.42],[.086,-.24],[.075,-.07],[.077,-.066],[.08,-.06],[.08,-.012],[.072,.006],[0,.008]].map(([r,y])=>new T.Vector2(r,y)),20),VIEW_MITTEN=new T.SphereGeometry(1,24,18);
+for(const g of [VIEW_SLEEVE,VIEW_MITTEN])SHARED.add(g);
+export function createViewArm(index:number){
+ const id=((index%16)+16)%16,{coat,accent,skin}=figurePaint(id),{add,at,box,bake}=kit(),arm=new T.Group(),fore=new T.Group(),knife=new T.Group();
+ // Forearm frame: y along the arm towards the fingers, z the back of the hand (towards the eye), thumb on -x.
+ const side=new T.Vector3(1,0,0).addScaledVector(VIEW_FOREARM,-VIEW_FOREARM.x).normalize();
+ fore.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(side,VIEW_FOREARM,new T.Vector3().crossVectors(side,VIEW_FOREARM)));fore.position.copy(VIEW_WRIST);arm.add(fore);
+ const rest=fore.quaternion.clone(),turn=new T.Quaternion();
+ add(fore,VIEW_SLEEVE,null,coat,'matte',(p,_n,c)=>{if(p.y>-.064)c.set(accent);});
+ // Mitten: one smooth rounded paddle with the thumb on the inner side, like the figures' hands.
+ add(fore,VIEW_MITTEN,at(0,.072,.002,.062,.076,.05),skin);add(fore,VIEW_MITTEN,at(-.056,.052,.016,.024,.036,.026,0,0,.55),skin);
+ box(knife,VIEW_HAND.x,-.1,VIEW_HAND.z,.055,.18,.055,KNIFE.grip);box(knife,VIEW_HAND.x,.02,VIEW_HAND.z,.17,.03,.07,KNIFE.guard);add(knife,new T.ConeGeometry(.058,.42,3),at(VIEW_HAND.x,.23,VIEW_HAND.z,1,1,1),KNIFE.blade,'gloss');
+ bake();
+ return{avatar:id,arm,knife,
+  // Point the forearm along `direction` (shoulder to wrist), or back to rest without one.
+  aim(direction?:T.Vector3){fore.quaternion.copy(rest);if(direction)fore.quaternion.premultiply(turn.setFromUnitVectors(VIEW_FOREARM,direction));},
+  dispose(){for(const g of [arm,knife]){g.removeFromParent();g.traverse(o=>{if(o instanceof T.Mesh)o.geometry.dispose();});}}};
 }
