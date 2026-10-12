@@ -36,7 +36,15 @@ export const STATIONS=LOCATIONS.flatMap((l,i)=>[0,1,2].map(j=>{const kind=PUZZLE
 export const EMERGENCY:Point={x:1140,y:925};
 export const REPAIR:Point={x:265,y:1010};
 const mapCache=new Map<string,ReturnType<typeof buildMap>>();
-export function mapFor(context:MapContext){const count=population(context),key=mapIdentity(context)+':'+count;let map=mapCache.get(key);if(!map){map=mapIdentity(context)==='nereid'?buildScienceMap(count):buildMap(count);mapCache.set(key,map);}return map;}
+export function mapFor(context:MapContext){const count=population(context),key=mapIdentity(context)+':'+count;let map=mapCache.get(key);if(!map){map=mapIdentity(context)==='nereid'?buildScienceMap(count):buildMap(count);closeSeams(map.corridors,map.floors);mapCache.set(key,map);}return map;}
+// A corridor that stops a few pixels short of the floor it leads into leaves a hairline seam.
+// Movement steps (6 px) jump it, but the walls built from the floor outlines (2D art, 3D view,
+// full map) drew a wall across it. Seams up to 6 px are closed so the drawn walls are exactly
+// where movement stops.
+function closeSeams(corridors:Rect[],floors:Rect[]){for(const a of corridors)for(const b of [...floors,...corridors]){if(a===b)continue;
+ const overlapX=Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x),overlapY=Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y);
+ if(overlapY>0){const right=b.x-(a.x+a.w),left=a.x-(b.x+b.w);if(right>0&&right<=6)a.w+=right;else if(left>0&&left<=6){a.x-=left;a.w+=left;}}
+ if(overlapX>0){const down=b.y-(a.y+a.h),up=a.y-(b.y+b.h);if(down>0&&down<=6)a.h+=down;else if(up>0&&up<=6){a.y-=up;a.h+=up;}}}}
 function buildMap(count:number){
  const size=count<=10?12:count<=20?16:20,locations=LOCATIONS.slice(0,size),corridors:Rect[]=[];
  const route=(points:[number,number][],width=112)=>{for(let i=1;i<points.length;i++){const [ax,ay]=points[i-1],[bx,by]=points[i];if(ax!==bx&&ay!==by)throw Error('Corridors must be orthogonal');corridors.push({x:Math.min(ax,bx)-width/2,y:Math.min(ay,by)-width/2,w:Math.abs(bx-ax)+width,h:Math.abs(by-ay)+width});}};
@@ -123,8 +131,8 @@ export function emergencyFor(c:MapContext){return mapIdentity(c)==='nereid'?{x:1
 export function repairFor(c:MapContext){if(mapIdentity(c)==='aurora')return REPAIR;const r=mapFor(c).locations.find(r=>r.id==='power')!;return{x:r.x+100,y:r.y+r.h*.7};}
 function buildScienceMap(count:number):ReturnType<typeof buildMap>{
  const bounds:[number,number,number,number][]=[
- [420,380,440,320],[1370,230,460,340],[2380,390,420,360],[2680,1100,400,330],[1350,1220,500,440],[2370,1910,500,330],
- [1380,2410,470,320],[440,1950,440,330],[130,1080,450,420],[810,920,360,300],[2030,1040,360,340],[1350,1900,410,300],
+ [420,380,440,320],[1370,230,460,340],[2380,390,420,360],[2690,1100,390,330],[1350,1220,500,440],[2370,1910,500,330],
+ [1380,2410,470,320],[440,1950,440,330],[130,1080,440,420],[810,920,360,300],[2030,1040,360,340],[1350,1900,410,300],
  [3350,370,440,350],[3490,1270,430,360],[3360,2150,440,330],[2240,2700,450,320],
  [430,2820,440,330],[1450,3150,450,340],[3150,3020,430,340],[4180,2300,460,350]];
  const names=['물질 분석동','탐사 관제동','생명 연구동','전기 실험동','중앙 홀','지질 기록동','시료 보관동','통신실','광합성 온실','열 실험동','광학 연구동','탐사 부두','에너지 연구동','보안실','천문 관측동','생태 연구동','화학 반응동','항법 연구동','해양 환경동','수중 장비동'];

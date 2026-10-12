@@ -1,8 +1,9 @@
 import * as T from 'three';
 import {reachAmount,type Reach,type DeviceTarget} from './interaction';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {mapFor,roomFloors,ventsFor,emergencyFor,repairFor,distance,sight,type Point} from './map';
-import {floorEdges} from './map-render';
+import {floorEdges,doorways} from './map-render';
 import {securityConsole,communicationsConsole} from './surveillance';
 import {createDoll,createViewArm,warmDolls,DOLL,VIEW_HAND,VIEW_SHOULDER,VIEW_WRIST} from './doll-character';
 import {stageLights} from './doll-stage';
@@ -15,47 +16,87 @@ type Puppet={root:T.Group;arms:T.Group[];legs:T.Group[];knife:T.Group;last:Point
 export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:boolean,avatars:number[]=[]){
  // basePixelRatio x quality (setQuality, driven by the frame-rate governor) is the drawing size.
  const renderer=new T.WebGLRenderer({canvas,antialias:!low,alpha:false,powerPreference:'high-performance'}),basePixelRatio=Math.min(devicePixelRatio||1,low?1:1.5);renderer.setPixelRatio(basePixelRatio);renderer.debug.checkShaderErrors=false;renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
- const scene=new T.Scene();scene.background=new T.Color('#102c40');scene.fog=new T.Fog('#102c40',7,22);
+ const scene=new T.Scene();scene.background=new T.Color('#22355a');scene.fog=new T.Fog('#22355a',7,22);
  const camera=new T.PerspectiveCamera(76,1,.06,130);camera.rotation.order='YXZ';scene.add(camera);
  stageLights(scene);
- const map=mapFor(config),geo=new T.BoxGeometry(1,1,1),softGeo=new RoundedBoxGeometry(1,1,1,3,.12),sphere=new T.SphereGeometry(1,24,16),cylinder=new T.CylinderGeometry(1,1,1,10),materials=new Map<string,T.MeshLambertMaterial>(),textures=new Set<T.Texture>(),labels:T.Sprite[]=[];
- const mat=(color:string)=>{let m=materials.get(color);if(!m){m=new T.MeshLambertMaterial({color});materials.set(color,m);}return m;};
+ const map=mapFor(config),geo=new T.BoxGeometry(1,1,1),softGeo=new RoundedBoxGeometry(1,1,1,3,.12),sphere=new T.SphereGeometry(1,24,16),cylinder=new T.CylinderGeometry(1,1,1,10),materials=new Map<string,T.Material>(),textures=new Set<T.Texture>(),labels:T.Sprite[]=[];
+ const mat=(color:string)=>{let m=materials.get(color) as T.MeshLambertMaterial|undefined;if(!m){m=new T.MeshLambertMaterial({color});materials.set(color,m);}return m;};
+ // Unlit colour for lanterns, string lights and lit windows (still fades into the fog).
+ const glowMat=(color:string)=>{let m=materials.get('glow:'+color) as T.MeshBasicMaterial|undefined;if(!m){m=new T.MeshBasicMaterial({color});materials.set('glow:'+color,m);}return m;};
  const box=(g:T.Object3D,x:number,y:number,z:number,w:number,h:number,d:number,c:string)=>{const m=new T.Mesh(softGeo,mat(c));m.position.set(x,y,z);m.scale.set(w,h,d);g.add(m);return m;};
- const ball=(g:T.Object3D,x:number,y:number,z:number,w:number,h:number,d:number,c:string)=>{const m=new T.Mesh(sphere,mat(c));m.position.set(x,y,z);m.scale.set(w,h,d);g.add(m);return m;};
- const batch=new Map<string,number[][]>();const fixed=(x:number,y:number,z:number,w:number,h:number,d:number,c:string)=>{const list=batch.get(c)||[];list.push([x,y,z,w,h,d]);batch.set(c,list);};
- // Shared rectangles and boundary segments are the exact geometry used by server collision.
- fixed(map.width*U/2,-.9,map.height*U/2,map.width*U+100,.2,map.height*U+100,'#124452');
- for(const c of map.corridors)fixed((c.x+c.w/2)*U,-.12,(c.y+c.h/2)*U,c.w*U,.24,c.h*U,'#5a675f');
+ // Night-time sea station in a toy style: cream pavilions with pastel bands, lit windows and
+ // string lights; wooden bridges with railings and lanterns over a visible sea. Everything
+ // static is batched by shape and colour into instanced meshes (one draw call per batch).
+ type Shape='box'|'ball'|'cyl';const batch=new Map<string,{shape:Shape;color:string;glow:boolean;items:number[][]}>();
+ const add=(shape:Shape,glow=false)=>(x:number,y:number,z:number,w:number,h:number,d:number,c:string)=>{const key=shape+(glow?'+':'')+c;let b=batch.get(key);if(!b){b={shape,color:c,glow,items:[]};batch.set(key,b);}b.items.push([x,y,z,w,h,d]);};
+ const fixed=add('box'),post=add('cyl'),bulb=add('ball',true),lit=add('box',true);
+ const plaques=new Map<string,T.SpriteMaterial>();
+ const tint=(c:string,amount:number,to='#f7f0e3')=>'#'+new T.Color(c).lerp(new T.Color(to),amount).getHexString();
+ const WALL='#f2e8d6',WOOD='#b98e61',SEAM='#8a6543',RAIL='#f0e4cc',LANTERN='#ffcf73';
+ // Sea: a wave texture repeated under the whole station, below the bridge decks.
+ {const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d')!;x.fillStyle='#1c5f74';x.fillRect(0,0,256,256);x.strokeStyle='#58aebf';x.lineWidth=3;x.globalAlpha=.5;for(let row=0;row<6;row++){const y=row*256/6+20;x.beginPath();for(let i=0;i<=256;i+=8){const yy=y+Math.sin(i/256*Math.PI*4+row)*5;if(i)x.lineTo(i,yy);else x.moveTo(i,yy);}x.stroke();}
+  const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;t.wrapS=t.wrapT=T.RepeatWrapping;const w=map.width*U+120,h=map.height*U+120;t.repeat.set(w/6,h/6);textures.add(t);const m=new T.MeshLambertMaterial({map:t});materials.set('sea',m);
+  const sea=new T.Mesh(new T.PlaneGeometry(w,h),m);sea.rotation.x=-Math.PI/2;sea.position.set(map.width*U/2,-.85,map.height*U/2);scene.add(sea);}
+ // Floors are the exact rectangles used by server collision. Bridge decks sit 2 cm under the
+ // room floors, so where a bridge runs into a room the room floor is the one drawn.
+ const roomRects=map.locations.flatMap(roomFloors),inRoom=(x:number,y:number,pad=0)=>roomRects.some(f=>x>=f.x-pad&&x<=f.x+f.w+pad&&y>=f.y-pad&&y<=f.y+f.h+pad);
+ for(const c of map.corridors){const cx=(c.x+c.w/2)*U,cz=(c.y+c.h/2)*U,along=c.w>=c.h;fixed(cx,-.14,cz,c.w*U,.24,c.h*U,WOOD);
+  for(let s=(along?c.x:c.y)+17;s<(along?c.x+c.w:c.y+c.h);s+=34)if(along)fixed(s*U,-.016,cz,.035,.01,c.h*U,SEAM);else fixed(cx,-.016,s*U,c.w*U,.01,.035,SEAM);
+  // Piles under both sides of the deck.
+  for(let s=(along?c.x:c.y)+40;s<(along?c.x+c.w:c.y+c.h)-20;s+=160)for(const side of [12,(along?c.h:c.w)-12]){const px=along?s:c.x+side,py=along?c.y+side:s;if(!inRoom(px,py,20))post(px*U,-.55,py*U,.1,.8,.1,'#6b4f35');}}
  for(const [i,r] of map.locations.entries()){
-  for(const f of roomFloors(r))fixed((f.x+f.w/2)*U,-.08,(f.y+f.h/2)*U,f.w*U,.16,f.h*U,['#485d64','#485367','#465e5b','#555260'][i%4]);
-  // Overhead beams, suspended lights and a large room number establish scale.
-  for(let x=r.x+70;x<r.x+r.w;x+=150){fixed(x*U,3.05,(r.y+r.h/2)*U,.14,.2,r.h*U,'#243b48');fixed(x*U,2.92,(r.y+r.h/2)*U,.09,.05,1.6,'#d7fff0');}
-  for(let x=r.x+24;x<r.x+r.w;x+=60)fixed(x*U,.008,(r.y+r.h/2)*U,.018,.01,r.h*U,'#6d8286');
-  for(let y=r.y+24;y<r.y+r.h;y+=60)fixed((r.x+r.w/2)*U,.009,y*U,r.w*U,.012,.018,'#6d8286');
-  const sign=label(`${String(i+1).padStart(2,'0')}  ${r.name}`,r.color,2.8,.5);sign.position.set((r.x+r.w/2)*U,2.45,(r.y+38)*U);scene.add(sign);labels.push(sign);
+  const floorColor=tint(r.color,.58),line=tint(r.color,.42,'#cfc3b0'),rug=tint(r.color,.35),rugEdge=tint(r.color,.12,'#3b4a66'),cx=(r.x+r.w/2)*U,cz=(r.y+r.h/2)*U;
+  for(const f of roomFloors(r)){fixed((f.x+f.w/2)*U,-.08,(f.y+f.h/2)*U,f.w*U,.16,f.h*U,floorColor);fixed((f.x+f.w/2)*U,-.53,(f.y+f.h/2)*U,f.w*U+.16,.74,f.h*U+.16,'#8e9aa6');}
+  for(let x=r.x+40;x<r.x+r.w;x+=60)fixed(x*U,.004,cz,.02,.008,r.h*U,line);
+  for(let y=r.y+40;y<r.y+r.h;y+=60)fixed(cx,.005,y*U,r.w*U,.008,.02,line);
+  // A rug in the middle, open pergola beams with string lights overhead, and the room sign.
+  fixed(cx,.012,cz,r.w*U*.5,.008,r.h*U*.44,rugEdge);fixed(cx,.016,cz,r.w*U*.5-.24,.008,r.h*U*.44-.24,rug);
+  for(let x=r.x+75;x<r.x+r.w-30;x+=150){fixed(x*U,3.14,cz,.16,.16,r.h*U+.1,'#e2c89c');for(let y=r.y+30;y<r.y+r.h-10;y+=30){const t=(y-r.y)/r.h;bulb(x*U,3.02-Math.sin(t*Math.PI)*.16,y*U,.03,.03,.03,'#ffe7b0');}}
+  const sign=plaque(`${String(i+1).padStart(2,'0')}  ${r.name}`,r.color,2.8,.5);sign.position.set(cx,2.45,(r.y+38)*U);scene.add(sign);labels.push(sign);
  }
- for(const e of floorEdges([...map.locations.flatMap(roomFloors),...map.corridors])){
-  const x=(e.x1+e.x2)/2,z=(e.y1+e.y2)/2,w=Math.abs(e.x2-e.x1)*U,d=Math.abs(e.y2-e.y1)*U;
-  const indoor=map.locations.some(r=>x>=r.x-.1&&x<=r.x+r.w+.1&&z>=r.y-.1&&z<=r.y+r.h+.1),h=indoor?3.1:1.15;
-  fixed(x*U,h/2,z*U,Math.max(.14,w),h,Math.max(.14,d),indoor?'#29424f':'#304955');
-  fixed(x*U,indoor?2.2:1.15,z*U,Math.max(.17,w),.045,Math.max(.17,d),'#80bdb6');
-  fixed(x*U,.13,z*U,Math.max(.18,w),.17,Math.max(.18,d),'#152c39');
+ for(const e of floorEdges([...roomRects,...map.corridors])){
+  const x=(e.x1+e.x2)/2,z=(e.y1+e.y2)/2,vertical=e.x1===e.x2,len=vertical?e.y2-e.y1:e.x2-e.x1,room=map.locations.find(r=>x>=r.x-.1&&x<=r.x+r.w+.1&&z>=r.y-.1&&z<=r.y+r.h+.1);
+  // slab: a box centred on the edge, t thick (across), running its whole length (+t so corners close).
+  const slab=(t:number,y:number,h:number,c:string,shape=fixed)=>vertical?shape(x*U,y+h/2,z*U,t,h,len*U+t,c):shape(x*U,y+h/2,z*U,len*U+t,h,t,c);
+  if(room){const band=tint(room.color,.42),deep=tint(room.color,.12,'#3b4a66');
+   slab(.16,0,3.1,WALL);slab(.2,0,1,band);slab(.23,.97,.08,deep);slab(.26,3.08,.16,deep);
+   // Windows: warm light on the outside face, pale glass on the inside face.
+   const inward=inRoom(vertical?x+4:x,vertical?z:z+4)&&!inRoom(vertical?x-4:x,vertical?z:z-4)?1:-1;
+   if(len>=150)for(let s=60+((len-120)%140)/2;s<=len-60;s+=140){const at=(vertical?e.y1:e.x1)+s;for(const side of [-1,1]){const off=side*.1,wx=vertical?(x*U+off):at*U,wz=vertical?at*U:(z*U+off),inside=side===inward,paint=inside?fixed:lit,glass=inside?'#a9d6ec':'#ffd98c';
+    if(vertical){paint(wx,1.75,wz,.03,1,.9,glass);fixed(wx+side*.012,1.75,wz,.03,1,.05,WALL);fixed(wx+side*.012,1.75,wz,.03,.05,.9,WALL);}else{paint(wx,1.75,wz,.9,1,.03,glass);fixed(wx,1.75,wz+side*.012,.05,1,.03,WALL);fixed(wx,1.75,wz+side*.012,.9,.05,.03,WALL);}}}
+  }else{
+   // Bridge railing: posts with a lantern on every third, top and middle rails, an edge board.
+   slab(.1,.96,.08,RAIL);slab(.07,.5,.06,RAIL);slab(.12,-.02,.1,SEAM);
+   const n=Math.max(1,Math.round(len/70));for(let k=0;k<=n;k++){const at=(vertical?e.y1:e.x1)+len*k/n,px=vertical?x:at,pz=vertical?at:z;post(px*U,.5,pz*U,.065,1,.065,RAIL);if(k%3===0){bulb(px*U,1.12,pz*U,.1,.1,.1,LANTERN);fixed(px*U,1.24,pz*U,.17,.05,.17,'#6b4f35');}}
+  }
  }
+ // Door frames where a bridge enters a building, with the room's plaque over the outside.
+ for(const d of doorways(map)){const r=d.room,deep=tint(r.color,.12,'#3b4a66'),mid=(d.a+d.b)/2,span=(d.b-d.a)*U,out=d.edge===(d.vertical?r.x:r.y)?-1:1,index=map.locations.indexOf(r);
+  for(const end of [d.a,d.b])if(d.vertical)fixed(d.edge*U,1.3,end*U,.3,2.6,.22,deep);else fixed(end*U,1.3,d.edge*U,.22,2.6,.3,deep);
+  if(d.vertical){fixed(d.edge*U,2.85,mid*U,.2,.5,span,WALL);fixed(d.edge*U,2.63,mid*U,.28,.08,span+.2,deep);}else{fixed(mid*U,2.85,d.edge*U,span,.5,.2,WALL);fixed(mid*U,2.63,d.edge*U,span+.2,.08,.28,deep);}
+  const sign=plaque(`${String(index+1).padStart(2,'0')}  ${r.name}`,r.color,1.75,.31);sign.position.set(d.vertical?(d.edge+out*14)*U:mid*U,2.92,d.vertical?mid*U:(d.edge+out*14)*U);scene.add(sign);labels.push(sign);}
  const deviceMeshes:T.Object3D[]=[],deviceTargets=new Map<T.Object3D,DeviceTarget>();const register=(g:T.Group,target:DeviceTarget)=>g.traverse(o=>{if(o instanceof T.Mesh){deviceMeshes.push(o);deviceTargets.set(o,target);}});
  const stations=new Map<string,{group:T.Group;screen:T.Mesh;label:T.Sprite;pos:Point}>();
+ // Each console is two meshes: the body (one vertex-coloured geometry per variant and room
+ // colour, shared) and the screen, whose material shows the task state.
+ const painted=new T.MeshLambertMaterial({vertexColors:true});materials.set('painted',painted);const consoles=new Map<string,T.BufferGeometry>();
+ const part=(g:T.BufferGeometry,x:number,y:number,z:number,w:number,h:number,d:number,c:string)=>{const p=g.clone();p.scale(w,h,d);p.translate(x,y,z);const color=new T.Color(c),n=p.attributes.position.count,colors=new Float32Array(n*3);for(let i=0;i<n;i++)color.toArray(colors,i*3);p.setAttribute('color',new T.BufferAttribute(colors,3));return p;};
+ const consoleBody=(variant:number,accent:string)=>{const key=variant+accent;let g=consoles.get(key);if(!g){const parts=[part(softGeo,0,.42,0,.58,.84,.42,'#ece3d1'),part(softGeo,0,.66,0,.6,.1,.44,accent),part(softGeo,0,.92,0,.84,.12,.56,'#fbf7ee'),...[0,1,2].map(row=>part(geo,-.06,1.04+row*.078,-.148,.39-row*.07,.014,.012,'#193e48')),part(softGeo,-.21,.99,.17,.07,.03,.06,'#eec775'),part(softGeo,0,.99,.17,.07,.03,.06,'#80c5de'),part(softGeo,.2,.99,.17,.07,.03,.06,'#e0a592')];
+  if(variant===0)parts.push(part(cylinder,.3,1.2,0,.12,.38,.12,'#7cc8e0'));else if(variant===1)parts.push(part(sphere,.28,1.23,0,.13,.2,.13,'#8fd6a0'));
+  g=mergeGeometries(parts.map(p=>p.index?p.toNonIndexed():p));parts.forEach(p=>p.dispose());consoles.set(key,g);}return g;};
  for(const [i,s] of map.stations.entries()){
-  const g=new T.Group();g.position.set(s.x*U,0,s.y*U);scene.add(g);
-  box(g,0,.42,0,.58,.84,.42,'#1c313f');box(g,0,.92,0,.84,.12,.56,'#bdccc4');const panel=box(g,0,1.13,-.1,.7,.38,.07,'#67d7b5');panel.rotation.x=-.3;for(let row=0;row<3;row++)box(g,-.06,1.04+row*.078,-.148,.39-row*.07,.014,.012,'#193e48');
-  box(g,-.21,.99,.17,.07,.03,.06,'#eec775');box(g,0,.99,.17,.07,.03,.06,'#80c5de');box(g,.2,.99,.17,.07,.03,.06,'#e0a592');
-  if(i%3===0){const jar=new T.Mesh(cylinder,mat('#6197a8'));jar.scale.set(.12,.38,.12);jar.position.set(.3,1.2,0);g.add(jar);}else if(i%3===1){ball(g,.28,1.23,0,.13,.2,.13,'#70ae87');}
+  const g=new T.Group();g.position.set(s.x*U,0,s.y*U);scene.add(g);const room=map.locations.find(r=>r.id===s.room);
+  g.add(new T.Mesh(consoleBody(i%3,tint(room?.color||'#7bdcff',.3)),painted));const panel=box(g,0,1.13,-.1,.7,.38,.07,'#67d7b5');panel.rotation.x=-.3;
   const l=label('E  '+s.name,'#ffe7ab',2.2,.34);l.position.y=1.7;g.add(l);stations.set(s.id,{group:g,screen:panel,label:l,pos:s});register(g,{action:'taskStart',station:s.id,point:s,height:1.13,label:s.name});
  }
+ function plaque(text:string,color:string,w:number,h:number){let m=plaques.get(text);if(!m){const c=document.createElement('canvas');c.width=512;c.height=96;const ctx=c.getContext('2d')!;ctx.fillStyle='#fdf6e8';ctx.beginPath();ctx.roundRect(3,3,506,90,40);ctx.fill();ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(11,11,490,74,34);ctx.fill();ctx.fillStyle='#1b2a3a';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 34px Arial,"Malgun Gothic",sans-serif';ctx.fillText(text,256,50,460);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;textures.add(t);m=new T.SpriteMaterial({map:t,depthTest:true,transparent:true});plaques.set(text,m);}const l=new T.Sprite(m);l.scale.set(w,h,1);return l;}
  function label(text:string,color:string,w:number,h:number){const c=document.createElement('canvas');c.width=512;c.height=96;const ctx=c.getContext('2d')!;ctx.fillStyle='#0b1a26e8';ctx.fillRect(0,0,512,96);ctx.strokeStyle=color;ctx.lineWidth=4;ctx.strokeRect(2,2,508,92);ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 30px Arial,"Malgun Gothic",sans-serif';ctx.fillText(text,256,48,486);const t=new T.CanvasTexture(c);t.colorSpace=T.SRGBColorSpace;textures.add(t);const l=new T.Sprite(new T.SpriteMaterial({map:t,depthTest:true,transparent:true}));l.scale.set(w,h,1);return l;}
- const marker=(p:Point,text:string,color:string,action:DeviceTarget['action'])=>{const g=new T.Group();g.position.set(p.x*U,0,p.y*U);scene.add(g);box(g,0,.45,0,.7,.9,.5,'#233541');box(g,0,1.01,0,.6,.22,.3,color);const l=label(text,color,2,.36);l.position.y=1.7;g.add(l);labels.push(l);register(g,{action,point:p,height:1.01,label:text});return g;};
+ const marker=(p:Point,text:string,color:string,action:DeviceTarget['action'])=>{const g=new T.Group();g.position.set(p.x*U,0,p.y*U);scene.add(g);box(g,0,.45,0,.7,.9,.5,'#ece3d1');box(g,0,1.01,0,.6,.22,.3,color);const l=label(text,color,2,.36);l.position.y=1.7;g.add(l);labels.push(l);register(g,{action,point:p,height:1.01,label:text});return g;};
  const emergencyDevice=marker(emergencyFor(config),'긴급회의','#e78876','emergency');const emergencyButton=emergencyDevice.children[1] as T.Mesh;emergencyDevice.remove(emergencyButton);deviceMeshes.splice(deviceMeshes.indexOf(emergencyButton),1);deviceTargets.delete(emergencyButton);const redButton=new T.Mesh(new T.CylinderGeometry(.22,.24,.14,24),mat('#ed5360'));redButton.position.y=1.01;emergencyDevice.add(redButton);deviceMeshes.push(redButton);deviceTargets.set(redButton,{action:'emergency',point:emergencyFor(config),height:1.08,label:'긴급회의'});marker(securityConsole(config),'C  CCTV','#7bdeda','cameraStart');marker(communicationsConsole(config),'통신 복구','#cfa9ec','commsRepair');marker(repairFor(config),'전력 복구','#efd284','repair');
  for(const v of ventsFor(config)){fixed(v.x*U,.03,v.y*U,1.2,.06,.66,'#172934');for(let n=-4;n<=4;n++)fixed(v.x*U+n*.12,.075,v.y*U,.035,.03,.52,'#758a95');const l=label('V  환기구 '+v.network,'#b8a6df',1.45,.25);l.position.set(v.x*U,.35,v.y*U);scene.add(l);labels.push(l);}
  const matrix=new T.Matrix4(),position=new T.Vector3(),rotation=new T.Quaternion(),scale=new T.Vector3();
- for(const [c,items] of batch){const mesh=new T.InstancedMesh(geo,mat(c),items.length);items.forEach((a,i)=>{matrix.compose(position.set(a[0],a[1],a[2]),rotation,scale.set(a[3],a[4],a[5]));mesh.setMatrixAt(i,matrix);});mesh.computeBoundingSphere();scene.add(mesh);}
+ const shapes={box:geo,ball:new T.IcosahedronGeometry(1,1),cyl:new T.CylinderGeometry(1,1,1,8)};
+ for(const {shape,color,glow,items} of batch.values()){const mesh=new T.InstancedMesh(shapes[shape],glow?glowMat(color):mat(color),items.length);items.forEach((a,i)=>{matrix.compose(position.set(a[0],a[1],a[2]),rotation,scale.set(a[3],a[4],a[5]));mesh.setMatrixAt(i,matrix);});mesh.computeBoundingSphere();scene.add(mesh);}
  const puppets=new Map<string,Puppet>();
  function puppet(avatar:number,name:string){const doll=createDoll(avatar),l=label(name,'#dcece7',1.3,.24);l.position.y=DOLL.labelY;doll.root.add(l);scene.add(doll.root);return{...doll,last:{x:NaN,y:NaN},phase:0,label:l,caption:name,avatar};}
  let latestData:SceneFrame|null=null;const raycaster=new T.Raycaster();raycaster.far=2.65;
