@@ -3,7 +3,7 @@
 // Playwright + Chromium.  Usage:
 //   BASE=http://127.0.0.1:8787 OUT=./verify-out node tests/browser/verify-ui.mjs [step...]
 //   (PW_MODULE=/path/to/playwright/index.mjs if playwright is not resolvable; CHROMIUM=path)
-// Steps: lobby aurora nereid host solo mobile perf29   (default: all)
+// Steps: lobby aurora nereid host solo mobile perf29 hitches   (default: all)
 // Headless Chromium renders WebGL in software (SwiftShader): frame times are not device numbers.
 import fs from 'node:fs';
 const BASE=process.env.BASE||'http://127.0.0.1:8787',OUT=process.env.OUT||'verify-out';fs.mkdirSync(OUT,{recursive:true});
@@ -32,8 +32,8 @@ function bot(code,p,seq,{wander=true}={}){
  return {stats,stop(){closed=true;clearInterval(timer);try{ws.close();}catch{}},act(body){return new Promise((resolve,reject)=>{const id=crypto.randomUUID(),t=setTimeout(()=>reject(Error('timeout')),5000);const on=e=>{const m=JSON.parse(e.data);if(m.type==='actResult'&&m.id===id){clearTimeout(t);ws.removeEventListener('message',on);resolve(m);}};ws.addEventListener('message',on);ws.send(JSON.stringify({type:'act',id,body:{...body,protocol:2,code,seq,warp,inputs:pending,requestId:crypto.randomUUID()}}));});},set dir(v){dir=v;wander=false;}};
 }
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM||'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
-async function page(key,code,{viewport={width:1280,height:800},mobile=false,query='?netdebug=1',resume=true}={}){
- const ctx=await browser.newContext({viewport,deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile});
+async function page(key,code,{viewport={width:1280,height:800},mobile=false,query='?netdebug=1',resume=true,init=null}={}){
+ const ctx=await browser.newContext({viewport,deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile});if(init)await ctx.addInitScript(init);
  await ctx.addInitScript(([c,k])=>{try{localStorage.setItem('nightfall-session',JSON.stringify({code:c,token:k}));}catch{}},[code,key]);
  const pg=await ctx.newPage();const errors=[];pg.on('pageerror',e=>errors.push(e.message));pg.on('console',m=>{if(m.type()==='error'&&!/favicon|404/.test(m.text()))errors.push(m.text());});
  await pg.goto(BASE+'/'+query,{waitUntil:'domcontentloaded'});
@@ -113,5 +113,15 @@ if(want('perf29')){
  for(const mapId of ['aurora','nereid']){const R=await room({mapId,count:29});const bots=R.players.slice(1).map(p=>bot(R.code,p,R.seq));const {pg,ctx,errors}=await page(R.players[0].key,R.code);
   await pg.waitForSelector(mapId==='nereid'?'.fps-surface canvas':'.field-viewport canvas',{timeout:120000});await pg.waitForFunction(()=>window.__fieldNet?.healthy(),null,{timeout:60000}).catch(()=>{});await pause(5000);
   note(`perf29-${mapId}`,await sampleMotion(pg,10000));await pg.screenshot({path:`${OUT}/perf29-${mapId}.png`});note(`perf29-${mapId}.errors`,errors);bots.forEach(b=>b.stop());await ctx.close();}
+}
+// Hitches: main-thread long tasks from page load through the first 12 s of play (a player
+// rejoining straight into a running game, 20 players), time until the game screen shows and
+// frame intervals after the first 4 s. Software WebGL: compare builds with it, not devices.
+if(want('hitches')){
+ const watch=()=>{window.__long=[];window.__raf=[];try{new PerformanceObserver(l=>{for(const e of l.getEntries())window.__long.push([e.startTime,e.duration]);}).observe({type:'longtask',buffered:true});}catch{}let last=0;const tick=t=>{if(last)window.__raf.push([t,t-last]);last=t;requestAnimationFrame(tick);};requestAnimationFrame(tick);};
+ for(const mapId of ['nereid','aurora']){const R=await room({mapId,count:20});const bots=R.players.slice(1).map(p=>bot(R.code,p,R.seq));const {pg,ctx,errors}=await page(R.players[0].key,R.code,{query:'',init:watch});
+  await pg.waitForSelector(mapId==='nereid'?'.fps-surface canvas':'.field-viewport canvas',{timeout:120000});const appear=await pg.evaluate(()=>performance.now());await pause(12000);
+  const d=await pg.evaluate(()=>({long:window.__long,raf:window.__raf})),long=d.long.filter(([t])=>t>=appear-500&&t<appear+12000).map(([,v])=>v),raf=d.raf.filter(([t])=>t>appear+4000).map(([,v])=>v).sort((a,b)=>a-b),q=p=>Math.round(raf[Math.min(raf.length-1,Math.floor(p*raf.length))]||0);
+  note(`hitches-${mapId}`,{gameScreenMs:Math.round(appear),longTasks:long.length,longTotalMs:Math.round(long.reduce((a,b)=>a+b,0)),longMaxMs:Math.round(Math.max(0,...long)),frameP50:q(.5),frameP95:q(.95),frameP99:q(.99)});note(`hitches-${mapId}.errors`,errors);bots.forEach(b=>b.stop());await ctx.close();}
 }
 fs.writeFileSync(`${OUT}/report.json`,JSON.stringify(report,null,1));await browser.close();process.exit(0);

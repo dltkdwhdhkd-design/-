@@ -23,9 +23,11 @@ class Window{values:number[]=[];size:number;constructor(size=120){this.size=size
  get last(){return this.values.at(-1)??null;}}
 // Rolling measurements shown by the in-game network panel (F3 / ?netdebug=1).
 export class NetStats{
- ack=new Window();correction=new Window(60);sampleAge=new Window(400);frameGap=new Window();action=new Window(30);kill=new Window(20);frameWork=new Window(240);frameDt=new Window(240);renderDelay=new Window(400);
+ ack=new Window();correction=new Window(60);sampleAge=new Window(400);frameGap=new Window();action=new Window(30);kill=new Window(20);frameWork=new Window(240);frameDt=new Window(240);renderDelay=new Window(400);render3d=new Window(240);view3d:{quality:number;fps:number}|null=null;
  counts:Record<string,number>={};server:ServerDiag|null=null;rtt=0;lastFrameAt=0;
  count(k:string){this.counts[k]=(this.counts[k]||0)+1;}
+ // 3D view: script+draw time per frame, drawing resolution and frame-rate target (governor).
+ record3d(ms:number,quality:number,fps:number){this.render3d.push(ms);this.view3d={quality,fps};}
  summary(){return{rttMs:this.rtt,frameGapP95:this.frameGap.q(.95),sampleAgeP50:this.sampleAge.q(.5),sampleAgeP95:this.sampleAge.q(.95),renderDelayP50:this.renderDelay.q(.5),renderDelayP95:this.renderDelay.q(.95),ackP50:this.ack.q(.5),ackP95:this.ack.q(.95),correctionMax:this.correction.q(1),actionP50:this.action.q(.5),killLast:this.kill.last,frameWorkP95:this.frameWork.q(.95),frameDtP95:this.frameDt.q(.95),counts:{...this.counts},server:this.server};}
 }
 

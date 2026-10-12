@@ -1,6 +1,7 @@
 NIGHTFALL SOURCE SNAPSHOT
 BASE: e9cb18602a22c8d278056214f497d94bfb5e0d44 (v21) + v22 local changes (not deployed)
 + v23 figure model rework and matching first-person arm (lib/doll-character.ts, lib/scene3d.ts; see REPORT_V23_MODEL_KO.md)
++ v24 toy-style figures, frame pacing, 3D quality governor, hitch and latency fixes (see REPORT_V24_KO.md)
 Read REPORT_V22_KO.md and START_HERE_KO.md first. Binary assets, screenshots and the pnpm lockfile are in the ZIP.
 
 
@@ -1536,7 +1537,7 @@ FILE: components/DollAvatar.tsx
 import {useEffect,useState} from 'react';
 import {AVATAR_3D} from '@/lib/first-person';
 import {DOLL_NAMES} from '@/lib/doll-names';
-export default function DollAvatar({index,className=''}:{index:number;className?:string}){const [src,setSrc]=useState('');const id=((index%16)+16)%16;useEffect(()=>{let active=true;setSrc('');void import('@/lib/doll-portraits').then(m=>m.dollPortrait(id)).then(url=>{if(active)setSrc(url);/* Warm the top-view frames of this figure for the field game (cached per avatar). */void import('@/lib/doll-sprites').then(m=>m.dollSheet(id)).catch(()=>{});}).catch(()=>{});return()=>{active=false;};},[id]);return <div className={`avatar doll-avatar ${className}`} style={{background:AVATAR_3D[id][0]}}>{src?<img src={src} alt={`${DOLL_NAMES[id]} 피규어 캐릭터`} draggable={false}/>:<span className="doll-placeholder">{DOLL_NAMES[id]}</span>}</div>;}
+export default function DollAvatar({index,className=''}:{index:number;className?:string}){const [src,setSrc]=useState('');const id=((index%16)+16)%16;useEffect(()=>{let active=true;const shown=new AbortController();setSrc('');void import('@/lib/doll-portraits').then(m=>m.dollPortrait(id,shown.signal)).then(url=>{if(active)setSrc(url);/* Warm the top-view frames of this figure for the field game (cached per avatar). */void import('@/lib/doll-sprites').then(m=>m.warmDollSheet(id)).catch(()=>{});}).catch(()=>{});return()=>{active=false;shown.abort();};},[id]);return <div className={`avatar doll-avatar ${className}`} style={{background:AVATAR_3D[id][0]}}>{src?<img src={src} alt={`${DOLL_NAMES[id]} 피규어 캐릭터`} draggable={false}/>:<span className="doll-placeholder">{DOLL_NAMES[id]}</span>}</div>;}
 
 
 ======================================================================
@@ -1581,6 +1582,7 @@ import {facilityLayer,drawRoomLabel,roomAtPoint,screenToWorld,viewForRoom} from 
 import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {CONTACT_MS,type Reach,type DeviceTarget} from '@/lib/interaction';
 import FirstPersonViewport from '@/components/FirstPersonViewport';
+import {framePacer} from '@/lib/frame-pacer';
 import {cameraMovement,inFront} from '@/lib/first-person';
 import type {SceneFrame,Look} from '@/lib/scene3d';
 import SecurityMonitor from '@/components/SecurityMonitor';
@@ -1639,11 +1641,16 @@ export default function FieldGame({sound,room,session,accept,send,identity}:Prop
  useEffect(()=>{if(taskOpen&&!room.field?.challenge)setTaskOpen(false);},[room.field?.challenge,taskOpen]);
  useEffect(()=>{const t=setInterval(()=>{if(document.hidden)return;const v=netRef.current!.visual;setHud(old=>distance(old,v)>1?{...v}:old);setClock(Date.now());},120);return()=>clearInterval(t);},[]);
  cueRef.current=(kind:string)=>{if(!soundRef.current)return;try{const Ctx=window.AudioContext||(window as unknown as {webkitAudioContext:typeof AudioContext}).webkitAudioContext;const ctx=audioRef.current||new Ctx();audioRef.current=ctx;void ctx.resume();const o=ctx.createOscillator(),g=ctx.createGain();const hit=kind==='attack'||kind==='blocked';o.type=hit?'triangle':'sine';o.frequency.setValueAtTime(hit?180:kind==='task'?740:430,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(hit?45:kind==='task'?1200:210,ctx.currentTime+.2);g.gain.setValueAtTime(hit?.13:.055,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.3);o.connect(g).connect(ctx.destination);o.start();o.stop(ctx.currentTime+.32);}catch{}};
+ // Spare figure sheets are not rendered while the game screen is open (see doll-sprites).
+ useEffect(()=>{let paused=false,gone=false;void import('@/lib/doll-sprites').then(m=>{if(gone)return;m.pauseSheetWarmup(true);paused=true;});return()=>{gone=true;if(paused)void import('@/lib/doll-sprites').then(m=>m.pauseSheetWarmup(false));};},[]);
  useEffect(()=>{const n=net;n.start();if(new URLSearchParams(location.search).get('netdebug')==='1')Reflect.set(window,'__fieldNet',n);/* for measurement scripts (tests/browser) */const wake=()=>n.wake();window.addEventListener('focus',wake);return()=>{window.removeEventListener('focus',wake);n.stop();};},[net]);
- const act=async(action:string,extra:Record<string,unknown>={})=>{if(busyRef.current)return false;busyRef.current=true;movementLock.current=['taskStart','cameraStart','ventEnter','ventMove','ventExit','emergency','report','repair','commsRepair'].includes(action);setBusy(true);try{const current=latest.current;if(fpsRef.current&&['taskStart','emergency','cameraStart','repair','commsRepair'].includes(action)){
+ const act=async(action:string,extra:Record<string,unknown>={})=>{if(busyRef.current)return false;busyRef.current=true;movementLock.current=['taskStart','cameraStart','ventEnter','ventMove','ventExit','emergency','report','repair','commsRepair'].includes(action);setBusy(true);try{const current=latest.current;let contact:Promise<unknown>|null=null;if(fpsRef.current&&['taskStart','emergency','cameraStart','repair','commsRepair'].includes(action)){
  const station=mapFor(current.config).stations.find(s=>s.id===extra.station),point=action==='taskStart'?station:action==='emergency'?emergencyFor(current.config):action==='cameraStart'?securityConsole(current.config):action==='repair'?repairFor(current.config):communicationsConsole(current.config);
- if(point){reach.current={started:performance.now(),target:{action:action as DeviceTarget['action'],station:station?.id,point,height:action==='taskStart'?1.13:1.01,label:''}};keys.current.clear();stick.current={x:0,y:0};await new Promise(resolve=>setTimeout(resolve,CONTACT_MS));if(latest.current.seq!==current.seq||latest.current.paused)return false;}
- }const before=latest.current.intel.length;const data=await netRef.current!.act(action,extra);if(!data)return false;if(data.room&&data.room.intel.length>before)toast(data.room.intel.at(-1)?.text);return true;}catch(e){toast.error((e as Error).name==='AbortError'?'응답이 늦어지고 있습니다. 연결 상태를 확인해 주세요.':(e as Error).message);return false;}finally{movementLock.current=false;busyRef.current=false;setBusy(false);}};
+ if(point){reach.current={started:performance.now(),target:{action:action as DeviceTarget['action'],station:station?.id,point,height:action==='taskStart'?1.13:1.01,label:''}};keys.current.clear();stick.current={x:0,y:0};contact=new Promise(resolve=>setTimeout(resolve,CONTACT_MS));}
+ }const before=latest.current.intel.length;
+  // The request leaves together with the reach animation; the panel opens when both the hand
+  // has touched the device and the server has answered (the longer of the two, not their sum).
+  const [data]=await Promise.all([netRef.current!.act(action,extra),contact]);if(!data)return false;if(data.room&&data.room.intel.length>before)toast(data.room.intel.at(-1)?.text);return true;}catch(e){toast.error((e as Error).name==='AbortError'?'응답이 늦어지고 있습니다. 연결 상태를 확인해 주세요.':(e as Error).message);return false;}finally{movementLock.current=false;busyRef.current=false;setBusy(false);}};
  const speechUnavailable=room.host||room.paused||!!f.vent||!!f.watching||!!f.challenge||f.invisibleUntil>serverNow;
  const openSpeech=()=>{if(speechUnavailable)return;setSpeechOpen(true);requestAnimationFrame(()=>speechInput.current?.focus({preventScroll:true}));};
  const speak=async(text:string,typed=false)=>{if(speechUnavailable||busyRef.current||!text.trim()||Date.now()<speechClock.current)return;const ok=await act('say',{text});if(ok){speechClock.current=Date.now()+1500;if(typed){setSpeechText('');setSpeechOpen(false);speechInput.current?.blur();canvas.current?.focus({preventScroll:true});}}};
@@ -1686,15 +1693,15 @@ export default function FieldGame({sound,room,session,accept,send,identity}:Prop
   return()=>{window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',clear);document.removeEventListener('visibilitychange',visibility);document.removeEventListener('focusin',focus);};
  },[]);
  useEffect(()=>{
-  const c=canvas.current;if(!c)return;const ctx=c.getContext('2d',{alpha:false});if(!ctx)return;let raf=0,last=performance.now(),width=900,height=600;let lastPaint=0;const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const c=canvas.current;if(!c)return;const ctx=c.getContext('2d',{alpha:false});if(!ctx)return;let raf=0,last=performance.now(),width=900,height=600;const pacer=framePacer(60);const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let floorCanvas:HTMLCanvasElement|null=null;
   // Top view draws the same 3D figure as the selection cards and the 3D map (frames rendered
   // once per avatar); the painted atlas is the fallback until they are ready or without WebGL.
-  const dolls:Record<number,DollSheet>={};void import('@/lib/doll-sprites').then(m=>{for(const avatar of new Set(latest.current.players.map(p=>((p.avatar%16)+16)%16)))m.dollSheet(avatar).then(sheet=>{dolls[avatar]=sheet;}).catch(()=>{});}).catch(()=>{});
+  const dolls:Record<number,DollSheet>={};/* Only the top view draws sheets; the 3D view never renders them. */if(!fpsRef.current)void import('@/lib/doll-sprites').then(m=>{for(const avatar of new Set(latest.current.players.map(p=>((p.avatar%16)+16)%16)))m.dollSheet(avatar).then(sheet=>{dolls[avatar]=sheet;}).catch(()=>{});}).catch(()=>{});
   const figure=(avatar:number,m:CharacterMotion)=>{const sheet=dolls[((avatar%16)+16)%16];if(sheet)drawDoll(ctx,sheet,m);else drawCharacter(ctx,sprites,avatar,m);};
   const sprites=CHARACTER_ATLASES.map(src=>{const image=new Image();let retries=0;image.onerror=()=>{if(retries++<2)image.src=`${src}?retry=${retries}`;};image.src=src;return image;}),rooms=new Image();rooms.src='/art/field-rooms.png';rooms.onload=()=>{if(!fpsRef.current)floorCanvas=facilityLayer(map,rooms);};
   const resize=()=>{const b=c.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,1.5,Math.sqrt(1500000/Math.max(1,b.width*b.height)));width=b.width;height=b.height;c.width=Math.round(width*dpr);c.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);};const ro=new ResizeObserver(resize);ro.observe(c);resize();
-  const draw=(time:number)=>{if(document.hidden){last=time;raf=requestAnimationFrame(draw);return;}if(time-lastPaint<1000/60-1){raf=requestAnimationFrame(draw);return;}lastPaint=time;const elapsed=(time-last)/1000,dt=Math.min(.05,elapsed);last=time;const net=netRef.current!,r=latest.current,s=net.snapshot,host=r.host;const work=performance.now();
+  const draw=(time:number)=>{if(document.hidden){last=time;raf=requestAnimationFrame(draw);return;}if(!pacer.due(time)){raf=requestAnimationFrame(draw);return;}const elapsed=(time-last)/1000,dt=Math.min(.05,elapsed);last=time;const net=netRef.current!,r=latest.current,s=net.snapshot,host=r.host;const work=performance.now();
    const rawDirection=movementVector(keys.current,stick.current),direction=fpsRef.current?cameraMovement(rawDirection,look.current.yaw):rawDirection;
    // Input follows real time up to 100 ms per frame, so a 15 fps device still walks at full speed.
    const moving=net.step(Math.min(.1,elapsed),direction,halt.current);net.stats.frameDt.push(dt*1000);
@@ -1756,7 +1763,7 @@ export default function FieldGame({sound,room,session,accept,send,identity}:Prop
  return <section className="field-game" ref={wrapper}>
   {!room.host&&isNeutral(role)&&<div className="neutral-objective"><strong>중립 · 독립 승리</strong><span>{f.neutral?.objective}</span></div>}<div className="field-top"><div className="field-mode"><Radio size={16}/><span>현장 수사 <small>{room.host?'진행자 관전':locationAt(hud,room.config)} · {liveStatus.connected&&liveStatus.checkpointAge<1000?'실시간 연결':'일반 연결'}{liveStatus.connected&&liveStatus.rtt>0?` ${liveStatus.rtt}ms`:''}</small></span></div><div className="mission-progress"><div><span>크루 팀 미션 {f.done}/{f.total}</span><b>{progress}%</b></div><div className="mission-track"><i style={{width:`${progress}%`}}/></div><small>전체 미션 완료 → 크루 승리</small></div><button className="field-tool" onClick={()=>setMapOpen(true)}><Map size={19}/><span>전체 지도 · M</span></button><button className="field-tool" onClick={()=>setNotesOpen(true)}><ClipboardList size={19}/><span>단서 {room.intel.length||''}</span></button>{!room.host&&<button className="field-tool" onClick={identity}><Eye size={19}/><span>직업</span></button>}</div>
   <div className={`field-viewport ${fps?'fps-viewport':''} ${room.host?'host-viewport':''}`}>{hit&&<div className="field-hit"><Skull size={42}/><strong>현장에서 탈락했습니다</strong></div>}<canvas style={fps?{visibility:'hidden'}:undefined} tabIndex={fps?-1:0} ref={canvas} onClick={e=>{if(!room.host)return;const box=e.currentTarget.getBoundingClientRect(),p=screenToWorld({x:e.clientX-box.left,y:e.clientY-box.top},viewTransform.current),area=roomAtPoint(map,p);if(area)focusRoom(area.id);}} aria-label={`${LOCATIONS.length}개 장소가 연결된 현장 지도. WASD 또는 방향키, 터치 조이스틱으로 이동하세요.`}/>
-   {fps&&<FirstPersonViewport data={sceneFrame} look={look} config={room.config} blocked={halt.current||speechOpen} follow={follow} onInteract={interactDevice}/>}
+   {fps&&<FirstPersonViewport data={sceneFrame} look={look} config={room.config} blocked={halt.current||speechOpen} follow={follow} onInteract={interactDevice} onFrame={(ms,quality,fps)=>netRef.current?.stats.record3d(ms,quality,fps)}/>}
    {fps&&room.host&&<div className="fps-spectate"><select aria-label="3D 관전 대상" value={follow} onChange={e=>setFollow(e.target.value)}><option value="">자유 이동 · WASD</option>{room.players.map(p=><option key={p.id} value={p.id}>{p.name} 위치에서 관전</option>)}</select><select aria-label="관전 위치" onChange={e=>{const a=LOCATIONS.find(l=>l.id===e.target.value);if(a){spectator.current={x:a.x+a.w/2,y:a.y+a.h/2};setFollow('');}}}><option value="">연구동으로 이동</option>{LOCATIONS.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></div>}
    {!room.host&&<div className="field-tasklist"><div><ClipboardList size={14}/>{['survivor','escapeartist'].includes(role||'')?'개인 승리 미션':red||isNeutral(role)?'위장용 미션':'나의 미션'}<small>{tasks.filter(t=>t.done).length}/{tasks.length}</small></div>{tasks.map(t=><button key={t.id} className={`${t.done?'done':''} ${mission===t.id?'tracking':''}`} onClick={()=>{setMission(t.id);setMapOpen(true);}}><span>{t.done?<Check size={12}/>:<i/>}</span><p>{t.name}<small>{LOCATIONS.find(r=>r.id===t.room)?.name}</small></p></button>)}</div>}
    {room.host&&!fps&&<div className="host-camera-bar"><div><span>진행자 관전</span><strong>{hostRoom?LOCATIONS.find(r=>r.id===hostRoom)?.name:'전체 시설'}</strong><small>{hostRoom?'방 안의 이동과 현장을 실시간으로 확인합니다.':'보고 싶은 방을 클릭하거나 아래에서 선택하세요.'}</small></div><Select value={hostRoom||'all'} onValueChange={v=>focusRoom(v==='all'?'':v)}><SelectTrigger aria-label="관전할 방 선택"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">전체 맵</SelectItem>{LOCATIONS.map(l=><SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent></Select>{hostRoom&&<button className="secondary" onClick={()=>focusRoom('')}><Map size={16}/>전체 맵</button>}</div>}
@@ -1792,7 +1799,7 @@ function NetPanel({net,close}:{net:FieldNet;close:()=>void}){
  const [s,setS]=useState(()=>net.stats.summary());const [,tick]=useState(0);
  useEffect(()=>{const t=setInterval(()=>{setS(net.stats.summary());tick(n=>n+1);},500);return()=>clearInterval(t);},[net]);
  const ms=(v:number|null|undefined)=>v===null||v===undefined?'–':`${Math.round(v)}ms`,sv=s.server;
- const rows:[string,string][]=[['전송',net.healthy()?'WebSocket (실시간)':'HTTP 대체'],['RTT',ms(s.rttMs)],['프레임 간격 p95',ms(s.frameGapP95)],['원격 샘플 나이 p50/p95',`${ms(s.sampleAgeP50)} / ${ms(s.sampleAgeP95)}`],['원격 표시 지연 p50/p95',`${ms(s.renderDelayP50)} / ${ms(s.renderDelayP95)}`],['입력 확인 p50/p95',`${ms(s.ackP50)} / ${ms(s.ackP95)}`],['보정 오차 최대',s.correctionMax===null?'–':`${s.correctionMax}px`],['행동 응답 p50',ms(s.actionP50)],['마지막 공격 요청→확정',ms(s.killLast)],['프레임 작업 p95 / 간격 p95',`${ms(s.frameWorkP95)} / ${ms(s.frameDtP95)}`],['미확인 입력',String(net.pending.length)],['재전송·재기준·재연결',`${s.counts.resend||0} · ${s.counts.rebase||0} · ${net.live?.reconnects||0}`]];
+ const rows:[string,string][]=[['전송',net.healthy()?'WebSocket (실시간)':'HTTP 대체'],['RTT',ms(s.rttMs)],['프레임 간격 p95',ms(s.frameGapP95)],['원격 샘플 나이 p50/p95',`${ms(s.sampleAgeP50)} / ${ms(s.sampleAgeP95)}`],['원격 표시 지연 p50/p95',`${ms(s.renderDelayP50)} / ${ms(s.renderDelayP95)}`],['입력 확인 p50/p95',`${ms(s.ackP50)} / ${ms(s.ackP95)}`],['보정 오차 최대',s.correctionMax===null?'–':`${s.correctionMax}px`],['행동 응답 p50',ms(s.actionP50)],['마지막 공격 요청→확정',ms(s.killLast)],['프레임 작업 p95 / 간격 p95',`${ms(s.frameWorkP95)} / ${ms(s.frameDtP95)}`],...(net.stats.view3d?[['3D 그리기 · 해상도',`${ms(net.stats.render3d.q(.95))} · ${Math.round(net.stats.view3d.quality*100)}% · ${net.stats.view3d.fps}fps`] as [string,string]]:[]),['미확인 입력',String(net.pending.length)],['재전송·재기준·재연결',`${s.counts.resend||0} · ${s.counts.rebase||0} · ${net.live?.reconnects||0}`]];
  if(sv)rows.push(['서버 인스턴스',`${sv.instance} · 이 인스턴스 ${sv.peersHere}명 / 전체 ${sv.instances}개`],['D1 RTT · 초당 문장',`${ms(sv.dbRttMs)} · ${sv.dbStatementsPerSec}`],['D1 쿼리(이 연결)',`${sv.queries} / ${sv.budget}`],['D1 오류 · 재활용',`${sv.dbErrors} · ${sv.recycles}`],['체크포인트 나이',ms(sv.checkpointAge)]);
  return <div className="net-debug" role="status" aria-label="네트워크 진단"><div><strong>네트워크 진단</strong><button onClick={close} aria-label="진단 닫기"><X size={14}/></button></div><dl>{rows.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl><small>F3으로 열고 닫기</small></div>;
 }
@@ -1826,13 +1833,17 @@ import {useEffect,useRef,useState,type MutableRefObject} from 'react';
 import type {SceneFrame,Look} from '@/lib/scene3d';
 import type {DeviceTarget} from '@/lib/interaction';
 import type {Config} from '@/lib/game';
-export default function FirstPersonViewport({data,look,config,blocked,follow,onInteract}:{data:MutableRefObject<SceneFrame|null>;look:MutableRefObject<Look>;config:Config;blocked:boolean;follow:string;onInteract:(target:DeviceTarget)=>void}){
- const interaction=useRef(onInteract);interaction.current=onInteract;const pick=useRef<((x?:number,y?:number)=>DeviceTarget|null)|null>(null);const [hint,setHint]=useState('');
+import {framePacer,qualityGovernor} from '@/lib/frame-pacer';
+export default function FirstPersonViewport({data,look,config,blocked,follow,onInteract,onFrame}:{data:MutableRefObject<SceneFrame|null>;look:MutableRefObject<Look>;config:Config;blocked:boolean;follow:string;onInteract:(target:DeviceTarget)=>void;onFrame?:(workMs:number,quality:number,fps:number)=>void}){
+ const interaction=useRef(onInteract);interaction.current=onInteract;const frameReport=useRef(onFrame);useEffect(()=>{frameReport.current=onFrame;});const pick=useRef<((x?:number,y?:number)=>DeviceTarget|null)|null>(null);const [hint,setHint]=useState('');
  const audioUnlock=useRef<(()=>void)|null>(null);const canvas=useRef<HTMLCanvasElement>(null),lock=useRef(blocked),following=useRef(follow),drag=useRef<{id:number;x:number;y:number}|null>(null),sensitivity=useRef(.0025);lock.current=blocked;following.current=follow;
  const [retry,setRetry]=useState(0);const [ready,setReady]=useState(false),[error,setError]=useState(''),[locked,setLocked]=useState(false),[low,setLow]=useState(()=>typeof window!=='undefined'&&window.matchMedia('(pointer:coarse)').matches);
  const turn=(x:number,y:number)=>{look.current.yaw=(look.current.yaw+x*sensitivity.current)%(Math.PI*2);look.current.pitch=Math.max(-1.1,Math.min(1.1,look.current.pitch+y*sensitivity.current));};
  useEffect(()=>{let cancelled=false,raf=0,scene:ReturnType<typeof import('@/lib/scene3d').createScene>|undefined,ro:ResizeObserver|undefined;setReady(false);setError('');
-  void import('@/lib/scene3d').then(({createScene})=>{if(cancelled||!canvas.current)return;try{scene=createScene(canvas.current,config,low);audioUnlock.current=scene.enableAudio;pick.current=scene.pickDevice;ro=new ResizeObserver(()=>{const b=canvas.current!.getBoundingClientRect();scene?.resize(b.width,b.height);});ro.observe(canvas.current);setReady(true);let last=0;const draw=(time:number)=>{if(cancelled)return;const modal=!!document.querySelector('[role="dialog"],[role="alertdialog"]');if((lock.current||modal||document.hidden)&&document.pointerLockElement===canvas.current)document.exitPointerLock();if(!document.hidden&&data.current&&time-last>=(low?1000/30-1:1000/60-1)){last=time;try{scene!.update(data.current,look.current,following.current);const label=lock.current?'':scene!.pickDevice()?.label||'';setHint(old=>old===label?old:label);}catch{setError('3D 화면을 표시하지 못했습니다. 저화질로 다시 연결해 주세요.');return;}}raf=requestAnimationFrame(draw);};raf=requestAnimationFrame(draw);}catch{setError('이 기기에서 3D 그래픽을 시작하지 못했습니다. 저화질로 다시 연결해 주세요.');}}).catch(()=>setError('3D 파일을 불러오지 못했습니다. 새로고침하거나 다시 연결해 주세요.'));
+  void import('@/lib/scene3d').then(({createScene})=>{if(cancelled||!canvas.current)return;try{scene=createScene(canvas.current,config,low,data.current?.room.players.map(p=>p.avatar)??[]);audioUnlock.current=scene.enableAudio;pick.current=scene.pickDevice;ro=new ResizeObserver(()=>{const b=canvas.current!.getBoundingClientRect();scene?.resize(b.width,b.height);});ro.observe(canvas.current);setReady(true);
+   // Even frame pacing (every frame the same length at the screen's refresh) and a governor that
+   // lowers the drawing resolution, then holds 30 fps, when the GPU cannot keep up.
+   const pacer=framePacer(60),governor=qualityGovernor(1);const draw=(time:number)=>{if(cancelled)return;if(document.pointerLockElement===canvas.current&&(lock.current||document.hidden||document.querySelector('[role="dialog"],[role="alertdialog"]')))document.exitPointerLock();if(!document.hidden&&data.current&&pacer.due(time)){const work=performance.now();try{scene!.update(data.current,look.current,following.current);const label=lock.current?'':scene!.pickDevice()?.label||'';setHint(old=>old===label?old:label);}catch{setError('3D 화면을 표시하지 못했습니다. 저화질로 다시 연결해 주세요.');return;}if(governor.frame(time,pacer.interval())){pacer.target=governor.target;scene!.setQuality(governor.scale);}frameReport.current?.(performance.now()-work,governor.scale,Math.round(1000/pacer.interval()));}raf=requestAnimationFrame(draw);};raf=requestAnimationFrame(draw);}catch{setError('이 기기에서 3D 그래픽을 시작하지 못했습니다. 저화질로 다시 연결해 주세요.');}}).catch(()=>setError('3D 파일을 불러오지 못했습니다. 새로고침하거나 다시 연결해 주세요.'));
   return()=>{cancelled=true;cancelAnimationFrame(raf);ro?.disconnect();scene?.dispose();if(document.pointerLockElement===canvas.current)document.exitPointerLock();};
  },[config.count,config.mapId,low,retry]);
  useEffect(()=>{const c=canvas.current;const lost=(e:Event)=>{e.preventDefault();setError('그래픽 연결이 중단되었습니다. 다시 연결해 주세요.');};c?.addEventListener('webglcontextlost',lost);return()=>c?.removeEventListener('webglcontextlost',lost);},[]);
@@ -10627,47 +10638,48 @@ export function drawDoll(ctx:CanvasRenderingContext2D,sheet:DollSheet,m:Characte
 FILE: lib/doll-character.ts
 ======================================================================
 import * as T from 'three';
-import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries,mergeVertices} from 'three/addons/utils/BufferGeometryUtils.js';
 import {AVATAR_3D} from './first-person.ts';
 export {DOLL_NAMES} from './doll-names.ts';
 
-// Desk-figure proportions (1 unit = 40 map px): the head is about half of the height, the
-// body a short flared coat on stubby legs, mitten hands and rounded toy shoes. Viewed from
-// the first-person camera (eye 1.43) other players' eyes sit slightly below eye level.
+// Soft toy figures (1 unit = 40 map px): a big round head (about half of the height), a small
+// bean-shaped body, stubby arms with mitten hands and round shoes. Simple dot eyes set low on
+// the face, rosy cheeks and chunky hair with rounded ends keep them cute rather than uncanny.
+// Viewed from the first-person camera (eye 1.43) other players' eyes sit a little lower.
 export const DOLL={height:1.71,headY:1.24,headScale:.94,shoulderY:.82,hipY:.42,labelY:2.0};
 // The head is authored around its own centre (y 1.36) and the head group is scaled/offset
 // onto DOLL.headY, so face, hair and accessories share one coordinate frame.
 const LEGACY_HEAD_Y=1.36;
 
-// A soft "mochi" head: full cheeks, the lower half narrowing to a small rounded chin.
-// faceZ() is the exact front surface, so painted features lie on the skin.
-const HC=LEGACY_HEAD_Y,HX=.445,HY=.425,HZ=.4;
-const jaw=(y:number)=>{const s=T.MathUtils.clamp((HC-.02-y)/(HY-.02),0,1);return s*s*(3-2*s);};
-const widthAt=(y:number)=>1-.16*jaw(y),depthAt=(y:number)=>1-.06*jaw(y);
+// A round head, only a little fuller at the cheeks than at the chin. faceZ() is the exact
+// front surface, so painted features lie on the skin.
+const HC=LEGACY_HEAD_Y,HX=.43,HY=.41,HZ=.41;
+const jaw=(y:number)=>{const s=T.MathUtils.clamp((HC-.05-y)/(HY-.05),0,1);return s*s*(3-2*s);};
+const widthAt=(y:number)=>1-.07*jaw(y),depthAt=(y:number)=>1-.03*jaw(y);
 const faceZ=(x:number,y:number)=>{const u=x/(HX*widthAt(y)),v=(y-HC)/HY;return -HZ*depthAt(y)*Math.sqrt(Math.max(.012,1-u*u-v*v));};
 // Hair rides on the same shape, `pad` above the skin; below the widest line it falls straight.
 const hairAt=(theta:number,phi:number,pad:number)=>{const y=HC+(HY+pad)*Math.cos(theta),s=Math.sin(theta);return new T.Vector3((HX+pad)*s*Math.sin(phi)*widthAt(y),y,(HZ+pad)*s*Math.cos(phi)*depthAt(y));};
 const hang=(phi:number,drop:number,pad:number,inward=0)=>{const e=hairAt(Math.PI/2,phi,pad);return new T.Vector3(e.x*(1-inward),HC-drop,e.z*(1-inward));};
-// Body surfaces for clothing details: the coat is a lathe of TORSO squashed to .8 depth.
-const TORSO=[[0,.425],[.16,.428],[.232,.44],[.252,.466],[.247,.51],[.232,.59],[.219,.67],[.213,.74],[.206,.8],[.188,.85],[.15,.887],[.09,.907],[.03,.914],[0,.915]];
+// The body is a bean: a lathe of TORSO squashed to .86 depth (torsoZ is its front surface).
+const TORSO=[[0,.415],[.14,.417],[.205,.43],[.228,.46],[.228,.52],[.216,.6],[.204,.68],[.196,.75],[.18,.81],[.15,.855],[.1,.885],[.04,.9],[0,.902]];
 const torsoR=(y:number)=>{for(let i=1;i<TORSO.length;i++){const [r0,y0]=TORSO[i-1],[r1,y1]=TORSO[i];if(y<=y1)return r0+(r1-r0)*T.MathUtils.clamp((y-y0)/(y1-y0),0,1);}return 0;};
-const torsoZ=(x:number,y:number)=>-.8*Math.sqrt(Math.max(.0004,torsoR(y)**2-x*x));
+const torsoZ=(x:number,y:number)=>-.86*Math.sqrt(Math.max(.0004,torsoR(y)**2-x*x));
 
 // Shared, never disposed: every doll in every scene and the portrait renderer use the same
 // three materials (vertex colours), so a doll costs one draw call per joint group and kind.
-const MATTE=new T.MeshStandardMaterial({vertexColors:true,roughness:.68,metalness:0});
-const GLOSS=new T.MeshStandardMaterial({vertexColors:true,roughness:.22,metalness:0});
-// A little of each surface's own colour is added as glow, like a painted PVC figure: shadow
-// sides stay readable under the map's cool light instead of turning grey-green.
-for(const m of [MATTE,GLOSS])m.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n\ttotalEmissiveRadiance += vColor.rgb * 0.16;');};
+const MATTE=new T.MeshStandardMaterial({vertexColors:true,roughness:.74,metalness:0});
+const GLOSS=new T.MeshStandardMaterial({vertexColors:true,roughness:.3,metalness:0});
+// A little of each surface's own colour is added as glow, like a soft vinyl toy: shadow sides
+// stay warm and readable under the map's cool light instead of turning grey-green.
+for(const m of [MATTE,GLOSS])m.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n\ttotalEmissiveRadiance += vColor.rgb * 0.2;');};
 const PAINT=new T.MeshBasicMaterial({vertexColors:true,side:T.DoubleSide});
 const SHADOW=new T.MeshBasicMaterial({color:'#07101a',transparent:true,opacity:.23,depthWrite:false});
-const SHADOW_GEO=new T.CircleGeometry(.36,24);
-const HEAD=(()=>{const s=new T.SphereGeometry(1,44,32);s.deleteAttribute('uv');s.deleteAttribute('normal');const g=mergeVertices(s);s.dispose();const p=g.attributes.position;for(let i=0;i<p.count;i++){const y=HC+p.getY(i)*HY;p.setXYZ(i,p.getX(i)*HX*widthAt(y),y,p.getZ(i)*HZ*depthAt(y));}g.computeVertexNormals();return g;})();
-const SPHERE=new T.SphereGeometry(1,16,12),SMALL=new T.SphereGeometry(1,10,8),ROUNDED=new RoundedBoxGeometry(1,1,1,1,.15),CYLINDER=new T.CylinderGeometry(1,1,1,22);
-const COAT=new T.LatheGeometry(TORSO.map(([r,y])=>new T.Vector2(r,y)),28),SLEEVE=new T.LatheGeometry([[0,.035],[.045,.03],[.064,0],[.068,-.09],[.072,-.158],[.077,-.162],[.078,-.19],[.068,-.21],[0,-.212]].map(([r,y])=>new T.Vector2(r,y)),14),TROUSER=new T.LatheGeometry([[0,.03],[.075,.02],[.09,-.03],[.083,-.2],[.076,-.3],[0,-.3]].map(([r,y])=>new T.Vector2(r,y)),14);
-const SHARED=new Set<T.BufferGeometry>([HEAD,SPHERE,SMALL,ROUNDED,CYLINDER,COAT,SLEEVE,TROUSER]);
+const SHADOW_GEO=new T.CircleGeometry(.34,24);
+const HEAD=(()=>{const s=new T.SphereGeometry(1,36,26);s.deleteAttribute('uv');s.deleteAttribute('normal');const g=mergeVertices(s);s.dispose();const p=g.attributes.position;for(let i=0;i<p.count;i++){const y=HC+p.getY(i)*HY;p.setXYZ(i,p.getX(i)*HX*widthAt(y),y,p.getZ(i)*HZ*depthAt(y));}g.computeVertexNormals();return g;})();
+const SPHERE=new T.SphereGeometry(1,16,12),SMALL=new T.SphereGeometry(1,10,8),CYLINDER=new T.CylinderGeometry(1,1,1,12);
+const lathe=(profile:number[][],segments:number)=>new T.LatheGeometry(profile.map(([r,y])=>new T.Vector2(r,y)),segments);
+const BODY=lathe(TORSO,24),SLEEVE=lathe([[0,.04],[.04,.035],[.06,.01],[.064,-.06],[.066,-.15],[.07,-.153],[.071,-.185],[.062,-.205],[0,-.208]],12),TROUSER=lathe([[0,.03],[.07,.02],[.085,-.02],[.08,-.18],[.074,-.28],[0,-.285]],12);
+const SHARED=new Set<T.BufferGeometry>([HEAD,SPHERE,SMALL,CYLINDER,BODY,SLEEVE,TROUSER]);
 type Kind='matte'|'gloss'|'paint';
 type Shade=(p:T.Vector3,n:T.Vector3,c:T.Color)=>void;
 const colour=new T.Color(),base=new T.Color(),matrix=new T.Matrix4(),q=new T.Quaternion(),e=new T.Euler(),p3=new T.Vector3(),n3=new T.Vector3(),hsl={h:0,s:0,l:0};
@@ -10678,34 +10690,38 @@ const ellipse=(x:number,y:number,rx:number,ry:number,n=28)=>Array.from({length:n
 // Sutherland-Hodgman: keeps the part of `shape` inside the convex counter-clockwise `edge`.
 const clip=(shape:T.Vector2[],edge:T.Vector2[])=>{let out=shape;for(let i=0;i<edge.length&&out.length;i++){const a=edge[i],b=edge[(i+1)%edge.length],input=out,side=(p:T.Vector2)=>(b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x)>=0;out=[];for(let j=0;j<input.length;j++){const p=input[j],r=input[(j+1)%input.length],pin=side(p);if(pin)out.push(p);if(pin!==side(r)){const t=((a.x-p.x)*(b.y-a.y)-(a.y-p.y)*(b.x-a.x))/((r.x-p.x)*(b.y-a.y)-(r.y-p.y)*(b.x-a.x));out.push(V(p.x+(r.x-p.x)*t,p.y+(r.y-p.y)*t));}}}return out;};
 // A stroke along a polyline, `width[i]` thick on its left (upper side when drawn left to
-// right) and `below` of that on the other side: lids, lashes, brows, mouths.
+// right) and `below` of that on the other side: lashes, brows, mouths.
 const stroke=(line:T.Vector2[],width:number[],below=.25)=>{const a:T.Vector2[]=[],b:T.Vector2[]=[];line.forEach((p,i)=>{const d=line[Math.min(line.length-1,i+1)].clone().sub(line[Math.max(0,i-1)]).normalize(),n=V(-d.y,d.x);a.push(p.clone().addScaledVector(n,width[i]));b.push(p.clone().addScaledVector(n,-width[i]*below));});return [...b,...a.reverse()];};
 const taper=(n:number,w0:number,w1:number,w2:number)=>Array.from({length:n},(_,i)=>{const t=i/(n-1);return t<.5?w0+(w1-w0)*Math.sin(t*Math.PI):w2+(w1-w2)*Math.sin(t*Math.PI);});
+// Lock end shapes: `round` stays full and closes like a fingertip; `drop` swells then rounds off.
+const round=(t:number)=>Math.max(0,1-t**2.4)**.5,drop=(t:number)=>Math.sin(Math.PI*(.18+.82*t))**.6;
 
-// Per-avatar look. Hair: short cap, bob (to the jaw) or long (to the shoulders); sweep turns
-// the fringe sideways; part splits it in the middle; tail adds twin tails, a ponytail or a bun.
-type Look={girl:boolean;hair:'short'|'bob'|'long';sweep:number;part?:boolean;ahoge?:boolean;tail?:'twin'|'pony'|'bun';clip?:boolean;glasses?:boolean;mouth:'smile'|'cat'|'open';shoe:number};
+// Per-avatar look. Hair: short, bob (to the jaw) or long (to the shoulders). Fringe: swept to
+// one side (sweep), parted in the middle, or straight-cut bangs; tail adds twin tails, a
+// ponytail or a bun.
+type Look={girl:boolean;hair:'short'|'bob'|'long';fringe:'swept'|'part'|'bangs';sweep:number;ahoge?:boolean;tail?:'twin'|'pony'|'bun';clip?:boolean;glasses?:boolean;mouth:'smile'|'cat'|'open';shoe:number};
 const LOOKS:Look[]=[
- {girl:false,hair:'short',sweep:.38,ahoge:true,mouth:'smile',shoe:0},{girl:true,hair:'long',sweep:-.08,mouth:'smile',shoe:3},
- {girl:false,hair:'short',sweep:-.22,mouth:'open',shoe:1},{girl:true,hair:'long',sweep:.26,mouth:'cat',shoe:2},
- {girl:true,hair:'bob',sweep:-.3,clip:true,mouth:'smile',shoe:3},{girl:false,hair:'short',sweep:0,part:true,mouth:'smile',shoe:0},
- {girl:true,hair:'short',sweep:.18,tail:'twin',mouth:'open',shoe:2},{girl:false,hair:'short',sweep:-.42,mouth:'smile',shoe:1},
- {girl:false,hair:'short',sweep:.5,ahoge:true,mouth:'cat',shoe:0},{girl:true,hair:'long',sweep:.3,clip:true,mouth:'smile',shoe:3},
- {girl:false,hair:'short',sweep:.16,glasses:true,mouth:'smile',shoe:1},{girl:true,hair:'bob',sweep:-.2,tail:'bun',mouth:'smile',shoe:2},
- {girl:true,hair:'short',sweep:.22,tail:'pony',mouth:'open',shoe:3},{girl:false,hair:'short',sweep:-.3,ahoge:true,mouth:'open',shoe:2},
- {girl:true,hair:'bob',sweep:.32,clip:true,mouth:'cat',shoe:0},{girl:false,hair:'short',sweep:-.45,mouth:'smile',shoe:1},
+ {girl:false,hair:'short',fringe:'swept',sweep:1,ahoge:true,mouth:'smile',shoe:0},{girl:true,hair:'long',fringe:'bangs',sweep:0,mouth:'smile',shoe:3},
+ {girl:false,hair:'short',fringe:'swept',sweep:-1,mouth:'open',shoe:1},{girl:true,hair:'long',fringe:'swept',sweep:1,mouth:'cat',shoe:2},
+ {girl:true,hair:'bob',fringe:'bangs',sweep:0,clip:true,mouth:'smile',shoe:3},{girl:false,hair:'short',fringe:'part',sweep:0,mouth:'smile',shoe:0},
+ {girl:true,hair:'short',fringe:'bangs',sweep:0,tail:'twin',mouth:'open',shoe:2},{girl:false,hair:'short',fringe:'swept',sweep:-1,mouth:'smile',shoe:1},
+ {girl:false,hair:'short',fringe:'swept',sweep:1,ahoge:true,mouth:'cat',shoe:0},{girl:true,hair:'long',fringe:'swept',sweep:-1,clip:true,mouth:'smile',shoe:3},
+ {girl:false,hair:'short',fringe:'part',sweep:0,glasses:true,mouth:'smile',shoe:1},{girl:true,hair:'bob',fringe:'swept',sweep:-1,tail:'bun',mouth:'smile',shoe:2},
+ {girl:true,hair:'short',fringe:'bangs',sweep:0,tail:'pony',mouth:'open',shoe:3},{girl:false,hair:'short',fringe:'swept',sweep:-1,ahoge:true,mouth:'open',shoe:2},
+ {girl:true,hair:'bob',fringe:'swept',sweep:1,clip:true,mouth:'cat',shoe:0},{girl:false,hair:'short',fringe:'swept',sweep:1,mouth:'smile',shoe:1},
 ];
-const SHOES=[['#30323f','#e6dfd2'],['#5a3a2b','#e9dcc6'],['#f1ece3','#b9b2a6'],['#7b3f4c','#efe5d8']];
+const SHOES=[['#3a3d4c','#e9e2d6'],['#6a4634','#ece0cb'],['#f3eee6','#c9c1b4'],['#8a4a58','#f1e7da']];
 const IRIS=['#806052','#5395ab','#947b52','#679c86','#a26f8d','#8b78b4','#5e95b6','#a17c53','#7e9c74','#9b7ab3','#679d99','#bb875e','#a58097','#7d9eb8','#9296c5','#708da6'];
 
-// Figure paint: skin a touch warmer, very dark hair lifted so its sculpted form still reads.
+// Figure paint: skin a touch warmer, very dark hair lifted so its rounded form still reads.
 // AVATAR_3D itself stays as authored (the 2D UI uses it); only the figures are repainted.
 function figurePaint(id:number){
  const [coat,hairBase,accent,skinBase,pants]=AVATAR_3D[id],fair=T.MathUtils.smoothstep(new T.Color(skinBase).getHSL(hsl,T.SRGBColorSpace).l,.5,.72),hairLight=new T.Color(hairBase).getHSL(hsl,T.SRGBColorSpace).l;
- return{coat,accent,pants,fair,hairLight,skin:shift(skinBase,0,.1*fair,-.01*fair),hair:shift(hairBase,Math.max(0,.15-hairLight),.02)};}
+ return{coat,accent,pants,fair,hairLight,skin:shift(skinBase,.01,.1*fair,-.01*fair),hair:shift(hairBase,Math.max(0,.17-hairLight),.03)};}
 const KNIFE={grip:'#393040',guard:'#c4d6dd',blade:'#dde8ed'};
 // Every piece is baked into its joint group's buffers with a vertex colour (shade() may vary
-// it per vertex); bake() then makes one mesh per joint group and material kind.
+// it per vertex); bake() then makes one mesh per joint group and material kind. Baked
+// geometry is marked shared: templates reuse it for every copy of that figure.
 function kit(){
  const parts=new Map<T.Object3D,Record<Kind,T.BufferGeometry[]>>();
  const add=(g:T.Object3D,source:T.BufferGeometry,m:T.Matrix4|null,c:T.ColorRepresentation,kind:Kind='matte',shade?:Shade)=>{
@@ -10715,141 +10731,135 @@ function kit(){
   let entry=parts.get(g);if(!entry){entry={matte:[],gloss:[],paint:[]};parts.set(g,entry);}entry[kind].push(geo);if(!SHARED.has(source))source.dispose();};
  const at=(x:number,y:number,z:number,sx:number,sy:number,sz:number,rx=0,ry=0,rz=0)=>matrix.compose(new T.Vector3(x,y,z),q.setFromEuler(e.set(rx,ry,rz)),new T.Vector3(sx,sy,sz)).clone();
  const ball=(g:T.Object3D,x:number,y:number,z:number,sx:number,sy:number,sz:number,c:T.ColorRepresentation,kind:Kind='matte',geo=Math.max(sx,sy,sz)<.05?SMALL:SPHERE)=>add(g,geo,at(x,y,z,sx,sy,sz),c,kind);
- const box=(g:T.Object3D,x:number,y:number,z:number,sx:number,sy:number,sz:number,c:T.ColorRepresentation,rz=0,kind:Kind='matte')=>add(g,ROUNDED,at(x,y,z,sx,sy,sz,0,0,rz),c,kind);
- const ring=(g:T.Object3D,x:number,y:number,z:number,r:number,tube:number,c:T.ColorRepresentation,sz=1,rx=Math.PI/2,arc=Math.PI*2,ry=0)=>add(g,new T.TorusGeometry(r,tube,6,20,arc),at(x,y,z,1,sz,1,rx,ry,0),c);
- const rod=(g:T.Object3D,a:T.Vector3,b:T.Vector3,r:number,c:T.ColorRepresentation)=>{const d=b.clone().sub(a);add(g,CYLINDER,new T.Matrix4().compose(a.clone().add(b).multiplyScalar(.5),new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),d.clone().normalize()),new T.Vector3(r,d.length(),r)),c,'gloss');};
- const bake=()=>{for(const [group,kinds] of parts)for(const [kind,list] of Object.entries(kinds) as [Kind,T.BufferGeometry[]][]){if(!list.length)continue;const merged=mergeGeometries(list,false)!;list.forEach(g=>g.dispose());merged.computeBoundingSphere();group.add(new T.Mesh(merged,kind==='paint'?PAINT:kind==='gloss'?GLOSS:MATTE));}parts.clear();};
- return{add,at,ball,box,ring,rod,bake};}
+ const ring=(g:T.Object3D,x:number,y:number,z:number,r:number,tube:number,c:T.ColorRepresentation,sz=1,rx=Math.PI/2,ry=0)=>add(g,new T.TorusGeometry(r,tube,6,20),at(x,y,z,1,sz,1,rx,ry,0),c);
+ const rod=(g:T.Object3D,a:T.Vector3,b:T.Vector3,r:number,c:T.ColorRepresentation,kind:Kind='matte')=>{const d=b.clone().sub(a);add(g,CYLINDER,new T.Matrix4().compose(a.clone().add(b).multiplyScalar(.5),new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),d.clone().normalize()),new T.Vector3(r,d.length(),r)),c,kind);};
+ const bake=()=>{for(const [group,kinds] of parts)for(const [kind,list] of Object.entries(kinds) as [Kind,T.BufferGeometry[]][]){if(!list.length)continue;const merged=mergeGeometries(list,false)!;list.forEach(g=>g.dispose());merged.computeBoundingSphere();merged.userData.shared=true;group.add(new T.Mesh(merged,kind==='paint'?PAINT:kind==='gloss'?GLOSS:MATTE));}parts.clear();};
+ return{add,at,ball,ring,rod,bake};}
 
-export function createDoll(index:number){
- const id=((index%16)+16)%16,look=LOOKS[id],root=new T.Group(),head=new T.Group(),arms:T.Group[]=[],legs:T.Group[]=[];
+// Builds one figure (about 9k triangles). createDoll() copies it, so this runs once per avatar.
+function build(id:number){
+ const look=LOOKS[id],root=new T.Group(),head=new T.Group(),girl=look.girl;
  root.name='doll-'+id;head.name='head';root.add(head);head.scale.setScalar(DOLL.headScale);head.position.y=DOLL.headY-LEGACY_HEAD_Y*DOLL.headScale;
- const {coat,accent,pants,skin,fair,hair,hairLight}=figurePaint(id),{add,at,ball,box,ring,rod,bake}=kit();
+ const {coat,accent,pants,skin,fair,hair,hairLight}=figurePaint(id),{add,at,ball,ring,rod,bake}=kit();
  // Flat shapes laid onto a surface z=surface(x,y), subdivided so they bend with it. Face paint
- // is unlit like figure paint; clothing decals are lit and face outwards (-z).
+ // is unlit like printed toy paint; clothing decals are lit and face outwards (-z).
  const lay=(g:T.Object3D,shape:T.Vector2[],c:T.ColorRepresentation|((x:number,y:number,o:T.Color)=>void),cx:number,cy:number,surface:(x:number,y:number)=>number,lift:number,kind:Kind='paint',mirror=1,fine=.03)=>{
   if(shape.length<3)return;const flat=new T.ShapeGeometry(new T.Shape(shape)).toNonIndexed(),vertices:number[]=[];
   const split=(a:T.Vector3,b:T.Vector3,c:T.Vector3,depth=0)=>{const ab=a.distanceTo(b),bc=b.distanceTo(c),ca=c.distanceTo(a);if(Math.max(ab,bc,ca)<fine||depth>=7){if(kind==='paint')vertices.push(a.x,a.y,0,b.x,b.y,0,c.x,c.y,0);else vertices.push(a.x,a.y,0,c.x,c.y,0,b.x,b.y,0);return;}if(ab>=bc&&ab>=ca){const m=a.clone().add(b).multiplyScalar(.5);split(a,m,c,depth+1);split(m,b,c,depth+1);}else if(bc>=ca){const m=b.clone().add(c).multiplyScalar(.5);split(a,b,m,depth+1);split(a,m,c,depth+1);}else{const m=c.clone().add(a).multiplyScalar(.5);split(a,b,m,depth+1);split(m,b,c,depth+1);}};
   const fp=flat.attributes.position;for(let i=0;i<fp.count;i+=3)split(new T.Vector3().fromBufferAttribute(fp,i),new T.Vector3().fromBufferAttribute(fp,i+1),new T.Vector3().fromBufferAttribute(fp,i+2));flat.dispose();
   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(vertices,3));const p=geo.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i)*mirror+cx,y=p.getY(i)+cy;p.setXYZ(i,x,y,surface(x,y)-lift);}geo.computeVertexNormals();
   if(typeof c==='function')add(g,geo,null,'#fff',kind,(v,_n,o)=>c((v.x-cx)*mirror,v.y-cy,o));else add(g,geo,null,c,kind);};
- const paint=(shape:T.Vector2[],c:T.ColorRepresentation|((x:number,y:number,o:T.Color)=>void),cx:number,cy:number,layer=0,mirror=1,fine=.03)=>lay(head,shape,c,cx,cy,faceZ,.003+layer*.0007,'paint',mirror,fine);
- const decal=(shape:T.Vector2[],c:T.ColorRepresentation,layer=0,kind:Kind='matte')=>lay(root,shape,c,0,0,torsoZ,.003+layer*.0025,kind,1,.04);
- // Hair shading: the underside a little darker and a glossy "angel ring" band around the crown.
- const sheen=shift(hair,.2,-.04),under=shift(hair,-.06);
- const hairShade:Shade=(p,n,c)=>{const band=Math.exp(-(((p.y-(HC+.255))/.045)**2))*Math.max(0,Math.min(1,(n.x*p.x/HX+n.y*(p.y-HC)/HY+n.z*p.z/HZ)*2.2));c.lerp(under,T.MathUtils.clamp((HC-.05-p.y)/.5,0,1)*.7).lerp(sheen,band*.75);};
- // A sculpted lock: a flattened tube along a smooth path, its wide side lying on the head,
- // tapering to a point. The open root is always buried in the hair cap.
- const lock=(path:T.Vector3[],width:number,flat=.42,profile=(t:number)=>Math.cos(t*Math.PI/2)**.75,steps=12)=>{
-  const curve=new T.CatmullRomCurve3(path,false,'centripetal'),v:number[]=[],ix:number[]=[],around=10;
-  for(let i=0;i<=steps;i++){const t=i/steps,p=curve.getPoint(t),tan=curve.getTangent(t),out=new T.Vector3(p.x/HX**2,(p.y-HC)/HY**2,p.z/HZ**2).normalize(),side=new T.Vector3().crossVectors(tan,out).normalize(),up=new T.Vector3().crossVectors(tan,side).normalize(),r=Math.max(.0015,width*(profile(t)||0));
+ const paint=(shape:T.Vector2[],c:T.ColorRepresentation|((x:number,y:number,o:T.Color)=>void),cx:number,cy:number,layer=0,mirror=1,fine=.03)=>lay(head,shape,c,cx,cy,faceZ,.003+layer*.0008,'paint',mirror,fine);
+ const decal=(shape:T.Vector2[],c:T.ColorRepresentation,layer=0)=>lay(root,shape,c,0,0,torsoZ,.003+layer*.0025,'matte',1,.04);
+ // Hair shading: a soft sheen across the crown, the underside a little deeper.
+ const sheen=shift(hair,.16,-.03),under=shift(hair,-.05);
+ const hairShade:Shade=(p,n,c)=>{const band=Math.exp(-(((p.y-(HC+.24))/.06)**2))*Math.max(0,Math.min(1,(n.x*p.x/HX+n.y*(p.y-HC)/HY+n.z*p.z/HZ)*2));c.lerp(under,T.MathUtils.clamp((HC-.05-p.y)/.5,0,1)*.6).lerp(sheen,band*.55);};
+ // A chunky lock: a thick flattened tube along a smooth path, its wide side lying on the head,
+ // ending in a rounded tip. The open root is always buried in the hair cap.
+ const lock=(path:T.Vector3[],width:number,flat=.5,profile=round,steps=10)=>{
+  const curve=new T.CatmullRomCurve3(path,false,'centripetal'),v:number[]=[],ix:number[]=[],around=9;
+  for(let i=0;i<=steps;i++){const t=i/steps,p=curve.getPoint(t),tan=curve.getTangent(t),out=new T.Vector3(p.x/HX**2,(p.y-HC)/HY**2,p.z/HZ**2).normalize(),side=new T.Vector3().crossVectors(tan,out).normalize(),up=new T.Vector3().crossVectors(tan,side).normalize(),r=Math.max(.002,width*(profile(t)||0));
    for(let j=0;j<around;j++){const a=j/around*Math.PI*2,w=p.clone().addScaledVector(side,Math.cos(a)*r).addScaledVector(up,Math.sin(a)*r*flat);v.push(w.x,w.y,w.z);if(i<steps){const n=i*around+j,k=i*around+(j+1)%around;ix.push(n,k,n+around,k,k+around,n+around);}}}
   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(v,3));geo.setIndex(ix);geo.computeVertexNormals();add(head,geo,null,hair,'matte',hairShade);};
 
  // ---- head (legacy coordinates, see LEGACY_HEAD_Y) ----------------------------------------
- // Skin with soft airbrushed cheeks (vertex colour, lit) instead of pasted blush ovals.
- const blush=shift(skin,.03+.02*(1-fair),.04+.1*fair,-.025),neck=shift(skin,-.08);
- add(head,HEAD,null,skin,'matte',(p,_n,c)=>{for(const s of [-1,1]){const dx=(p.x-s*.235)/.092,dy=(p.y-1.226)/.056;if(p.z<0)c.lerp(blush,(.45+.25*fair)*Math.exp(-dx*dx-dy*dy));}c.lerp(neck,T.MathUtils.clamp((1.02-p.y)/.08,0,1));});
- for(const side of [-1,1])ball(head,side*.405,1.29,.03,.048,.068,.05,skin,'matte',SMALL);
- // Eyes: mirrored per side, iris clipped to the eye opening, gradient iris, two highlights.
- const iris=IRIS[id],girl=look.girl,EX=.168,EY=1.322;
- const top=girl?new T.CubicBezierCurve(V(-.098,-.002),V(-.088,.075),V(.035,.104),V(.112,.04)):new T.CubicBezierCurve(V(-.098,0),V(-.084,.07),V(.04,.099),V(.112,.034));
- const bottom=girl?new T.CubicBezierCurve(V(.112,.04),V(.098,-.045),V(-.02,-.09),V(-.098,-.002)):new T.CubicBezierCurve(V(.112,.034),V(.096,-.042),V(-.02,-.08),V(-.098,0));
- let opening=[...top.getPoints(16),...bottom.getPoints(16).slice(1,-1)];if(T.ShapeUtils.isClockWise(opening))opening=opening.reverse();
- const ix=.008,iy=girl?.006:.002,rx=girl?.066:.061,ry=girl?.086:.076,inside=(s:T.Vector2[])=>clip(s,opening);
- const irisTop=shift(iris,-.2,.02),irisLow=shift(iris,.17,.08),rim=shift(iris,-.3,.05),pupil=shift(iris,-.42,-.1),glow=shift(iris,.3,.1),lidShade=new T.Color('#d6d2e4'),white=new T.Color('#fffaf5');
- const lid=girl?'#3a2830':'#2f2630',brow=shift(hair,hairLight>.45?-.18:-.04,.04),lash=shift(lid,.25);
+ // Skin with soft rosy cheeks (vertex colour, lit) and a little shade under the chin.
+ const blush=skin.clone().lerp(new T.Color('#ff8e8c'),.28+.22*fair),neck=shift(skin,-.07);
+ add(head,HEAD,null,skin,'matte',(p,_n,c)=>{for(const s of [-1,1]){const dx=(p.x-s*.2)/.08,dy=(p.y-1.222)/.05;if(p.z<0)c.lerp(blush,.75*Math.exp(-dx*dx-dy*dy));}c.lerp(neck,T.MathUtils.clamp((1.03-p.y)/.08,0,1));});
+ for(const side of [-1,1])ball(head,side*.418,1.3,.02,.042,.062,.048,skin,'matte',SMALL);
+ // Eyes: tall dark ovals set a little below the middle of the face, tinted with the eye colour
+ // at the bottom, with one big and one small highlight (same side on both eyes, like a light).
+ const EX=.148,EY=1.3,rx=girl?.053:.049,ry=girl?.071:.066,dark=new T.Color('#2a2129').lerp(new T.Color(IRIS[id]),.12),tint=shift(IRIS[id],-.04,.06);
  for(const side of [-1,1]){const cx=side*EX;
-  paint(opening,(_x,y,o)=>o.copy(white).lerp(lidShade,T.MathUtils.clamp((y-.012)/.07,0,1)),cx,EY,1,side,.02);
-  paint(inside(ellipse(ix,iy,rx,ry)),rim,cx,EY,2,side);
-  paint(inside(ellipse(ix,iy,rx*.9,ry*.92)),(_x,y,o)=>o.copy(irisTop).lerp(irisLow,T.MathUtils.clamp((iy+ry*.6-y)/(ry*1.3),0,1)),cx,EY,3,side,.014);
-  paint(clip(inside(ellipse(ix,iy-ry*.5,rx*.62,ry*.3)),ellipse(ix,iy,rx*.8,ry*.84)),glow,cx,EY,4,side);
-  paint(inside(ellipse(ix+.002,iy+.012,rx*.44,ry*.48)),pupil,cx,EY,5,side);
-  paint(inside(ellipse(ix-.025,iy+.03,.022,.027)),'#ffffff',cx,EY,6,side);
-  paint(inside(ellipse(ix+.03,iy-.038,.011,.011,16)),'#ffffff',cx,EY,6,side);
-  if(girl)paint(inside(ellipse(ix+.03,iy+.043,.006,.006,12)),'#ffffff',cx,EY,6,side);
-  // Upper lash line (thicker at the outer corner, a small flick for the girls), lower lash.
-  const line=top.getPoints(18);if(girl)line.push(V(.124,.052),V(.136,.066));
-  const w=line.map((_,i)=>{const t=i/18;return i>18?(i===19?.011:.003):(girl?.006:.008)+(girl?.012:.011)*t*t*(3-2*t);});
-  paint(stroke(line,w,.35),lid,cx,EY,7,side);
-  paint(stroke(bottom.getPoints(18).slice(0,7),[.0015,.004,.0045,.004,.0032,.002,.0008],0),lash,cx,EY,7,side);
-  if(girl)paint(stroke(new T.QuadraticBezierCurve(V(-.04,.103),V(.03,.122),V(.088,.083)).getPoints(10),taper(11,.0008,.0035,.0006),0),shift(skin,-.1,.05),cx,EY,1,side);
-  const browLine=girl?new T.QuadraticBezierCurve(V(-.07,-.004),V(-.005,.024),V(.074,.0)).getPoints(12):new T.QuadraticBezierCurve(V(-.08,-.012),V(-.01,.02),V(.078,.006)).getPoints(12);
-  paint(stroke(browLine,girl?taper(13,.006,.0105,.003):taper(13,.012,.0155,.006),.5),brow,cx+side*.004,girl?1.452:1.446,1,side);
+  paint(ellipse(0,0,rx,ry,32),(_x,y,o)=>o.copy(dark).lerp(tint,.8*T.MathUtils.clamp((-.15*ry-y)/(.75*ry),0,1)),cx,EY,1,1,.012);
+  paint(ellipse(-rx*.3,ry*.34,rx*.38,ry*.31,20),'#ffffff',cx,EY,2);
+  paint(ellipse(rx*.36,-ry*.4,rx*.17,rx*.17,14),'#ffffff',cx,EY,2);
+  // Two small lashes at the outer corner for the girls.
+  if(girl)for(const [a,len] of [[.42,.024],[.85,.02]] as const){const s=V(Math.cos(a)*rx*.96,Math.sin(a)*ry*.96),d=V(Math.cos(a)*1.25,Math.sin(a)*.9).normalize();paint(stroke([s,s.clone().addScaledVector(d,len*.5),s.clone().addScaledVector(d,len)],[.0055,.004,.0012],.5),dark,cx,EY,1,side);}
+  // Small soft brows.
+  paint(stroke(new T.QuadraticBezierCurve(V(-.034,-.004),V(0,.012),V(.036,-.002)).getPoints(8),girl?taper(9,.004,.0068,.003):taper(9,.0065,.009,.005),.5),shift(hair,hairLight>.45?-.22:-.05,.04),cx+side*.004,EY+.105,1,side);
  }
- // Nose dot and a small mouth (a smile, a cat "ω" or a little open laugh).
- paint(ellipse(0,0,.009,.006,14),shift(skin,-.07,-.02,-.01),0,1.257,1);
- const mouthC=new T.Color('#8c3f4a').lerp(skin,.1);
- if(look.mouth==='open'){const m=[...new T.QuadraticBezierCurve(V(-.036,.008),V(0,.0),V(.036,.008)).getPoints(10),...new T.CubicBezierCurve(V(.036,.008),V(.03,-.04),V(-.03,-.04),V(-.036,.008)).getPoints(14).slice(1,-1)].reverse();paint(m,'#93404c',0,1.188,1);paint(clip(ellipse(0,-.03,.022,.014),m),'#ec8f98',0,1.188,2);}
- else if(look.mouth==='cat'){for(const s of [-1,1])paint(stroke(new T.QuadraticBezierCurve(V(0,.006),V(.016,-.02),V(.032,.004)).getPoints(9),taper(10,.002,.005,.0015),.5),mouthC,0,1.19,1,s);}
- else paint(stroke(new T.QuadraticBezierCurve(V(-.033,.008),V(0,-.019),V(.033,.008)).getPoints(12),taper(13,.0025,.0065,.0025),.5),mouthC,0,1.19,1);
+ // A small mouth close under the eyes: a smile, a cat "ω" or a little open laugh.
+ const mouthC=new T.Color('#7c3a42').lerp(skin,.08);
+ if(look.mouth==='open'){const m=[...new T.QuadraticBezierCurve(V(-.026,.006),V(0,.002),V(.026,.006)).getPoints(8),...new T.CubicBezierCurve(V(.026,.006),V(.022,-.034),V(-.022,-.034),V(-.026,.006)).getPoints(12).slice(1,-1)].reverse();paint(m,'#8e3d48',0,1.19,1);paint(clip(ellipse(0,-.024,.016,.011),m),'#ec8f98',0,1.19,2);}
+ else if(look.mouth==='cat'){for(const s of [-1,1])paint(stroke(new T.QuadraticBezierCurve(V(0,.005),V(.013,-.016),V(.026,.004)).getPoints(8),taper(9,.0022,.005,.0018),.5),mouthC,0,1.195,1,s);}
+ else paint(stroke(new T.QuadraticBezierCurve(V(-.025,.007),V(0,-.016),V(.025,.007)).getPoints(10),taper(11,.0025,.0062,.0025),.5),mouthC,0,1.195,1);
 
  // ---- hair -------------------------------------------------------------------------------
- // A sculpted cap: clumps that end in points along the hairline and tuck into the skin at
- // their edge, so the hairline is a clean curve; fringe and side locks lie on top of it.
- const hairline=(f:number)=>{const k=[[0,1.0],[.7,1.08],[1.0,1.45],[1.3,1.52],[1.6,1.37],[2.05,2.2],[Math.PI,2.62]];for(let i=1;i<k.length;i++)if(f<=k[i][0]){const t=(f-k[i-1][0])/(k[i][0]-k[i-1][0]);return k[i-1][1]+(k[i][1]-k[i-1][1])*t*t*(3-2*t);}return 2.62;};
- const clumps=16,sectors=clumps*4,rings=20,hv:number[]=[],hi:number[]=[];
- for(let a=0;a<=rings;a++)for(let b=0;b<=sectors;b++){
-  const phi=b/sectors*Math.PI*2,f=Math.abs(Math.atan2(Math.sin(phi-Math.PI),Math.cos(phi-Math.PI))),frac=(b/4)%1,tip=1-Math.abs(2*frac-1),u=a/rings;
-  const edge=hairline(f)+tip*.11*T.MathUtils.smoothstep(f,.75,1.15),theta=.006+(edge-.006)*u;
-  const pad=(.046+.026*Math.cos(Math.min(theta,Math.PI/2))**2)*(1-T.MathUtils.smoothstep(u,.8,1))+.014*Math.sin(Math.PI*frac)**2*u*(1-T.MathUtils.smoothstep(u,.85,1))-.018*T.MathUtils.smoothstep(u,.9,1);
-  const p=hairAt(theta,phi,pad);hv.push(p.x,p.y,p.z);if(a<rings&&b<sectors){const n=a*(sectors+1)+b;hi.push(n,n+sectors+1,n+1,n+1,n+sectors+1,n+sectors+2);}}
+ // One puffy cap, fringe included: its edge is a row of soft rounded scallops that curl under
+ // into the skin, so there is no hard rim. The fringe is straight-cut, parted in the middle or
+ // longer on one side (sweep); side locks and tails are added on top.
+ const sweep=look.sweep,front=(s:number)=>look.fringe==='bangs'?1.3:look.fringe==='part'?1.13+.17*Math.min(1,Math.abs(s)/.55):1.25+.09*sweep*T.MathUtils.clamp(s/.9,-1,1);
+ const sides=[[.75,0],[1.02,1.38],[1.3,1.5],[1.6,1.36],[2.05,2.15],[Math.PI,2.55]];
+ const hairline=(s:number)=>{const f=Math.abs(s);let back=2.55;for(let i=1;i<sides.length;i++)if(f<=sides[i][0]){const t=T.MathUtils.clamp((f-sides[i-1][0])/(sides[i][0]-sides[i-1][0]),0,1),from=i===1?front(s):sides[i-1][1];back=from+(sides[i][1]-from)*t*t*(3-2*t);break;}return f<.75?front(s):back;};
+ // Rings run from the crown to the edge at full thickness, then LIP rings roll the edge under
+ // into the skin, so the edge reads as a thick rounded lip and meets the skin at a clean line.
+ const clumps=14,sectors=clumps*5,rings=16,LIP=[[.012,.04],[.026,.016],[.034,-.012]],hv:number[]=[],hi:number[]=[];
+ for(let a=0;a<=rings+LIP.length;a++)for(let b=0;b<=sectors;b++){
+  const phi=b/sectors*Math.PI*2,s=Math.atan2(Math.sin(phi-Math.PI),Math.cos(phi-Math.PI)),frac=(b/5)%1,arch=Math.sin(Math.PI*frac),u=Math.min(1,a/rings);
+  const edge=hairline(s)+arch*(Math.abs(s)<.8?.055:.085),lip=LIP[a-rings-1],theta=lip?edge+lip[0]:.006+(edge-.006)*u;
+  const pad=lip?lip[1]:(.05+.032*Math.cos(Math.min(theta,Math.PI/2))**2)*(1-.25*T.MathUtils.smoothstep(u,.7,1))+.008*arch*u;
+  const p=hairAt(theta,phi,pad);hv.push(p.x,p.y,p.z);if(a<rings+LIP.length&&b<sectors){const n=a*(sectors+1)+b;hi.push(n,n+sectors+1,n+1,n+1,n+sectors+1,n+sectors+2);}}
  const capRaw=new T.BufferGeometry();capRaw.setAttribute('position',new T.Float32BufferAttribute(hv,3));capRaw.setIndex(hi);const cap=mergeVertices(capRaw);capRaw.dispose();cap.computeVertexNormals();add(head,cap,null,hair,'matte',hairShade);
- // Fringe: overlapping locks of varied width and length from the crown, lying on the forehead
- // and ending above the brows. [offset from the front, half width, extra length]
- const fringe=look.part?[[-.84,.085,.03],[-.6,.1,0],[-.36,.09,.05],[-.14,.075,.02],[.14,.075,.02],[.36,.09,.05],[.6,.1,0],[.84,.085,.03]]
-  :[[-.86,.09,.02],[-.6,.11,.05],[-.36,.075,0],[-.15,.115,.07],[.08,.085,.02],[.3,.12,.06],[.56,.08,0],[.82,.1,.04]];
- for(const [i,[o,w,l]] of fringe.entries()){
-  const sweep=look.part?Math.sign(o)*.32:look.sweep,len=1.21+l+((id*7+i*3)%5)*.01-Math.abs(o)*.05+(look.part?.03:0),phi=Math.PI+o-sweep*.25,steps=[0,.22,.45,.68,.86,1];
-  lock(steps.map(t=>hairAt(.3+(len-.3)*t,phi+sweep*.55*t**1.4,.02+.06*Math.sin(Math.PI*Math.min(1,t*1.12))**.8)),w*(girl?.95:1),.4,t=>Math.cos(t*Math.PI/2)**.55);}
+ // A swept fringe gets one big soft swoop across the top, so the hair has a direction.
+ if(look.fringe==='swept')lock([0,.3,.6,.85,1].map(t=>hairAt(.25+.95*t,Math.PI-sweep*(.25-1.05*t),.05+.045*Math.sin(Math.PI*t))),.16,.45,round,10);
  // Side locks frame the face in front of the ears; longer for bob/long hair and the girls.
- const sideDrop=look.hair==='long'?.44:look.hair==='bob'?.32:girl?.24:.07;
- for(const s of [-1,1]){const phi=Math.PI-s*1.12;lock([hairAt(.55,phi,.02),hairAt(1.0,phi,.05),hairAt(1.38,phi+s*.06,.05),hang(phi+s*.1,sideDrop*.45,.045),hang(phi+s*.12,sideDrop,.03,.06)],girl?.08:.07,.45);}
- // Bob and long hair: a mass of wide locks over the back and sides, resting on the back.
- if(look.hair!=='short'){const long=look.hair==='long',drop=long?.62:.34;
-  for(let i=0;i<9;i++){const phi=(i-4)/4*1.62,d=drop*(1-Math.abs(i-4)*.02)+(i%2)*.03;
-   lock([hairAt(.95,phi,.02),hairAt(1.3,phi,.07),hang(phi,0,.075),hang(phi,d*.5,.07,long?.08:.02),hang(phi,d*.85,.06,long?.28:.08),hang(phi,d,.04,long?.36:.2)],.13,.5,t=>t<.7?1:Math.cos((t-.7)/.3*Math.PI/2)**.7,14);}}
+ const sideDrop=look.hair==='long'?.4:look.hair==='bob'?.3:girl?.22:.04;
+ for(const s of [-1,1]){const phi=Math.PI-s*1.1;lock([hairAt(.6,phi,.02),hairAt(1.0,phi,.055),hairAt(1.36,phi+s*.05,.055),hang(phi+s*.08,sideDrop*.5,.05),hang(phi+s*.1,sideDrop,.04,.05)],girl?.095:.085,.55);}
+ // Bob and long hair: a soft mass of wide rounded locks over the back and sides.
+ if(look.hair!=='short'){const long=look.hair==='long',d0=long?.56:.32;
+  for(let i=0;i<7;i++){const phi=(i-3)/3*1.55,d=d0*(1-Math.abs(i-3)*.03);
+   lock([hairAt(.95,phi,.02),hairAt(1.3,phi,.075),hang(phi,0,.08),hang(phi,d*.5,.075,long?.08:.03),hang(phi,d*.85,.065,long?.24:.1),hang(phi,d,.05,long?.3:.2)],.16,.55,round,12);}}
  // Tails and accessories.
- if(look.tail==='twin')for(const s of [-1,1]){const phi=s*1.05,tie=hairAt(.95,phi,.075);ball(head,tie.x,tie.y,tie.z,.05,.05,.05,accent,'gloss');lock([hairAt(.95,phi,0),hairAt(.95,phi,.13),new T.Vector3(s*.6,HC-.05,.32),new T.Vector3(s*.6,HC-.3,.28),new T.Vector3(s*.54,HC-.5,.25)],.11,.85,t=>Math.sin(Math.PI*(.2+.8*t))**.7,14);}
- if(look.tail==='pony'){ball(head,...hairAt(1.12,0,.08).toArray() as [number,number,number],.055,.055,.055,accent,'gloss');lock([hairAt(1.12,0,.0),hairAt(1.1,0,.16),new T.Vector3(0,HC-.16,.66),new T.Vector3(.03,HC-.44,.56),new T.Vector3(-.02,HC-.62,.46)],.13,.7,t=>Math.sin(Math.PI*(.25+.75*t))**.8,14);}
- if(look.tail==='bun'){const c=hairAt(.62,0,.15);ball(head,c.x,c.y,c.z,.17,.165,.165,hair);ring(head,c.x,c.y-.09,c.z-.07,.12,.022,accent,1,Math.PI/2-.95);}
- if(look.ahoge)lock([hairAt(.14,Math.PI,.0),hairAt(.06,Math.PI,.1),new T.Vector3(.04,HC+HY+.16,-.07),new T.Vector3(.1,HC+HY+.14,-.01)],.042,.5,t=>Math.cos(t*Math.PI/2)**.6,10);
- if(look.clip){const c=hairAt(1.12,Math.PI+.62,.085);box(head,c.x,c.y,c.z,.15,.045,.05,accent,-.55);ball(head,c.x-.04,c.y+.025,c.z-.012,.026,.026,.014,'#e3c67e','gloss');}
- if(look.glasses)for(const s of [-1,1]){const x=s*EX,slope=(faceZ(x+.01,EY)-faceZ(x-.01,EY))/.02,z=faceZ(x,EY)-.032;add(head,new T.TorusGeometry(.104,.0075,6,32),at(x,EY,z,1,.92,1,0,Math.atan2(-slope,1),0),'#584531','gloss');if(s>0)box(head,0,EY+.02,faceZ(0,EY)-.045,.12,.014,.012,'#584531');rod(head,new T.Vector3(s*.268,EY+.02,faceZ(.268,EY)-.03),new T.Vector3(s*.43,EY+.03,-.02),.007,'#584531');}
+ if(look.tail==='twin')for(const s of [-1,1]){const phi=s*1.05,tie=hairAt(.95,phi,.08);ball(head,tie.x,tie.y,tie.z,.05,.05,.05,accent,'gloss');lock([hairAt(.95,phi,0),hairAt(.95,phi,.14),new T.Vector3(s*.6,HC-.06,.32),new T.Vector3(s*.6,HC-.3,.28),new T.Vector3(s*.53,HC-.48,.25)],.12,.85,drop,12);}
+ if(look.tail==='pony'){const tie=hairAt(1.1,0,.08);ball(head,tie.x,tie.y,tie.z,.055,.055,.055,accent,'gloss');lock([hairAt(1.1,0,0),hairAt(1.08,0,.16),new T.Vector3(0,HC-.14,.64),new T.Vector3(.02,HC-.4,.54),new T.Vector3(-.02,HC-.56,.45)],.13,.8,drop,12);}
+ if(look.tail==='bun'){const c=hairAt(.6,0,.15);ball(head,c.x,c.y,c.z,.165,.16,.16,hair);ring(head,c.x,c.y-.09,c.z-.07,.12,.024,accent,1,Math.PI/2-.95);}
+ if(look.ahoge)lock([hairAt(.12,Math.PI,0),hairAt(.05,Math.PI,.1),new T.Vector3(.03,HC+HY+.17,-.06),new T.Vector3(.09,HC+HY+.15,0)],.045,.6,round,8);
+ if(look.clip){const c=hairAt(1.1,Math.PI+.66,.09);rod(head,c.clone().add(new T.Vector3(.055,.03,0)),c.clone().add(new T.Vector3(-.055,-.03,0)),.022,accent,'gloss');ball(head,c.x,c.y,c.z-.018,.034,.034,.02,'#f2d27a','gloss');}
+ if(look.glasses)for(const s of [-1,1]){const x=s*EX,slope=(faceZ(x+.01,EY)-faceZ(x-.01,EY))/.02,z=faceZ(x,EY)-.03;add(head,new T.TorusGeometry(.085,.008,6,28),at(x,EY,z,1,1,1,0,Math.atan2(-slope,1),0),'#5b4836','gloss');if(s>0)rod(head,new T.Vector3(-.064,EY+.02,faceZ(-.064,EY)-.035),new T.Vector3(.064,EY+.02,faceZ(.064,EY)-.035),.008,'#5b4836','gloss');rod(head,new T.Vector3(s*.232,EY+.01,faceZ(.232,EY)-.025),new T.Vector3(s*.415,EY+.03,-.02),.007,'#5b4836','gloss');}
 
- // ---- body: a short flared coat on a tiny neck -------------------------------------------
- add(root,COAT,at(0,0,0,1,1,.8),coat);
- ring(root,0,.452,0,.247,.017,shift(coat,-.07),.8);
- add(root,CYLINDER,at(0,.93,0,.066,.12,.066),skin,'matte',(p,_n,c)=>c.lerp(neck,T.MathUtils.clamp((p.y-.9)/.06,0,1)*.8));
- // Shirt V, lapels, collar, buttons and a name badge, laid on the coat surface.
- decal([V(-.084,.888),V(-.004,.672),V(.004,.672),V(.084,.888)],accent);
- for(const s of [-1,1])decal([V(s*.078,.889),V(s*.135,.862),V(s*.058,.722),V(s*.003,.668)],shift(coat,-.05),1);
- ring(root,0,.905,0,.072,.022,accent,1);
- for(const y of [.6,.53])ball(root,0,y,torsoZ(0,y)-.006,.014,.014,.008,'#d8c59b','gloss');
- decal([V(.1,.715),V(.165,.715),V(.165,.77),V(.1,.77)],'#efe6d2',1);decal([V(.1,.757),V(.165,.757),V(.165,.77),V(.1,.77)],accent,2);
- if([0,3,7,12].includes(id))ring(root,0,.89,0,.1,.05,accent,.86);
- if(id===5)ring(root,0,.9,.05,.16,.05,coat,.75,Math.PI/2-.3,Math.PI,0);
+ // ---- body: a small bean with a round collar ---------------------------------------------
+ add(root,BODY,at(0,0,0,1,1,.86),coat);
+ ring(root,0,.445,0,.222,.02,shift(coat,-.06),.86);
+ ring(root,0,.885,0,.082,.032,accent,.9);
+ decal([V(-.072,.876),V(-.004,.74),V(.004,.74),V(.072,.876)],accent);
+ for(const y of [.66,.58])ball(root,0,y,torsoZ(0,y)-.006,.017,.017,.01,'#f1e3c2','gloss');
+ if([0,3,7,12].includes(id))ring(root,0,.875,0,.1,.05,accent,.88);
+ if(id===5)add(root,new T.TorusGeometry(.15,.05,6,16,Math.PI),at(0,.9,.05,1,.75,1,Math.PI/2-.3,0,0),coat);
  // ---- limbs: shoulder and hip pivots are what scene3d animates ------------------------------
- const [shoe,sole]=SHOES[look.shoe];
+ const [shoe,sole]=SHOES[look.shoe],arms:T.Group[]=[],legs:T.Group[]=[];
  for(const side of [-1,1]){
-  const arm=new T.Group();arm.name=side<0?'leftArm':'rightArm';arm.position.set(side*.235,DOLL.shoulderY,0);root.add(arm);
-  add(arm,SLEEVE,at(side*.008,0,0,1,1,1,0,0,side*.12),coat,'matte',(p,_n,c)=>{if(Math.cos(.12)*p.y-Math.sin(side*.12)*(p.x-side*.008)<-.16)c.set(accent);});
-  ball(arm,side*.037,-.262,-.008,.058,.064,.058,skin);ball(arm,0,-.25,-.052,.024,.032,.026,skin);
+  const arm=new T.Group();arm.name=side<0?'leftArm':'rightArm';arm.position.set(side*.225,DOLL.shoulderY,0);root.add(arm);
+  add(arm,SLEEVE,at(side*.006,0,0,1,1,1,0,0,side*.1),coat,'matte',(p,_n,c)=>{if(Math.cos(.1)*p.y-Math.sin(side*.1)*(p.x-side*.006)<-.152)c.set(accent);});
+  ball(arm,side*.028,-.252,-.006,.054,.058,.054,skin);ball(arm,0,-.24,-.046,.022,.03,.024,skin);
   arms.push(arm);
-  const leg=new T.Group();leg.name=side<0?'leftLeg':'rightLeg';leg.position.set(side*.112,DOLL.hipY,0);root.add(leg);
+  const leg=new T.Group();leg.name=side<0?'leftLeg':'rightLeg';leg.position.set(side*.105,DOLL.hipY,0);root.add(leg);
   add(leg,TROUSER,null,pants);
-  ball(leg,0,-.343,-.035,.096,.074,.15,shoe);ball(leg,0,-.404,-.037,.1,.017,.156,sole,'matte',SPHERE);
-  box(leg,0,-.287,-.1,.086,.016,.03,accent,0);
+  ball(leg,0,-.34,-.03,.092,.072,.142,shoe);ball(leg,0,-.4,-.032,.098,.02,.15,sole);
   legs.push(leg);
  }
  const knife=new T.Group();knife.name='knife';
- box(knife,.04,-.33,-.035,.045,.13,.045,KNIFE.grip);box(knife,.04,-.40,-.035,.14,.022,.065,KNIFE.guard);
- add(knife,new T.ConeGeometry(.05,.28,3),at(.04,-.555,-.035,1,1,1,0,0,Math.PI),KNIFE.blade,'gloss');
+ rod(knife,new T.Vector3(.04,-.27,-.035),new T.Vector3(.04,-.39,-.035),.024,KNIFE.grip);ball(knife,.04,-.4,-.035,.07,.012,.032,KNIFE.guard);
+ add(knife,new T.ConeGeometry(.045,.26,3),at(.04,-.545,-.035,1,1,1,0,0,Math.PI),KNIFE.blade,'gloss');
  knife.visible=false;arms[1].add(knife);
  bake();
  const shadow=new T.Mesh(SHADOW_GEO,SHADOW);shadow.name='shadow';shadow.rotation.x=-Math.PI/2;shadow.position.y=.018;root.add(shadow);
- return{root,head,arms,legs,knife,shadow,dispose(){root.traverse(o=>{if(o instanceof T.Mesh&&o.geometry!==SHADOW_GEO)o.geometry.dispose();});}};
+ return root;
 }
+
+// One template per avatar, built on first use; every doll is a cheap copy that shares its
+// geometry and materials, so a player coming into view never costs a long frame.
+const TEMPLATES=new Map<number,T.Group>();
+const template=(id:number)=>{let t=TEMPLATES.get(id);if(!t){t=build(id);TEMPLATES.set(id,t);}return t;};
+export function createDoll(index:number){
+ const id=((index%16)+16)%16,root=template(id).clone(),part=(name:string)=>root.getObjectByName(name) as T.Group;
+ return{root,head:part('head'),arms:[part('leftArm'),part('rightArm')],legs:[part('leftLeg'),part('rightLeg')],knife:part('knife'),shadow:part('shadow') as unknown as T.Mesh,
+  // The geometry belongs to the template (shared by every copy), so only the copy is dropped.
+  dispose(){root.removeFromParent();}};
+}
+// Builds the templates of these avatars now (call it while a loading screen shows), so the
+// first sighting of each figure during play costs nothing.
+export function warmDolls(indices:number[]){for(const i of new Set(indices))template(((i%16)+16)%16);}
 
 // The player's own forearm in first person (camera space, reaching in from the lower right):
 // the figures' sleeve with its cuff band and a mitten hand, in the player's own figure paint,
@@ -10858,10 +10868,10 @@ export function createDoll(index:number){
 // point, and aim() swings the whole forearm so the long sleeve always comes from the shoulder.
 const VIEW_FOREARM=new T.Vector3(-.075,.21,-.17).normalize();
 export const VIEW_HAND=new T.Vector3(.28,-.15,-.55),VIEW_WRIST=VIEW_HAND.clone().addScaledVector(VIEW_FOREARM,-.072),VIEW_SHOULDER=VIEW_WRIST.clone().addScaledVector(VIEW_FOREARM,-.37);
-const VIEW_SLEEVE=new T.LatheGeometry([[0,-.95],[.11,-.95],[.096,-.42],[.086,-.24],[.075,-.07],[.077,-.066],[.08,-.06],[.08,-.012],[.072,.006],[0,.008]].map(([r,y])=>new T.Vector2(r,y)),20),VIEW_MITTEN=new T.SphereGeometry(1,24,18);
+const VIEW_SLEEVE=lathe([[0,-.95],[.105,-.95],[.094,-.42],[.084,-.24],[.074,-.07],[.077,-.066],[.08,-.06],[.08,-.012],[.072,.006],[0,.008]],20),VIEW_MITTEN=new T.SphereGeometry(1,24,18);
 for(const g of [VIEW_SLEEVE,VIEW_MITTEN])SHARED.add(g);
 export function createViewArm(index:number){
- const id=((index%16)+16)%16,{coat,accent,skin}=figurePaint(id),{add,at,box,bake}=kit(),arm=new T.Group(),fore=new T.Group(),knife=new T.Group();
+ const id=((index%16)+16)%16,{coat,accent,skin}=figurePaint(id),{add,at,rod,bake}=kit(),arm=new T.Group(),fore=new T.Group(),knife=new T.Group();
  // Forearm frame: y along the arm towards the fingers, z the back of the hand (towards the eye), thumb on -x.
  const side=new T.Vector3(1,0,0).addScaledVector(VIEW_FOREARM,-VIEW_FOREARM.x).normalize();
  fore.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(side,VIEW_FOREARM,new T.Vector3().crossVectors(side,VIEW_FOREARM)));fore.position.copy(VIEW_WRIST);arm.add(fore);
@@ -10869,7 +10879,7 @@ export function createViewArm(index:number){
  add(fore,VIEW_SLEEVE,null,coat,'matte',(p,_n,c)=>{if(p.y>-.064)c.set(accent);});
  // Mitten: one smooth rounded paddle with the thumb on the inner side, like the figures' hands.
  add(fore,VIEW_MITTEN,at(0,.072,.002,.062,.076,.05),skin);add(fore,VIEW_MITTEN,at(-.056,.052,.016,.024,.036,.026,0,0,.55),skin);
- box(knife,VIEW_HAND.x,-.1,VIEW_HAND.z,.055,.18,.055,KNIFE.grip);box(knife,VIEW_HAND.x,.02,VIEW_HAND.z,.17,.03,.07,KNIFE.guard);add(knife,new T.ConeGeometry(.058,.42,3),at(VIEW_HAND.x,.23,VIEW_HAND.z,1,1,1),KNIFE.blade,'gloss');
+ rod(knife,new T.Vector3(VIEW_HAND.x,-.19,VIEW_HAND.z),new T.Vector3(VIEW_HAND.x,-.01,VIEW_HAND.z),.03,KNIFE.grip);add(knife,SPHERE,at(VIEW_HAND.x,.02,VIEW_HAND.z,.09,.016,.04),KNIFE.guard);add(knife,new T.ConeGeometry(.058,.42,3),at(VIEW_HAND.x,.23,VIEW_HAND.z,1,1,1),KNIFE.blade,'gloss');
  bake();
  return{avatar:id,arm,knife,
   // Point the forearm along `direction` (shoulder to wrist), or back to rest without one.
@@ -10890,17 +10900,21 @@ FILE: lib/doll-portraits.ts
 import * as T from 'three';
 import {createDoll,DOLL} from './doll-character';
 import {stageLights} from './doll-stage';
-import {withDollRenderer} from './doll-render';
-const cache=new Map<number,Promise<string>>();
+import {withDollRenderer,DOLL_CANVAS} from './doll-render';
+const cache=new Map<number,Promise<string>>(),wanted=new Map<number,number>();
 // The card shows the figure exactly as other players see it in the 3D map: same model, same
 // light rig, tone mapping and floor, seen from first-person eye height at a few steps.
-export function dollPortrait(index:number):Promise<string>{const id=((index%16)+16)%16;const cached=cache.get(id);if(cached)return cached;
- const result=withDollRenderer(renderer=>{renderer.setSize(384,448);
-  const scene=new T.Scene();scene.background=new T.Color('#102c40');const camera=new T.PerspectiveCamera(34,384/448,.1,30);camera.position.set(1.3,1.43,-3.2);camera.lookAt(0,DOLL.height*.53,0);
+// A portrait is only rendered while some card still waits for it: cards pass a signal that
+// aborts when they unmount, and a queued job nobody waits for is dropped (the avatar picker
+// of a player who rejoins straight into a game used to keep rendering 16 portraits in play).
+export function dollPortrait(index:number,signal?:AbortSignal):Promise<string>{const id=((index%16)+16)%16;wanted.set(id,(wanted.get(id)||0)+1);signal?.addEventListener('abort',()=>wanted.set(id,(wanted.get(id)||1)-1),{once:true});const cached=cache.get(id);if(cached)return cached;
+ const result=withDollRenderer(async renderer=>{if(!wanted.get(id))throw new DOMException('portrait no longer shown','AbortError');
+  const scene=new T.Scene();scene.background=new T.Color('#102c40');const camera=new T.PerspectiveCamera(34,DOLL_CANVAS.width/DOLL_CANVAS.height,.1,30);camera.position.set(1.3,1.43,-3.2);camera.lookAt(0,DOLL.height*.53,0);
   stageLights(scene);
   const doll=createDoll(id);doll.head.rotation.y=-.08;scene.add(doll.root);
   const floor=new T.Mesh(new T.CircleGeometry(.62,40),new T.MeshLambertMaterial({color:'#485d64'}));floor.rotation.x=-Math.PI/2;floor.position.y=-.002;scene.add(floor);
-  renderer.render(scene,camera);const url=renderer.domElement.toDataURL('image/webp',.93);doll.dispose();floor.geometry.dispose();floor.material.dispose();return url;});
+  // Encoded off the main thread (toBlob) rather than with the blocking toDataURL.
+  renderer.render(scene,camera);const blob=await new Promise<Blob|null>(resolve=>renderer.domElement.toBlob(resolve,'image/webp',.93));doll.dispose();floor.geometry.dispose();floor.material.dispose();if(!blob)throw Error('portrait');return URL.createObjectURL(blob);});
  cache.set(id,result);result.catch(()=>cache.delete(id));return result;}
 
 
@@ -10908,16 +10922,27 @@ export function dollPortrait(index:number):Promise<string>{const id=((index%16)+
 FILE: lib/doll-render.ts
 ======================================================================
 import * as T from 'three';
-// One transient WebGL renderer for every offscreen doll render (selection portraits and the
-// top-view sprite sheets), never one context per card. Jobs run one at a time; the context
-// is released shortly after the last job.
-let renderer:T.WebGLRenderer|undefined,idle:ReturnType<typeof setTimeout>|undefined,queue:Promise<unknown>=Promise.resolve();
+// One WebGL renderer for every offscreen doll render (selection portraits and the top-view
+// sprite sheets), never one context per card. Jobs run one per frame as early as possible:
+// most of them then finish while the lobby or the game is still loading (deferring them to
+// idle time moved the same work into the first seconds of play, measured). The canvas
+// keeps one size (DOLL_CANVAS; sprite frames use a corner of it): resizing it for every job
+// reallocated the drawing buffer each time. Shaders compile without blocking error checks. The context
+// is kept while jobs keep coming and released after a long quiet spell or when the page is
+// hidden; it is never force-lost (WEBGL_lose_context blocked the main thread for 120-150 ms
+// in the middle of play, measured in headless Chromium).
+// The canvas is kept, so a renderer made again later reuses the same WebGL context instead of
+// piling up contexts that only garbage collection would free.
+let renderer:T.WebGLRenderer|undefined,canvas:HTMLCanvasElement|undefined,idle:ReturnType<typeof setTimeout>|undefined,queue:Promise<unknown>=Promise.resolve();
+const release=()=>{renderer?.dispose();renderer=undefined;};
+if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(idle);queue=queue.then(release,release);}});
+export const DOLL_CANVAS={width:384,height:448};
 export function withDollRenderer<R>(job:(r:T.WebGLRenderer)=>R|Promise<R>):Promise<R>{
  const run=queue.then(async()=>{
   await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));clearTimeout(idle);
-  renderer||=new T.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
-  renderer.setPixelRatio(1);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
-  try{return await job(renderer);}finally{idle=setTimeout(()=>{renderer?.dispose();renderer?.forceContextLoss();renderer=undefined;},1200);}
+  canvas||=document.createElement('canvas');if(!renderer){renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:true,preserveDrawingBuffer:true});renderer.debug.checkShaderErrors=false;renderer.setPixelRatio(1);renderer.setSize(DOLL_CANVAS.width,DOLL_CANVAS.height,false);}
+  renderer.setViewport(0,0,DOLL_CANVAS.width,DOLL_CANVAS.height);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+  try{return await job(renderer);}finally{idle=setTimeout(release,30000);}
  });
  queue=run.then(()=>{},()=>{});return run;
 }
@@ -10929,31 +10954,41 @@ FILE: lib/doll-sprites.ts
 import * as T from 'three';
 import {createDoll,DOLL} from './doll-character';
 import {stageLights} from './doll-stage';
-import {withDollRenderer} from './doll-render';
+import {withDollRenderer,DOLL_CANVAS} from './doll-render';
 import {DOLL_FRAMES,type DollSheet} from './characters';
 // Top-view (Aurora) character frames rendered from the same 3D figure as the 3D map and the
 // selection portraits, with the same lights. Frames face right; the 2D renderer mirrors them.
 const W=170,H=190,UNIT=80,ELEVATION=.38,TURN=.78;
-const cache=new Map<number,Promise<DollSheet>>();
-export function dollSheet(index:number):Promise<DollSheet>{const id=((index%16)+16)%16;const cached=cache.get(id);if(cached)return cached;
- const result=withDollRenderer(renderer=>{renderer.setSize(W,H);renderer.setClearColor(0x000000,0);
+const cache=new Map<number,Promise<DollSheet>>(),needed=new Set<number>();
+// optional: a background warm-up, dropped when its turn comes while a game screen is open
+// (unless the top view has asked for the same figure in the meantime).
+export function dollSheet(index:number,optional=false):Promise<DollSheet>{const id=((index%16)+16)%16;if(!optional)needed.add(id);const cached=cache.get(id);if(cached)return cached;
+ const result=withDollRenderer(async renderer=>{if(!needed.has(id)&&warmupPaused)throw new DOMException('sheet not needed now','AbortError');renderer.setClearColor(0x000000,0);
   const scene=new T.Scene();stageLights(scene);
   const camera=new T.OrthographicCamera(-W/2/UNIT,W/2/UNIT,H/2/UNIT,-H/2/UNIT,.1,30),target=new T.Vector3(0,.93,0);
   camera.position.copy(target).add(new T.Vector3(0,Math.sin(ELEVATION),-Math.cos(ELEVATION)).multiplyScalar(8));camera.lookAt(target);camera.updateMatrixWorld();
   const foot=new T.Vector3(0,0,0).project(camera),footX=(foot.x+1)/2*W,footY=(1-foot.y)/2*H;
   const doll=createDoll(id);doll.shadow.visible=false;scene.add(doll.root);
+  // Frames are drawn in the bottom-left W x H of the shared canvas (WebGL viewport origin).
+  renderer.setViewport(0,0,W,H);const top=DOLL_CANVAS.height-H;
   const sheet=document.createElement('canvas');sheet.width=W*DOLL_FRAMES;sheet.height=H;const ctx=sheet.getContext('2d')!;
   // 0 idle · 1-4 walk (same limb swing as the 3D map) · 5 knife strike · 6 strike without knife
   const strides=[0,.5,.18,-.5,-.18];
   for(let f=0;f<DOLL_FRAMES;f++){
    const stride=f<5?strides[f]:0,strike=f>=5;
    doll.root.rotation.y=strike?TURN+.45:TURN;doll.legs[0].rotation.x=stride;doll.legs[1].rotation.x=-stride;doll.arms[0].rotation.x=-stride*.65;doll.arms[1].rotation.x=strike?2.0:stride*.65;doll.knife.visible=f===5;
-   renderer.clear();renderer.render(scene,camera);ctx.drawImage(renderer.domElement,f*W,0);
+   renderer.clear();renderer.render(scene,camera);ctx.drawImage(renderer.domElement,0,top,W,H,f*W,0,W,H);
   }
   doll.dispose();
   return{image:sheet,frameW:W,frameH:H,footX,footY,scale:94/(DOLL.height*Math.cos(ELEVATION)*UNIT)};
  });
  cache.set(id,result);result.catch(()=>cache.delete(id));return result;}
+// Background warm-up of a sheet (portraits warm the sheet of the figure they show). Paused
+// while a game screen is open: the top view asks for its own figures, the 3D view never draws
+// sheets, and rendering spare ones beside the game only cost frames.
+let warmupPaused=0;
+export function pauseSheetWarmup(paused:boolean){warmupPaused=Math.max(0,warmupPaused+(paused?1:-1));}
+export function warmDollSheet(index:number){if(!warmupPaused)void dollSheet(index,true).catch(()=>{});}
 
 
 ======================================================================
@@ -10997,9 +11032,11 @@ class Window{values:number[]=[];size:number;constructor(size=120){this.size=size
  get last(){return this.values.at(-1)??null;}}
 // Rolling measurements shown by the in-game network panel (F3 / ?netdebug=1).
 export class NetStats{
- ack=new Window();correction=new Window(60);sampleAge=new Window(400);frameGap=new Window();action=new Window(30);kill=new Window(20);frameWork=new Window(240);frameDt=new Window(240);renderDelay=new Window(400);
+ ack=new Window();correction=new Window(60);sampleAge=new Window(400);frameGap=new Window();action=new Window(30);kill=new Window(20);frameWork=new Window(240);frameDt=new Window(240);renderDelay=new Window(400);render3d=new Window(240);view3d:{quality:number;fps:number}|null=null;
  counts:Record<string,number>={};server:ServerDiag|null=null;rtt=0;lastFrameAt=0;
  count(k:string){this.counts[k]=(this.counts[k]||0)+1;}
+ // 3D view: script+draw time per frame, drawing resolution and frame-rate target (governor).
+ record3d(ms:number,quality:number,fps:number){this.render3d.push(ms);this.view3d={quality,fps};}
  summary(){return{rttMs:this.rtt,frameGapP95:this.frameGap.q(.95),sampleAgeP50:this.sampleAge.q(.5),sampleAgeP95:this.sampleAge.q(.95),renderDelayP50:this.renderDelay.q(.5),renderDelayP95:this.renderDelay.q(.95),ackP50:this.ack.q(.5),ackP95:this.ack.q(.95),correctionMax:this.correction.q(1),actionP50:this.action.q(.5),killLast:this.kill.last,frameWorkP95:this.frameWork.q(.95),frameDtP95:this.frameDt.q(.95),counts:{...this.counts},server:this.server};}
 }
 
@@ -12477,7 +12514,7 @@ import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js'
 import {mapFor,roomFloors,ventsFor,emergencyFor,repairFor,distance,sight,type Point} from './map';
 import {floorEdges} from './map-render';
 import {securityConsole,communicationsConsole} from './surveillance';
-import {createDoll,createViewArm,DOLL,VIEW_HAND,VIEW_SHOULDER,VIEW_WRIST} from './doll-character';
+import {createDoll,createViewArm,warmDolls,DOLL,VIEW_HAND,VIEW_SHOULDER,VIEW_WRIST} from './doll-character';
 import {stageLights} from './doll-stage';
 import type {View} from './game';
 import type {FieldSnapshot,Effect} from './field';
@@ -12485,8 +12522,9 @@ export type SceneFrame={room:View;own:Point;people:FieldSnapshot['people'];bodie
 export type Look={yaw:number;pitch:number};
 const U=.025;
 type Puppet={root:T.Group;arms:T.Group[];legs:T.Group[];knife:T.Group;last:Point;phase:number;label:T.Sprite;caption:string;avatar:number;dispose:()=>void};
-export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:boolean){
- const renderer=new T.WebGLRenderer({canvas,antialias:!low,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,low?1:1.5));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:boolean,avatars:number[]=[]){
+ // basePixelRatio x quality (setQuality, driven by the frame-rate governor) is the drawing size.
+ const renderer=new T.WebGLRenderer({canvas,antialias:!low,alpha:false,powerPreference:'high-performance'}),basePixelRatio=Math.min(devicePixelRatio||1,low?1:1.5);renderer.setPixelRatio(basePixelRatio);renderer.debug.checkShaderErrors=false;renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
  const scene=new T.Scene();scene.background=new T.Color('#102c40');scene.fog=new T.Fog('#102c40',7,22);
  const camera=new T.PerspectiveCamera(76,1,.06,130);camera.rotation.order='YXZ';scene.add(camera);
  stageLights(scene);
@@ -12540,6 +12578,10 @@ export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:b
  let ownArm:ReturnType<typeof createViewArm>|undefined;
  const dressArm=(avatar:number)=>{if(ownArm?.avatar===((avatar%16)+16)%16)return;ownArm?.dispose();ownArm=createViewArm(avatar);hand.add(ownArm.arm);heldKnife.add(ownArm.knife);};
  const armDirection=new T.Vector3();
+ // Warm-up while the loading screen shows: build the figures of everyone in the room and
+ // compile their shaders with one of them in the scene, so neither a player coming into view
+ // nor the first frame with a figure stalls on building geometry or compiling shaders.
+ {warmDolls(avatars);const warm=createDoll(avatars[0]??0),arm=createViewArm(avatars[0]??0);scene.add(warm.root);camera.add(arm.arm,arm.knife);try{renderer.compile(scene,camera);}catch{}warm.dispose();arm.dispose();}
  let last=0,step=0;let audio:AudioContext|undefined;const stepTimes=new Map<string,number>();
  const enableAudio=()=>{try{audio||=new AudioContext();void audio.resume();}catch{}};
  const footstep=(id:string,p:Point,own:Point,yaw:number,time:number)=>{if(!audio||audio.state!=='running'||time-(stepTimes.get(id)||0)<340)return;stepTimes.set(id,time);const dist=distance(p,own);if(dist>220||!sight(p,own,config))return;const ctx=audio,o=ctx.createOscillator(),g=ctx.createGain(),pan=ctx.createStereoPanner();o.type='triangle';o.frequency.setValueAtTime(95,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(38,ctx.currentTime+.075);g.gain.setValueAtTime(.035*(1-dist/240),ctx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.09);pan.pan.value=Math.max(-1,Math.min(1,((p.x-own.x)*Math.cos(yaw)+(p.y-own.y)*Math.sin(yaw))/150));o.connect(g).connect(pan).connect(ctx.destination);o.start();o.stop(ctx.currentTime+.1);};
@@ -12561,7 +12603,9 @@ export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:b
  }
  function disposeLabel(l:T.Sprite){const material=l.material as T.SpriteMaterial;if(material.map){material.map.dispose();textures.delete(material.map);}material.dispose();}
  function removePuppet(p:Puppet){scene.remove(p.root);disposeLabel(p.label);p.dispose();}
- return{update,pickDevice,enableAudio,resize(w:number,h:number){renderer.setSize(w,h,false);camera.aspect=w/Math.max(1,h);camera.updateProjectionMatrix();},dispose(){puppets.forEach(p=>p.dispose());scene.traverse(o=>{if(o instanceof T.Mesh)o.geometry.dispose();if(o instanceof T.Sprite)o.material.dispose();});textures.forEach(t=>t.dispose());materials.forEach(m=>m.dispose());renderer.dispose();void audio?.close();},stats:()=>renderer.info.render};
+ return{update,pickDevice,enableAudio,resize(w:number,h:number){renderer.setSize(w,h,false);camera.aspect=w/Math.max(1,h);camera.updateProjectionMatrix();},
+  setQuality(scale:number){renderer.setPixelRatio(basePixelRatio*scale);},
+  dispose(){puppets.forEach(p=>p.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!o.geometry.userData.shared)o.geometry.dispose();if(o instanceof T.Sprite)o.material.dispose();});textures.forEach(t=>t.dispose());materials.forEach(m=>m.dispose());renderer.dispose();void audio?.close();},stats:()=>renderer.info.render};
 }
 
 
@@ -13418,7 +13462,7 @@ FILE: tests/browser/verify-ui.mjs
 // Playwright + Chromium.  Usage:
 //   BASE=http://127.0.0.1:8787 OUT=./verify-out node tests/browser/verify-ui.mjs [step...]
 //   (PW_MODULE=/path/to/playwright/index.mjs if playwright is not resolvable; CHROMIUM=path)
-// Steps: lobby aurora nereid host solo mobile perf29   (default: all)
+// Steps: lobby aurora nereid host solo mobile perf29 hitches   (default: all)
 // Headless Chromium renders WebGL in software (SwiftShader): frame times are not device numbers.
 import fs from 'node:fs';
 const BASE=process.env.BASE||'http://127.0.0.1:8787',OUT=process.env.OUT||'verify-out';fs.mkdirSync(OUT,{recursive:true});
@@ -13447,8 +13491,8 @@ function bot(code,p,seq,{wander=true}={}){
  return {stats,stop(){closed=true;clearInterval(timer);try{ws.close();}catch{}},act(body){return new Promise((resolve,reject)=>{const id=crypto.randomUUID(),t=setTimeout(()=>reject(Error('timeout')),5000);const on=e=>{const m=JSON.parse(e.data);if(m.type==='actResult'&&m.id===id){clearTimeout(t);ws.removeEventListener('message',on);resolve(m);}};ws.addEventListener('message',on);ws.send(JSON.stringify({type:'act',id,body:{...body,protocol:2,code,seq,warp,inputs:pending,requestId:crypto.randomUUID()}}));});},set dir(v){dir=v;wander=false;}};
 }
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM||'/opt/pw-browsers/chromium',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
-async function page(key,code,{viewport={width:1280,height:800},mobile=false,query='?netdebug=1',resume=true}={}){
- const ctx=await browser.newContext({viewport,deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile});
+async function page(key,code,{viewport={width:1280,height:800},mobile=false,query='?netdebug=1',resume=true,init=null}={}){
+ const ctx=await browser.newContext({viewport,deviceScaleFactor:1,isMobile:mobile,hasTouch:mobile});if(init)await ctx.addInitScript(init);
  await ctx.addInitScript(([c,k])=>{try{localStorage.setItem('nightfall-session',JSON.stringify({code:c,token:k}));}catch{}},[code,key]);
  const pg=await ctx.newPage();const errors=[];pg.on('pageerror',e=>errors.push(e.message));pg.on('console',m=>{if(m.type()==='error'&&!/favicon|404/.test(m.text()))errors.push(m.text());});
  await pg.goto(BASE+'/'+query,{waitUntil:'domcontentloaded'});
@@ -13528,6 +13572,16 @@ if(want('perf29')){
  for(const mapId of ['aurora','nereid']){const R=await room({mapId,count:29});const bots=R.players.slice(1).map(p=>bot(R.code,p,R.seq));const {pg,ctx,errors}=await page(R.players[0].key,R.code);
   await pg.waitForSelector(mapId==='nereid'?'.fps-surface canvas':'.field-viewport canvas',{timeout:120000});await pg.waitForFunction(()=>window.__fieldNet?.healthy(),null,{timeout:60000}).catch(()=>{});await pause(5000);
   note(`perf29-${mapId}`,await sampleMotion(pg,10000));await pg.screenshot({path:`${OUT}/perf29-${mapId}.png`});note(`perf29-${mapId}.errors`,errors);bots.forEach(b=>b.stop());await ctx.close();}
+}
+// Hitches: main-thread long tasks from page load through the first 12 s of play (a player
+// rejoining straight into a running game, 20 players), time until the game screen shows and
+// frame intervals after the first 4 s. Software WebGL: compare builds with it, not devices.
+if(want('hitches')){
+ const watch=()=>{window.__long=[];window.__raf=[];try{new PerformanceObserver(l=>{for(const e of l.getEntries())window.__long.push([e.startTime,e.duration]);}).observe({type:'longtask',buffered:true});}catch{}let last=0;const tick=t=>{if(last)window.__raf.push([t,t-last]);last=t;requestAnimationFrame(tick);};requestAnimationFrame(tick);};
+ for(const mapId of ['nereid','aurora']){const R=await room({mapId,count:20});const bots=R.players.slice(1).map(p=>bot(R.code,p,R.seq));const {pg,ctx,errors}=await page(R.players[0].key,R.code,{query:'',init:watch});
+  await pg.waitForSelector(mapId==='nereid'?'.fps-surface canvas':'.field-viewport canvas',{timeout:120000});const appear=await pg.evaluate(()=>performance.now());await pause(12000);
+  const d=await pg.evaluate(()=>({long:window.__long,raf:window.__raf})),long=d.long.filter(([t])=>t>=appear-500&&t<appear+12000).map(([,v])=>v),raf=d.raf.filter(([t])=>t>appear+4000).map(([,v])=>v).sort((a,b)=>a-b),q=p=>Math.round(raf[Math.min(raf.length-1,Math.floor(p*raf.length))]||0);
+  note(`hitches-${mapId}`,{gameScreenMs:Math.round(appear),longTasks:long.length,longTotalMs:Math.round(long.reduce((a,b)=>a+b,0)),longMaxMs:Math.round(Math.max(0,...long)),frameP50:q(.5),frameP95:q(.95),frameP99:q(.99)});note(`hitches-${mapId}.errors`,errors);bots.forEach(b=>b.stop());await ctx.close();}
 }
 fs.writeFileSync(`${OUT}/report.json`,JSON.stringify(report,null,1));await browser.close();process.exit(0);
 
@@ -15019,3 +15073,201 @@ export default defineConfig(async () => {
   };
 });
 
+
+======================================================================
+FILE: lib/frame-pacer.ts
+======================================================================
+// Frame pacing for the game loops (2D field and 3D first person).
+//
+// Drawing on every display refresh up to the target rate, and on every 2nd/3rd/... refresh
+// above it, keeps every frame the same length. The old test "at least 15.7 ms since the last
+// frame" alternated 1- and 2-refresh frames on 75/90/144 Hz screens (75 Hz -> 37 fps), which
+// reads as judder even when the average rate looks fine.
+export type Pacer={due(time:number):boolean;refresh():number;interval():number;target:number};
+export function framePacer(target=60):Pacer{
+ const deltas:number[]=[];let lastTick=0,lastFrame=0,refresh=1000/60,every=1;
+ const pacer:Pacer={target,
+  due(time){
+   // The refresh interval is the shortest recent rAF delta: slow frames (2+ refreshes) do not
+   // move it, so a device slower than its screen draws on every callback and never skips a
+   // frame that is ready (a quantile was inflated by slow frames and skipped the fast ones).
+   if(lastTick){const d=time-lastTick;if(d>4&&d<100){deltas.push(d);if(deltas.length>30)deltas.shift();if(deltas.length>=4)refresh=Math.min(...deltas);}}
+   lastTick=time;every=Math.max(1,Math.floor(1000/pacer.target/refresh+.25));
+   if(lastFrame&&time-lastFrame<refresh*(every-.5))return false;
+   lastFrame=time;return true;},
+  refresh:()=>refresh,interval:()=>refresh*every};
+ return pacer;
+}
+
+// Keeps the 3D view smooth on slow GPUs: when frames keep missing their slot, render fewer
+// pixels (down to 60 %); if that is still not enough, hold a steady 30 fps instead of an
+// uneven 40-50. Recovers quality when there is headroom again. Changes are rate-limited so
+// the picture never flickers between sizes.
+export type Governor={frame(time:number,interval:number):boolean;scale:number;target:number};
+export function qualityGovernor(start=1,{min=.6,step=.9,grow=1.05}={}):Governor{
+ // ceiling: the last scale that missed frames; growth stays just under it and the ceiling
+ // relaxes by 4 % every 30 s. A failed probe returns straight to the last scale that held
+ // (good), and retries of 60 fps after a 30 fps lock back off (20 s, 40 s, ... 160 s).
+ let window:number[]=[],lastDrawn=0,changedAt=0,lockedAt=0,retry=20000,ceiling=1,ceilingAt=0,streak=0,good=0;
+ const g:Governor={scale:start,target:60,
+  // Called for every drawn frame with the interval the pacer is aiming for; returns true when
+  // scale or target changed (the caller resizes the drawing buffer).
+  frame(time,interval){
+   if(lastDrawn)window.push((time-lastDrawn)/interval);lastDrawn=time;
+   if(window.length<40||time-changedAt<1200)return false;
+   const sorted=[...window].sort((a,b)=>a-b),missed=window.filter(r=>r>1.45).length/window.length,median=sorted[sorted.length>>1];window=[];
+   if(missed>.2){changedAt=time;streak=0;
+    if(g.target===60&&lockedAt){g.target=30;lockedAt=time;retry=Math.min(160000,retry*2);return true;}
+    // Far over budget (most frames take 3+ slots): go straight to the smallest size, one resize
+    // instead of five (each resize reallocates the drawing buffer).
+    if(g.scale>min+.001){ceiling=g.scale;ceilingAt=time;g.scale=median>2.5?min:good&&good<g.scale?good:Math.max(min,g.scale*step);if(good>=ceiling)good=0;return true;}
+    if(g.target>30){g.target=30;lockedAt=time;return true;}
+    return false;}
+   if(missed>=.03){streak=0;return false;}
+   if(++streak>=2&&g.target===60)good=g.scale;
+   if(ceiling<1&&time-ceilingAt>30000){ceiling=Math.min(1,ceiling*1.04);ceilingAt=time;}
+   if(g.target<60&&time-lockedAt>retry){g.target=60;changedAt=time;return true;}
+   if(g.target===60&&streak>=2&&g.scale<Math.min(1,ceiling*.97)-.001){g.scale=Math.min(ceiling*.97,g.scale*grow,1);changedAt=time;streak=0;return true;}
+   if(g.target===60&&lockedAt&&streak>=2)lockedAt=0;
+   return false;}};
+ return g;
+}
+
+
+======================================================================
+FILE: tests/frame-pacer.mjs
+======================================================================
+import assert from 'node:assert/strict';
+import {framePacer,qualityGovernor} from '../lib/frame-pacer.ts';
+// Simulated displays: rAF fires every refresh (with a little timestamp jitter). Every drawn
+// frame must be the same length (a whole number of refreshes), at the highest rate <= ~target.
+const run=(hz,target,seconds=3,jitter=.3)=>{const pacer=framePacer(target),period=1000/hz,drawn=[];let seed=7;const rand=()=>((seed=seed*16807%2147483647)/2147483647-.5)*2*jitter;
+ for(let i=1;i<=hz*seconds;i++){const t=i*period+rand();if(pacer.due(t))drawn.push(t);}
+ const gaps=drawn.slice(30).map((t,i,a)=>i?t-a[i-1]:null).filter(Boolean),fps=gaps.length/((drawn.at(-1)-drawn[30])/1000);
+ return{fps:Math.round(fps),even:Math.max(...gaps)-Math.min(...gaps)<period*.5};};
+// The v22 test (draw when at least 1000/60-1 ms passed) for comparison.
+const old=(hz)=>{const period=1000/hz;let last=0,n=0,first=0,end=0;for(let i=1;i<=hz*3;i++){const t=i*period;if(t-last>=1000/60-1){last=t;if(!first)first=t;end=t;n++;}}return Math.floor((n-1)/((end-first)/1000)+.01);};
+const expect={60:60,75:75,90:90,120:60,144:72,165:55,240:60};
+for(const [hz,fps] of Object.entries(expect)){const r=run(+hz,60);assert.ok(r.even,`${hz} Hz frames must be even`);assert.ok(Math.abs(r.fps-fps)<=1,`${hz} Hz: ${r.fps} fps, expected ${fps}`);}
+for(const hz of [60,90,120,144]){const r=run(hz,30);assert.ok(r.even);assert.ok(Math.abs(r.fps-(hz===144?29:30))<=1,`${hz} Hz at 30: ${r.fps}`);}
+assert.equal(old(75),37);assert.equal(old(90),45);assert.equal(old(144),48);
+// A device slower than the screen draws on every callback (never skips a ready frame).
+{const pacer=framePacer(60);let drawn=0;for(let i=1;i<=120;i++)if(pacer.due(i*33.4))drawn++;assert.ok(drawn>=118);}
+// ... also when its frame times vary (mostly 67-83 ms, sometimes one or two refreshes): no
+// callback is skipped (a quantile-based refresh estimate skipped the quick ones).
+{const pacer=framePacer(60),gaps=[66.7,83.3,66.7,33.3,83.3,66.7,16.7,83.3];let t=0,skipped=0;for(let i=0;i<400;i++){t+=gaps[i%gaps.length];if(!pacer.due(t)&&i>8)skipped++;}assert.equal(skipped,0,'slow, uneven device skipped frames');}
+// Governor: a GPU that needs 26 ms per frame at full resolution (cost ~ pixels = scale^2) on a
+// 60 Hz screen. It must settle at a resolution that fits the 16.7 ms slot.
+const slots=(g,ms)=>Math.max(g.target===30?2:1,Math.ceil(ms*g.scale*g.scale/16.67-1e-9));
+{const g=qualityGovernor(1);let t=0,changes=0;for(let i=0;i<1500;i++){t+=slots(g,26)*16.67;if(g.frame(t,g.target===30?33.33:16.67))changes++;}
+ assert.equal(g.target,60);assert.ok(26*g.scale*g.scale<=16.7,`settled scale ${g.scale.toFixed(2)}`);assert.ok(changes<=6,`few changes (${changes})`);}
+// A GPU that cannot make 60 fps even at the lowest resolution holds a steady 30 instead.
+{const g=qualityGovernor(1);let t=0,changes=0;for(let i=0;i<1500;i++){t+=slots(g,60)*16.67;if(g.frame(t,g.target===30?33.33:16.67)&&t<20000)changes++;}
+ assert.equal(g.target,30);assert.ok(g.scale<=.61);assert.ok(changes<=2,`far over budget: straight to the smallest size, then 30 fps (${changes} changes)`);}
+// A fast GPU never loses resolution.
+{const g=qualityGovernor(1);let t=0;for(let i=0;i<1500;i++){t+=16.67;g.frame(t,16.67);}assert.equal(g.scale,1);assert.equal(g.target,60);}
+console.log(`PASS: even frame pacing at 60/75/90/120/144/165/240 Hz (v22 cap: 75 Hz -> ${old(75)} fps, 90 Hz -> ${old(90)} fps, 144 Hz -> ${old(144)} fps), 30 fps lock pacing, slow devices never skip, quality governor settles / locks 30 / keeps full resolution.`);
+
+
+======================================================================
+FILE: REPORT_V24_KO.md
+======================================================================
+# 밤의 시민 v24 작업 보고서 — 귀여운 캐릭터 모델 + 끊김·지연 개선
+
+기준: v23(이 브랜치의 이전 커밋 `597e581`). **로컬 변경이며 배포하지 않았습니다.**
+
+표기: **[실측]** 이 환경에서 실행해 확인 · **[추정]** 코드 근거의 판단 · **[미검증]** 확인하지 못함
+
+---
+
+## 1. 요약
+
+| 영역 | 무엇을 했나 | 확인 |
+|---|---|---|
+| 캐릭터 모델 | 처음부터 다시 만듦: 둥근 머리, 단순한 점 눈(하이라이트 2개), 낮게 놓인 이목구비, 볼터치, 끝이 둥근 큼직한 머리카락, 콩 모양 몸, 벙어리장갑 손, 둥근 신발 | [실측] 렌더·실제 앱 |
+| 모델 비용 | 인형당 삼각형 평균 17,325 → 12,119(−30 %). 아바타마다 한 번 만든 뒤 복사(복사 0.22 ms) | [실측] |
+| 프레임 간격 | 75/90/144 Hz 화면에서 들쭉날쭉하던 프레임을 고르게(예: 75 Hz 37 fps → 75 fps) | [실측] 단위 테스트 |
+| 3D 화질 자동 조절 | GPU가 느리면 해상도를 낮추고(최저 60 %), 그래도 부족하면 고른 30 fps로 고정. 터치 기기도 60 fps를 목표로(전엔 무조건 30) | [실측] 단위 테스트 |
+| 게임 중 멈춤 | 오프스크린 렌더러 강제 해제(120–150 ms 멈춤) 제거, 필요 없는 초상화·스프라이트 작업 취소, 3D에서는 2D용 스프라이트를 만들지 않음, 로딩 중에 인형·셰이더 미리 준비 | [실측] 아래 4 |
+| 반응 속도 | 3D에서 장치를 누를 때 "손 뻗기 260 ms → 그 다음 요청"을 동시에 진행 | [추정] 코드 |
+| 회귀 | 자동 테스트 38/38(새 프레임 간격 테스트 포함), 타입 검사, 브라우저 점검 전 단계 통과, 콘솔 오류 0 | [실측] |
+
+## 2. 캐릭터 모델: 무엇이 이질적이었고 어떻게 바꿨나
+
+v23 인형은 3D 공에 애니메이션식 큰 눈(흰자·홍채·속눈썹·쌍꺼풀)을 그려 붙이고 머리카락을 뾰족한 가닥으로 만든 형태라, 가까이서 보거나 각도가 바뀌면 "그림을 붙인 공"처럼 어색해 보였습니다. 이번에는 장난감 피규어처럼 **큰 덩어리와 단순한 표정**으로 다시 만들었습니다.
+
+- **머리**: 거의 둥근 공(턱만 아주 살짝 좁아짐).
+- **눈**: 흰자 없는 세로로 긴 점 눈. 아래쪽에 눈 색이 은은하게 비치고, 큰 하이라이트와 작은 하이라이트를 양쪽 눈 같은 방향에 둠. 여자 캐릭터는 눈꼬리에 작은 속눈썹 두 개.
+- **배치**: 눈을 얼굴 가운데보다 조금 아래에, 입을 눈 바로 아래에 작게(아기 얼굴 비율). 짧고 부드러운 눈썹.
+- **볼**: 피부에 칠한 장밋빛 볼터치(조명을 받음). 어두운 피부는 붉게 뜨지 않도록 약하게.
+- **머리카락**: 앞머리까지 하나로 이어진 도톰한 머리 껍데기. 가장자리는 둥근 물결 모양이고 피부 쪽으로 말려 들어가 **두께가 보이는 둥근 테**로 끝납니다(가늘고 뾰족한 가닥 없음). 옆으로 넘긴 머리는 큰 앞머리 덩어리 하나로 방향만 줌. 단발·긴 머리·트윈테일·포니테일·똥머리·바보털·머리핀·동그란 안경은 그대로 유지하되 모두 끝이 둥근 큼직한 형태로.
+- **몸**: 콩 모양 몸통, 둥근 목깃, 작은 V 칼라와 단추 2개, 소매 끝 색 띠, 벙어리장갑 손, 둥근 신발과 밑창.
+- **캐릭터별 스타일**은 `lib/doll-character.ts`의 `LOOKS` 표(머리 길이, 앞머리 종류, 꼬리, 입 모양, 신발 색) 한 곳에서 바꿀 수 있습니다.
+
+1인칭 내 팔도 새 인형과 같은 소매·장갑·피부색입니다(v23에서 맞춘 구조 유지).
+
+비교: `docs/v24/model/compare-*.jpg`(위/왼쪽 v23, 아래/오른쪽 v24), 실제 앱: `docs/v24/browser/`.
+
+## 3. 끊김·지연: 원인과 수정
+
+### 3.1 프레임 간격이 들쭉날쭉하던 문제
+두 게임 화면(2D 오로라, 3D 네레이드)이 "직전 프레임에서 15.7 ms가 지났으면 그린다"는 방식으로 60 fps를 맞추고 있었습니다. 60 Hz 화면에서는 문제없지만, 다른 주사율에서는 1칸·2칸 프레임이 섞여 끊겨 보입니다 [실측: 시뮬레이션].
+
+| 화면 주사율 | v23 | v24 |
+|---|---|---|
+| 60 Hz | 60 fps | 60 fps |
+| 75 Hz | 37 fps(들쭉날쭉) | 75 fps |
+| 90 Hz | 45 fps | 90 fps |
+| 120 Hz | 60 fps | 60 fps(2칸마다 고르게) |
+| 144 Hz | 48 fps | 72 fps(고르게) |
+
+`lib/frame-pacer.ts`가 화면 주사율을 재서 "매 칸" 또는 "정확히 N칸마다" 그립니다. 화면보다 느린 기기에서는 준비된 프레임을 절대 건너뛰지 않습니다(`tests/frame-pacer.mjs`).
+
+### 3.2 느린 GPU에서 요동치던 3D 화면
+3D 화면에 **화질 자동 조절**을 넣었습니다. 프레임이 제 시간을 자주 넘기면 그리는 해상도를 낮추고(10 %씩, 많이 느리면 한 번에 60 %까지), 최저 해상도로도 부족하면 들쭉날쭉한 40–50 fps 대신 **고른 30 fps**로 고정합니다. 여유가 생기면 천천히 되돌리고, 직전에 실패한 크기 바로 아래에서 멈춰 크기가 왔다갔다하지 않게 했습니다. 30 fps로 고정된 경우 60 fps 재시도는 20 s, 40 s, … 160 s 간격으로 늘어납니다.
+- 전에는 터치 기기(휴대전화·태블릿)는 성능과 상관없이 3D를 **30 fps로 고정**했습니다. 이제 60 fps를 목표로 하고, 기기가 못 따라오면 위 조절이 알아서 낮춥니다.
+- F3 진단 패널에 **"3D 그리기 · 해상도"**(프레임당 처리 시간 p95, 현재 해상도 %, 목표 fps) 줄을 추가했습니다.
+
+### 3.3 게임 중 갑자기 멈추던 문제
+헤드리스 브라우저 CPU 프로파일로 찾은 원인과 수정입니다 [실측].
+1. **오프스크린 렌더러 강제 해제**: 초상화·탑뷰 스프라이트를 만든 뒤 1.2초 쉬면 WebGL 컨텍스트를 강제로 버렸는데(`forceContextLoss`), 이것이 게임 시작 직후 **120–150 ms 멈춤**을 만들었습니다. 이제 버리지 않고 30초 넘게 쉬거나 탭이 숨겨질 때만 정리하며, 같은 캔버스를 다시 씁니다.
+2. **매번 캔버스 크기 변경**: 초상화(384×448)와 스프라이트(170×190)를 번갈아 만들 때마다 캔버스 크기를 바꿔 버퍼를 새로 잡았습니다. 이제 크기를 고정하고 스프라이트는 한쪽 모서리에 그립니다. 초상화 인코딩은 메인 스레드를 막는 `toDataURL` 대신 `toBlob`.
+3. **보이지 않는 초상화를 게임 중에 그리던 문제**: 첫 화면의 캐릭터 선택 칸(16명)이 만들던 초상화가, 플레이어가 곧장 게임으로 들어간 뒤에도 게임 중에 계속 만들어지고 있었습니다. 이제 그 카드가 사라지면 남은 작업은 취소됩니다. 게임 화면이 열려 있는 동안에는 "미리 만들어 두기" 스프라이트 작업도 건너뜁니다(2D 화면이 실제로 필요한 것은 그대로 만듦).
+4. **3D 화면에서 2D용 스프라이트 생성**: 3D 지도(네레이드)는 탑뷰 스프라이트를 쓰지 않는데도 만들고 있었습니다. 3D에서는 만들지 않습니다.
+5. **처음 보는 플레이어에서 멈춤**: 플레이어가 처음 시야에 들어올 때마다 인형을 새로 만들었습니다(약 20 ms). 이제 아바타마다 한 번 만든 "원본"을 복사(0.22 ms)하고, 3D 로딩 화면 동안 방 안 모든 아바타의 원본과 셰이더를 미리 준비합니다. 셰이더의 동기식 오류 검사도 껐습니다.
+
+### 3.4 장치 반응이 늦던 문제
+3D에서 미션 장치·긴급 버튼·CCTV를 누르면 손 뻗는 애니메이션(260 ms)을 **끝낸 뒤에야** 서버에 요청을 보내, 화면이 열리기까지 260 ms + 왕복 시간이 걸렸습니다. 이제 요청을 애니메이션 시작과 동시에 보내고, 손이 닿고 응답이 오면(둘 중 늦은 쪽) 바로 엽니다 [추정: 코드상 대기 시간이 "합"에서 "최댓값"으로 바뀜. 실제 앱에서 장치를 눌러 보는 자동 확인은 하지 못함].
+
+## 4. 측정 [실측: 헤드리스 Chromium, 소프트웨어 WebGL]
+
+같은 측정 스크립트(`tests/browser/verify-ui.mjs hitches`, 새로 추가)로 v23과 v24 빌드를 나란히 띄워 3번씩 쟀습니다. 20명 방, 플레이어가 **게임 진행 중인 방에 곧장 다시 들어가는** 상황이며, 숫자는 "페이지 로드 → 게임 화면 표시 후 12초"의 메인 스레드 긴 작업(50 ms 이상)입니다.
+
+| 지도 | 항목 | v23 | v24 |
+|---|---|---|---|
+| 네레이드(3D) | 게임 화면이 뜨기까지 | 7.2–7.8 s | **2.8–4.5 s** |
+| | 긴 작업 개수 / 합계 | 4–5개 / 0.90–1.17 s | **2개 / 0.58–0.84 s** |
+| | 프레임 간격 중앙값 | 200–217 ms | **150–183 ms** |
+| 오로라(2D) | 게임 화면이 뜨기까지 | 5.5–6.1 s | **1.1–1.4 s** |
+| | 긴 작업 개수 / 합계 | 4–5개 / 0.60–0.66 s | **0–1개 / 0–0.08 s** |
+
+- 소프트웨어 WebGL이라 프레임 시간 자체(150–200 ms)는 실제 기기 값이 아닙니다. **두 빌드를 같은 조건에서 비교한 상대값**으로 봐 주세요.
+- 남은 점 ①: 네레이드에서 가장 긴 단일 작업은 v24가 0.5–0.6 s로 v23(0.3–0.5 s)보다 깁니다. 이 환경은 프레임이 매우 느려서 화질 조절이 해상도를 한 번에 최저로 낮추는데, 소프트웨어 WebGL에서는 그 캔버스 크기 변경 한 번이 느립니다. 실제 GPU에서는 짧고, 빠른 기기에서는 일어나지 않습니다 [추정].
+- 남은 점 ②: 오로라에서 게임에 들어온 직후 몇 초는 v24 프레임 p95가 조금 높습니다(167–200 ms vs 100–117 ms). v24가 2–4초 일찍 게임 화면에 들어가서, v23은 로딩 중에 만들던 방 인원 스프라이트를 v24는 게임 첫 몇 초에 만들기 때문입니다. 15초 뒤 다시 재면 같습니다(프레임 92–109 vs 106–111). 로비를 거쳐 들어오는 보통 흐름에서는 로비에서 미리 만들어집니다.
+
+## 5. 검증
+- `node tests/run-all.mjs`: **38/38 통과** [실측]. `doll-character` 테스트(비율·머리 크기·접지·관절·메시 수·공유 재질·삼각형 한도)는 조건을 바꾸지 않고 통과. 새 `frame-pacer` 테스트: 60–240 Hz 고른 간격, 느리고 들쭉날쭉한 기기에서 프레임 건너뛰지 않음, 화질 조절의 수렴·30 fps 고정·빠른 기기 유지.
+- `tsc --noEmit` 통과. eslint: 새로 만든 파일과 라이브러리 파일은 경고·오류 0. 기존에 React Compiler 규칙 오류가 있던 컴포넌트(`FieldGame`, `FirstPersonViewport`, `DollAvatar`)는 **v23과 같은 개수**(새로 늘지 않음).
+- 실제 앱(`pnpm run build` → 로컬 D1 → `pnpm run start`) + `verify-ui.mjs lobby nereid aurora solo mobile`: 로비 카드, 두 지도 이동, 전체화면·지도, 회의 전환, 포인터 잠금, 진행자 단독, 모바일 세로·가로 모두 통과, **콘솔 오류 0** [실측]. 스크린샷 `docs/v24/browser/`.
+
+## 6. 남은 점·미검증
+- **실기기** [미검증]: 휴대전화·태블릿·크롬북에서의 실제 프레임, 화질 자동 조절이 실제로 어느 해상도에 자리 잡는지, 발열. 배포 후 F3 패널의 "3D 그리기 · 해상도" 줄로 확인할 수 있습니다.
+- **장치 반응 시간**: 3.4는 코드 변경에 따른 판단이며 실제 앱에서 장치를 눌러 시간을 잰 것은 아닙니다 [추정].
+- **디자인 취향**: 얼굴·머리 스타일은 주관적인 선택입니다. 특정 캐릭터의 머리 모양·입 모양은 `LOOKS` 표만 바꾸면 됩니다.
+- 네트워크(실시간 서버·보간) 구조는 v22에서 시뮬레이터로 맞춘 그대로 두었습니다. 느린 기기에서 프레임이 빨라지면 다른 플레이어 표시 지연도 함께 줄어듭니다(메시지 처리가 프레임 사이에 일어나므로) [추정].
+
+## 7. 변경 파일
+- 모델: `lib/doll-character.ts`(새로 작성, 원본 복사 구조), `lib/doll-render.ts`, `lib/doll-portraits.ts`, `lib/doll-sprites.ts`, `components/DollAvatar.tsx`
+- 화면·성능: `lib/frame-pacer.ts`(신규), `components/FirstPersonViewport.tsx`, `components/FieldGame.tsx`, `lib/scene3d.ts`, `lib/field-net.ts`(진단 패널 값)
+- 테스트·도구: `tests/frame-pacer.mjs`(신규), `tests/browser/verify-ui.mjs`(`hitches` 단계 추가)
+- 문서: 이 파일, `START_HERE_KO.md`, `SOURCE_FOR_CLAUDE.txt`, `docs/v24/`

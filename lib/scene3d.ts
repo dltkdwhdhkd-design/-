@@ -4,7 +4,7 @@ import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js'
 import {mapFor,roomFloors,ventsFor,emergencyFor,repairFor,distance,sight,type Point} from './map';
 import {floorEdges} from './map-render';
 import {securityConsole,communicationsConsole} from './surveillance';
-import {createDoll,createViewArm,DOLL,VIEW_HAND,VIEW_SHOULDER,VIEW_WRIST} from './doll-character';
+import {createDoll,createViewArm,warmDolls,DOLL,VIEW_HAND,VIEW_SHOULDER,VIEW_WRIST} from './doll-character';
 import {stageLights} from './doll-stage';
 import type {View} from './game';
 import type {FieldSnapshot,Effect} from './field';
@@ -12,8 +12,9 @@ export type SceneFrame={room:View;own:Point;people:FieldSnapshot['people'];bodie
 export type Look={yaw:number;pitch:number};
 const U=.025;
 type Puppet={root:T.Group;arms:T.Group[];legs:T.Group[];knife:T.Group;last:Point;phase:number;label:T.Sprite;caption:string;avatar:number;dispose:()=>void};
-export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:boolean){
- const renderer=new T.WebGLRenderer({canvas,antialias:!low,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,low?1:1.5));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
+export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:boolean,avatars:number[]=[]){
+ // basePixelRatio x quality (setQuality, driven by the frame-rate governor) is the drawing size.
+ const renderer=new T.WebGLRenderer({canvas,antialias:!low,alpha:false,powerPreference:'high-performance'}),basePixelRatio=Math.min(devicePixelRatio||1,low?1:1.5);renderer.setPixelRatio(basePixelRatio);renderer.debug.checkShaderErrors=false;renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;
  const scene=new T.Scene();scene.background=new T.Color('#102c40');scene.fog=new T.Fog('#102c40',7,22);
  const camera=new T.PerspectiveCamera(76,1,.06,130);camera.rotation.order='YXZ';scene.add(camera);
  stageLights(scene);
@@ -67,6 +68,10 @@ export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:b
  let ownArm:ReturnType<typeof createViewArm>|undefined;
  const dressArm=(avatar:number)=>{if(ownArm?.avatar===((avatar%16)+16)%16)return;ownArm?.dispose();ownArm=createViewArm(avatar);hand.add(ownArm.arm);heldKnife.add(ownArm.knife);};
  const armDirection=new T.Vector3();
+ // Warm-up while the loading screen shows: build the figures of everyone in the room and
+ // compile their shaders with one of them in the scene, so neither a player coming into view
+ // nor the first frame with a figure stalls on building geometry or compiling shaders.
+ {warmDolls(avatars);const warm=createDoll(avatars[0]??0),arm=createViewArm(avatars[0]??0);scene.add(warm.root);camera.add(arm.arm,arm.knife);try{renderer.compile(scene,camera);}catch{}warm.dispose();arm.dispose();}
  let last=0,step=0;let audio:AudioContext|undefined;const stepTimes=new Map<string,number>();
  const enableAudio=()=>{try{audio||=new AudioContext();void audio.resume();}catch{}};
  const footstep=(id:string,p:Point,own:Point,yaw:number,time:number)=>{if(!audio||audio.state!=='running'||time-(stepTimes.get(id)||0)<340)return;stepTimes.set(id,time);const dist=distance(p,own);if(dist>220||!sight(p,own,config))return;const ctx=audio,o=ctx.createOscillator(),g=ctx.createGain(),pan=ctx.createStereoPanner();o.type='triangle';o.frequency.setValueAtTime(95,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(38,ctx.currentTime+.075);g.gain.setValueAtTime(.035*(1-dist/240),ctx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.09);pan.pan.value=Math.max(-1,Math.min(1,((p.x-own.x)*Math.cos(yaw)+(p.y-own.y)*Math.sin(yaw))/150));o.connect(g).connect(pan).connect(ctx.destination);o.start();o.stop(ctx.currentTime+.1);};
@@ -88,5 +93,7 @@ export function createScene(canvas:HTMLCanvasElement,config:View['config'],low:b
  }
  function disposeLabel(l:T.Sprite){const material=l.material as T.SpriteMaterial;if(material.map){material.map.dispose();textures.delete(material.map);}material.dispose();}
  function removePuppet(p:Puppet){scene.remove(p.root);disposeLabel(p.label);p.dispose();}
- return{update,pickDevice,enableAudio,resize(w:number,h:number){renderer.setSize(w,h,false);camera.aspect=w/Math.max(1,h);camera.updateProjectionMatrix();},dispose(){puppets.forEach(p=>p.dispose());scene.traverse(o=>{if(o instanceof T.Mesh)o.geometry.dispose();if(o instanceof T.Sprite)o.material.dispose();});textures.forEach(t=>t.dispose());materials.forEach(m=>m.dispose());renderer.dispose();void audio?.close();},stats:()=>renderer.info.render};
+ return{update,pickDevice,enableAudio,resize(w:number,h:number){renderer.setSize(w,h,false);camera.aspect=w/Math.max(1,h);camera.updateProjectionMatrix();},
+  setQuality(scale:number){renderer.setPixelRatio(basePixelRatio*scale);},
+  dispose(){puppets.forEach(p=>p.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!o.geometry.userData.shared)o.geometry.dispose();if(o instanceof T.Sprite)o.material.dispose();});textures.forEach(t=>t.dispose());materials.forEach(m=>m.dispose());renderer.dispose();void audio?.close();},stats:()=>renderer.info.render};
 }
