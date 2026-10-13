@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>천체 시뮬레이터</title>
+    <meta name="description" content="중학교 과학 '태양계', '별과 우주' 단원을 3D·VR·AR로 체험하는 시뮬레이션" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%230c1430'/%3E%3Ccircle cx='32' cy='32' r='9' fill='%23ffd54f'/%3E%3Cellipse cx='32' cy='32' rx='24' ry='9' fill='none' stroke='%234fc3f7' stroke-width='3' transform='rotate(-25 32 32)'/%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./vendor/three/three.module.min.js",
+          "three/addons/": "./vendor/three/addons/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="home">
+      <header class="hero">
+        <h1>천체 시뮬레이터</h1>
+        <p>중학교 과학 <b>태양계</b> · <b>별과 우주</b> 단원을 직접 움직여 보며 이해해요.</p>
+        <p class="hint">
+          컴퓨터·태블릿에서는 마우스/손가락으로 돌려 보고, <b>메타 퀘스트 3</b> 브라우저에서 열면
+          <b>VR</b>(가상 우주 속으로)과 <b>AR</b>(내 책상 위 모형)으로 볼 수 있어요.
+        </p>
+      </header>
+      <div id="cards"></div>
+      <footer>
+        <p>모형의 크기와 거리는 이해를 돕기 위해 실제 비율과 다르게 과장한 부분이 있어요.</p>
+      </footer>
+    </main>
+
+    <div id="sim" hidden>
+      <div id="viewport">
+        <a id="back" href="#/">← 목록</a>
+        <div id="pip-label" hidden></div>
+      </div>
+      <aside id="panel">
+        <button id="panel-toggle" aria-label="조작판 접기/펴기">▾</button>
+        <div class="panel-head">
+          <span id="sim-unit"></span>
+          <h2 id="sim-title"></h2>
+        </div>
+        <div class="xr-buttons">
+          <button id="btn-vr" hidden>🥽 VR로 보기</button>
+          <button id="btn-ar" hidden>📦 AR로 보기</button>
+        </div>
+        <p id="xr-note"></p>
+        <section id="controls"></section>
+        <details id="info-wrap" open>
+          <summary>학습 내용</summary>
+          <div id="info"></div>
+        </details>
+      </aside>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
