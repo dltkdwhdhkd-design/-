@@ -25,25 +25,35 @@
 
 ## 실행하기
 
-### 1) 인터넷 주소로 열기 — GitHub Pages (추천, 퀘스트 3에서 쓰려면 이 방법)
+### 1) 인터넷 주소로 열기 — GitHub Pages (퀘스트 3에서 쓰려면 이 방법)
 
-VR/AR(WebXR)은 **https 주소**에서만 동작하므로 GitHub Pages로 공개하는 것이 가장 쉽습니다.
+VR/AR(WebXR)은 **https 주소**에서만 동작하므로 GitHub Pages로 공개해야 합니다. 컴퓨터에서 한 번만 설정하면 됩니다.
 
-1. 이 저장소의 **Settings → Pages** 로 이동합니다.
-2. **Build and deployment → Source** 를 `Deploy from a branch` 로 두고,
-   **Branch** 에서 이 코드가 있는 브랜치(예: `main`)와 `/ (root)` 를 고른 뒤 **Save** 합니다.
-3. 1~2분 뒤 `https://dltkdwhdhkd-design.github.io/-/` 주소로 접속합니다.
+1. 컴퓨터 브라우저로 https://github.com/dltkdwhdhkd-design/-/settings/pages 에 들어갑니다.
+   (저장소 위쪽 메뉴의 **⚙ Settings** → 왼쪽 메뉴 **Pages**)
+2. **Build and deployment** 의 **Source** 가 `Deploy from a branch` 인지 확인합니다.
+3. 바로 아래 **Branch** 에서 `None` 으로 되어 있는 버튼을 눌러
+   **`claude/astronomy-simulation-program-1wc4vp`** 를 고르고, 옆 폴더는 **`/ (root)`** 그대로 둔 뒤 **Save** 를 누릅니다.
+   > ⚠ `main` 을 고르면 안 됩니다. 지금 `main` 에는 코드가 없고 이 설명서만 있어요. (코드를 `main` 에 합친 뒤에는 `main` 을 골라도 됩니다.)
+4. 1~3분 기다린 뒤 같은 Pages 화면을 새로고침하면 위쪽에 **"Your site is live at …"** 이 나타납니다.
+5. 그 주소 `https://dltkdwhdhkd-design.github.io/-/` 를 컴퓨터에서 먼저 열어 단원 목록이 보이는지 확인합니다.
 
-### 2) 내 컴퓨터에서 열기
+진행 상황은 저장소의 **Actions** 탭에서 `pages build and deployment` 항목으로 볼 수 있어요 (초록 체크 ✓ = 성공).
 
-별도 설치나 빌드가 필요 없습니다. 폴더에서 간단한 웹 서버만 실행하면 됩니다.
+### 2) 내 컴퓨터에서만 열어 보기 (선택 — VR은 안 됨)
 
-```bash
-python3 -m http.server 8000
-# 브라우저에서 http://localhost:8000 열기
-```
+인터넷에 올리지 않고 컴퓨터 화면으로만 보고 싶을 때의 방법입니다. **퀘스트 3에서는 이 방법으로 VR을 쓸 수 없어요** (https가 아니기 때문).
 
-> `index.html`을 더블클릭해서 바로 열면(file://) 모듈을 불러오지 못하므로 꼭 웹 서버로 여세요.
+1. 코드 내려받기: https://github.com/dltkdwhdhkd-design/-/archive/refs/heads/claude/astronomy-simulation-program-1wc4vp.zip
+   (저장소 첫 화면의 초록 **Code → Download ZIP** 은 `main` 을 받으므로 코드가 없습니다.)
+2. 압축을 풀고, 그 폴더(`index.html` 이 있는 폴더)에서 명령 프롬프트/터미널을 엽니다.
+3. 웹 서버 실행 (파이썬이 설치되어 있어야 해요):
+   ```bash
+   python -m http.server 8000     # 윈도우에서 안 되면: py -m http.server 8000
+   ```
+4. 브라우저에서 http://localhost:8000 을 엽니다.
+
+> `index.html`을 더블클릭해서 바로 열면(file://) 화면이 비어 보입니다. 꼭 위처럼 웹 서버로 여세요.
 
 ## 메타 퀘스트 3에서 쓰기
 
