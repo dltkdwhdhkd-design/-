@@ -676,7 +676,7 @@ export class XRInput {
       ctrl.addEventListener('connected', (e) => {
         ctrl.userData.source = e.data;
         ray.visible = e.data.targetRayMode === 'tracked-pointer';
-        grip.visible = !e.data.hand;
+        model.visible = !e.data.hand; // 손 추적일 때는 컨트롤러 모형을 숨긴다
       });
       ctrl.addEventListener('disconnected', () => {
         ctrl.userData.source = null;
@@ -702,7 +702,9 @@ export class XRInput {
       );
       ringMesh.position.set(0, 0.02, -0.03);
       ringMesh.rotation.x = 0.5;
-      grip.add(body, ringMesh);
+      const model = new THREE.Group();
+      model.add(body, ringMesh);
+      grip.add(model);
       scene.add(grip);
 
       const hand = renderer.xr.getHand(i);
