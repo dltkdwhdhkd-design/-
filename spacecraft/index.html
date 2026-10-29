@@ -374,6 +374,7 @@ td.unk { color: #4e5786; }
       <label class="chk"><input type="checkbox" id="sInv"> 위아래 시선 반전</label>
     </div>
     <div class="setIn"><b>조작 방식</b><div class="ctabs" id="sInput"></div><small id="sInputNote"></small></div>
+    <div class="setIn" id="hostSet" hidden><b>방장 설정 · 플레이어끼리 대결</b><div class="ctabs" id="sPvp"></div><small>방에 있는 모두에게 바로 적용돼요. 기지 코어 6칸 안은 안전 구역이에요.</small></div>
     <p>이 기기에만 저장돼요. 마우스와 손가락으로 화면을 끌 때 모두 적용돼요.</p>
     <div class="row"><button class="btn" id="setClose">완료</button></div>
   </div>
@@ -1996,7 +1997,13 @@ function showInput() {
   });
   $("sInputNote").textContent = `지금은 ${isTouch ? "터치 버튼으로" : "마우스·키보드로"} 조작해요. ` + (SET.input === "auto" ? "자동: 마우스를 누르거나 WASD를 치면 마우스로, 화면을 손가락으로 누르면 터치로 바뀌어요." : "자동으로 바뀌지 않아요.");
 }
-function showSet() { showInput(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
+// 방장은 게임하면서도 여기(O)나 방 명단 창에서 대결을 켜고 꺼요
+function showHostSet() {
+  $("hostSet").hidden = !net.host; if (!net.host) return;
+  const box = $("sPvp"); box.innerHTML = "";
+  [[false, "끄기"], [true, "켜기"]].forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = net.pvp === v ? "on" : ""; b.onclick = () => { net.setPvp(v); showHostSet(); }; box.appendChild(b); });
+}
+function showSet() { showInput(); showHostSet(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
 function saveSet() { SET.sens = +$("sSens").value; SET.vol = +$("sVol").value; SET.inv = $("sInv").checked; showSet(); setAir(S.planet); try { localStorage.setItem("spacecraft2-set", JSON.stringify(SET)); } catch (e) {} }
 ["sSens", "sVol", "sInv"].forEach(id => $(id).addEventListener("input", saveSet));
 $("sVol").addEventListener("change", () => sfx.pop());
@@ -2792,7 +2799,7 @@ const net = (() => {
     const el = $("room"); if (!code || !$("startOv").hidden) { el.hidden = true; return; }
     if (performance.now() - roomT < 500) return; roomT = performance.now();
     const n = Object.keys(others).length + 1, same = Object.values(others).filter(o => o.pk === S.planet).length;
-    el.hidden = false; el.innerHTML = live ? `방 <b>${code}</b> · ${n}명 · 이 행성에 ${same}명 더${pvp ? " · ⚔ 대결 켜짐" : ""} ▸` : `방 <b>${code}</b> · 연결 끊김`;
+    el.hidden = false; el.innerHTML = live ? `방 <b>${code}</b> · ${n}명 · 이 행성에 ${same}명 더${host ? ` · 방장 · 대결 ${pvp ? "켜짐" : "꺼짐"}` : pvp ? " · ⚔ 대결 켜짐" : ""} ▸` : `방 <b>${code}</b> · 연결 끊김`;
   }
   function openRoster() {
     pause(true);
@@ -2803,7 +2810,7 @@ const net = (() => {
       b.onclick = () => { me.party = k; try { localStorage.setItem("spacecraft2-party", String(k)); } catch (e) {} psyncT = 3; openRoster(); }; pp.appendChild(b); }
     const vb = $("pvpPick"); vb.innerHTML = "";
     [[false, "끄기"], [true, "켜기"]].forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = pvp === v ? "on" : ""; b.disabled = !host; b.onclick = () => { setPvp(v); openRoster(); }; vb.appendChild(b); });
-    $("pvpNote").textContent = host ? "방장만 바꿀 수 있어요. 기지 코어 6칸 안은 안전 구역이에요." : `방장이 정해요 · 지금 ${pvp ? "켜짐" : "꺼짐"} · 기지 코어 6칸 안은 안전 구역`;
+    $("pvpNote").textContent = host ? "내가 방장이라 바꿀 수 있어요(설정 O에서도 돼요). 기지 코어 6칸 안은 안전 구역이에요." : `방장이 정해요 · 지금 ${pvp ? "켜짐" : "꺼짐"} · 기지 코어 6칸 안은 안전 구역`;
     $("rosterNote").textContent = `방 코드 ${code}${host ? " · 내가 방장이에요. 내 게임을 끄면 방이 닫혀요." : ""}`;
     const box = $("rosterList"); box.innerHTML = "";
     L.forEach(o => { const d = document.createElement("div"); d.innerHTML = `<i style="background:${o.color}"></i><b></b><small>${(PLANETS[o.pk] || {}).name || "?"}${o.party ? ` · <span style="color:${PARTY_COL[o.party]}">파티 ${o.party}</span>` : ""}</small><small>임무 ${o.done}개</small>`; d.querySelector("b").textContent = o.name; box.appendChild(d); });
@@ -2824,7 +2831,7 @@ const net = (() => {
   });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { send, tick, partyDone, setPvp, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
+  return { send, tick, partyDone, setPvp, get host() { return live && host; }, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
