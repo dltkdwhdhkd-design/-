@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>html,body{margin:0}</style>
 <title>스페이스 크래프트</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
 <style>
@@ -81,6 +82,22 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 .slot { width: 46px; height: 46px; border: 2px solid transparent; border-radius: 6px; background: #ffffff10; position: relative; padding: 0; flex: none; }
 .slot.on { border-color: #fff; }
 .slot canvas { width: 30px; height: 30px; image-rendering: pixelated; position: absolute; left: 6px; top: 5px; }
+.slot em { position: absolute; left: 3px; top: 1px; font-size: 10px; font-style: normal; color: var(--ink-dim); }
+.slot.empty { opacity: .55; }
+.bag { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 4px; }
+.bag .slot { width: 64px; height: 64px; cursor: pointer; color: inherit; }
+.bag .slot canvas { left: 16px; top: 6px; }
+.bag .slot label { position: absolute; left: 2px; right: 2px; bottom: 2px; font-size: 10px; line-height: 1.1; text-align: center; pointer-events: none; }
+.bag .slot span { bottom: 14px; }
+.bag .slot.inhot { border-color: #ffffff55; }
+.bag.hot { background: #ffffff08; border-radius: 10px; padding: 6px; }
+.bag.hot .slot { width: 52px; height: 52px; }
+.bag.hot .slot canvas { left: 9px; top: 8px; }
+#invOv h3 { margin: 10px 0 0; font-size: 1em; }
+#invOv h3 small, #invOv .hint { color: var(--ink-dim); font-weight: 400; font-size: .85em; }
+.equip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.equip div { background: #ffffff08; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; display: grid; }
+.equip small { color: var(--ink-dim); font-size: .8em; }
 .slot span { position: absolute; right: 3px; bottom: 1px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px #000; }
 #tools { right: max(10px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); display: grid; gap: 6px; }
 #tools .btn { padding: .5em .9em; font-size: .9em; text-align: left; }
@@ -219,6 +236,10 @@ td.unk { color: #4e5786; }
 .set output { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-dim); }
 .set .chk { grid-template-columns: auto 1fr; }
 .set .chk input { width: 20px; height: 20px; accent-color: var(--ore); }
+.setIn { display: grid; gap: 6px; margin-top: 16px; }
+.setIn small, #pvpBox small { color: var(--ink-dim); }
+#pvpBox { margin-top: 10px; }
+.ctabs button:disabled { opacity: .5; }
 #flight { position: fixed; inset: 0; z-index: 12; background: #000; display: grid; place-items: center; text-align: center; }
 #flight canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 #flight .txt { position: relative; text-shadow: 0 2px 10px #000; }
@@ -264,6 +285,7 @@ td.unk { color: #4e5786; }
 <div class="hud click" id="hotbar" hidden></div>
 <div class="hud" id="tools" hidden>
   <button class="btn click" id="bCraft">제작 <kbd>E</kbd></button>
+  <button class="btn ghost click" id="bInv">가방·장비 <kbd>I</kbd></button>
   <button class="btn ghost click" id="bDex">도감·일지 <kbd>J</kbd></button>
   <button class="btn ghost click" id="bMap">우주 지도 <kbd>M</kbd></button>
   <button class="btn ghost click" id="bLook">꾸미기 <kbd>C</kbd> · 시점 <kbd>V</kbd></button>
@@ -329,6 +351,20 @@ td.unk { color: #4e5786; }
   </div>
 </div>
 
+<div class="overlay" id="invOv" hidden>
+  <div class="card wide">
+    <h2>가방과 장비</h2>
+    <div class="equip" id="equipList"></div>
+    <p class="hint">아래 단축 칸(1~9)을 하나 고른 뒤, 그 칸에 넣을 물건을 누르세요. 게임 중에는 숫자 키나 마우스 휠로 바꿔 들어요. 버린 물건은 땅에 떨어져서 누구나 주울 수 있어요.</p>
+    <div class="bag hot" id="hotEdit"></div>
+    <div class="ctabs" id="bagMode"></div>
+    <h3>도구</h3><div class="bag" id="bagTools"></div>
+    <h3>블록</h3><div class="bag" id="bagBlocks"></div>
+    <h3>재료 <small>(손에 들 수는 있지만 놓을 수는 없어요)</small></h3><div class="bag" id="bagMats"></div>
+    <div class="row"><button class="btn ghost" id="hotClear">고른 칸 비우기</button><button class="btn ghost" id="dropOne">1개 버리기 <kbd>Q</kbd></button><button class="btn ghost" id="dropAll">모두 버리기 <kbd>Shift+Q</kbd></button><button class="btn" id="invClose">닫기 <kbd>I</kbd></button></div>
+  </div>
+</div>
+
 <div class="overlay" id="setOv" hidden>
   <div class="card">
     <h2>설정</h2>
@@ -337,6 +373,7 @@ td.unk { color: #4e5786; }
       <label>소리 크기 <input type="range" id="sVol" min="0" max="1" step="0.05"><output id="oVol"></output></label>
       <label class="chk"><input type="checkbox" id="sInv"> 위아래 시선 반전</label>
     </div>
+    <div class="setIn"><b>조작 방식</b><div class="ctabs" id="sInput"></div><small id="sInputNote"></small></div>
     <p>이 기기에만 저장돼요. 마우스와 손가락으로 화면을 끌 때 모두 적용돼요.</p>
     <div class="row"><button class="btn" id="setClose">완료</button></div>
   </div>
@@ -371,7 +408,7 @@ td.unk { color: #4e5786; }
     <li>이 화면을 닫거나 끄면 방이 닫혀요. 수업이 끝날 때까지 켜 두세요.</li>
   </ol>
   <div class="tPlanets" id="tPlanets"></div>
-  <div class="tNotice"><input id="tMsg" maxlength="60" placeholder="학생 화면에 띄울 말 (예: 5분 남았어요! 기지로 돌아오세요)" aria-label="학생에게 보낼 말"><button class="btn" id="tSend">학생 화면에 띄우기</button></div>
+  <div class="tNotice"><input id="tMsg" maxlength="60" placeholder="학생 화면에 띄울 말 (예: 5분 남았어요! 기지로 돌아오세요)" aria-label="학생에게 보낼 말"><button class="btn" id="tSend">학생 화면에 띄우기</button><button class="btn ghost" id="tPvp">플레이어 대결: 꺼짐</button></div>
   <div class="tablewrap"><table class="tTable" id="tTable"></table></div>
 </div>
 
@@ -380,6 +417,7 @@ td.unk { color: #4e5786; }
     <h2>우리 반 탐사대</h2>
     <p id="rosterNote"></p>
     <div id="partyBox"><b>내 파티</b> <small>같은 파티끼리는 누가 임무를 끝내면 모두 완료돼요</small><div class="ctabs" id="partyPick"></div></div>
+    <div id="pvpBox"><b>플레이어끼리 대결</b> <small id="pvpNote"></small><div class="ctabs" id="pvpPick"></div></div>
     <div class="roster" id="rosterList"></div>
     <div class="row"><button class="btn ghost" id="rosterClose">닫기</button></div>
   </div>
@@ -461,7 +499,14 @@ const MATS = {
 const WHERE = { 100: "철광석 · 수성에 많음", 101: "모래·레골리스", 102: "수성·금성 황 광석", 103: "지구 바다", 104: "금성 표면·화성 땅속", 105: "목성형 행성 구름", 106: "유로파 얼음", 107: "타이탄 호수",
   108: "지구 땅속 (검은 점)", 109: "지구 땅속 (청록 점)", 110: "지구 깊은 땅속 (노란 점)", 111: "지구 가장 깊은 곳 (하늘색 점)", 112: "달의 바다 현무암 (보라 점)",
   4: "지구 땅속 회색 돌", 7: "지구 나무 줄기", 11: "달의 바다", 14: "그늘진 구덩이·극관", 32: "제작" };
-const itemName = (id) => (BLOCKS[id] || MATS[id] || {}).n || "?";
+// 도구(120~): 손에 들어야 효과가 있어요
+const TOOLS = { 120: { n: "돌 곡괭이", tier: 1 }, 121: { n: "철 곡괭이", tier: 2 }, 122: { n: "다이아몬드 곡괭이", tier: 3 },
+  123: { n: "돌 칼", dmg: 6, col: "#8f9198" }, 124: { n: "철 칼", dmg: 8, col: "#e2e5ec" }, 125: { n: "다이아몬드 칼", dmg: 11, col: "#7ff0ff" } };
+// 가방에 있는 가장 좋은 곡괭이 단계(죽어서 떨어뜨리면 내려가요)
+const bestTier = () => Math.max(0, ...Object.keys(TOOLS).filter(t => S.inv[t] > 0 && TOOLS[t].tier).map(t => TOOLS[t].tier));
+const SAFE_R = 6; // 기지 코어 근처 안전 구역(대결 피해 없음)
+const TOOL_OF = { 1: 120, 2: 121, 3: 122 };
+const itemName = (id) => (BLOCKS[id] || MATS[id] || TOOLS[id] || {}).n || "?";
 const SOLID = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin));
 const LIQ = (b) => !!(BLOCKS[b] && BLOCKS[b].liquid);
 
@@ -497,6 +542,7 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
   [[16, 16, 2, 4], [16, 16, 30, 10], [16, 16, 8, 30], [16, 16, 28, 28], [16, 16, 20, 1]].forEach(([a, b, c, d]) => { k.beginPath(); k.moveTo(a, b); k.lineTo((a + c) / 2 + 3, (b + d) / 2 - 2); k.lineTo(c, d); k.stroke(); });
 })();
 function iconCanvas(id) {
+  if (TOOLS[id]) return TOOLS[id].tier ? pickIcon(TOOLS[id].tier) : swordIcon(TOOLS[id].col);
   const c = document.createElement("canvas"); c.width = c.height = 16;
   const ox = id >= 100 ? (id - 100 + MT) * 16 : id * 16, oy = id >= 100 ? 0 : (BLOCKS[id].top ? 16 : 0);
   c.getContext("2d").drawImage(atlas, ox, oy, 16, 16, 0, 0, 16, 16); return c;
@@ -545,7 +591,7 @@ const GAS_TOP = 29;
 const VENUS_SURF = 12, VENUS_BASE = 36;
 
 /* ═════════════ 세계 ═════════════ */
-const SX = 64, SY = 52, SZ = 64, CH = 16;
+const SX = 96, SY = 52, SZ = 96, CH = 16;
 const W = new Uint8Array(SX * SY * SZ), SH = new Uint8Array(SX * SZ);
 let wrapX = false, base = { x: 32, y: 12, z: 32 };
 const I = (x, y, z) => x + SX * (z + SZ * y);
@@ -627,23 +673,25 @@ function placeLander(lv, floor) {
 }
 const GEN = {
   earth() {
-    base = { x: 30, z: 34 };
+    // 넓은 섬(바다 수면 16칸), 땅속이 깊어서 아래로 갈수록 귀한 광석
+    base = { x: 46, z: 50 };
     for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
-      const d = Math.hypot(x - 30, z - 32) / 30;
-      let h = 9 + fbm(x / 18, z / 18, 1) * 9 - Math.max(0, d - .55) * 22;
-      h = flatten(h, x, z, base.x, base.z, 13);
+      const d = Math.hypot(x - 48, z - 48) / 46;
+      let h = 17 + fbm(x / 20, z / 20, 1) * 11 - Math.max(0, d - .62) * 30;
+      h = flatten(h, x, z, base.x, base.z, 21);
       h = Math.max(2, Math.min(SY - 10, Math.round(h)));
-      const beach = h <= 9;
+      const beach = h <= 17;
       col(x, z, h, beach ? 5 : 2, 1, beach ? 5 : 3, 2, 4);
-      for (let y = h + 1; y <= 8; y++) set(x, y, z, 6);
-      if (h > 9) caves(x, z, h, 201);
-      ores(x, z, h - 2, 38, .028, 5, 4); ores(x, z, h - 2, 9, .022, 3); ores(x, z, h - 2, 39, .014, 7);
-      ores(x, z, h - 2, 40, .012, 8, 1, 6); ores(x, z, h - 2, 41, .008, 9, 1, 4);
-      if (h >= 11 && h > 8 && hash(x, z, 77) < .018 && Math.hypot(x - base.x, z - base.z) > 5) tree(x, h + 1, z);
+      for (let y = h + 1; y <= 16; y++) set(x, y, z, 6);
+      if (h > 17) caves(x, z, h, 201);
+      ores(x, z, h - 2, 38, .045, 5, 8); ores(x, z, h - 2, 9, .034, 3); ores(x, z, h - 2, 39, .022, 7);
+      ores(x, z, h - 2, 40, .016, 8, 1, 9); ores(x, z, h - 2, 41, .011, 9, 1, 5);
+      const forest = .02 + .06 * smooth(.5, .72, noise(x / 14, z / 14, 88));
+      if (h >= 19 && hash(x, z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) tree(x, h + 1, z);
     }
-    // 바위 절벽에 드러난 철광석
-    for (let i = 0; i < 26; i++) { const x = Math.floor(hash(i, 5, 9) * SX), z = Math.floor(hash(i, 6, 9) * SZ), h = topY(x, z); if (h > 10 && get(x, h, z) === 2) set(x, h, z, 9); }
-    placeLander(13, 23);
+    // 바위 절벽에 드러난 철광석·석탄
+    for (let i = 0; i < 60; i++) { const x = Math.floor(hash(i, 5, 9) * SX), z = Math.floor(hash(i, 6, 9) * SZ), h = topY(x, z); if (h > 18 && get(x, h, z) === 2) set(x, h, z, i % 3 ? 9 : 38); }
+    placeLander(21, 23);
   },
   moon() {
     base = { x: 32, z: 33 };
@@ -659,7 +707,7 @@ const GEN = {
       col(x, z, h, mare ? 11 : 10, mare ? 2 : 3, 12, 0, 12);
       if (pd < .9) { SH[x + SX * z] = 1; if (pd < .55) { set(x, h, z, 14); set(x, h - 1, z, 14); } }
       if (pd >= 1) caves(x, z, h, 211);
-      ores(x, z, h, 9, .02, 11); if (mare) ores(x, z, h, 42, .035, 13);
+      ores(x, z, h, 9, .028, 11); if (mare) ores(x, z, h, 42, .045, 13);
     }
     for (const [cx, cz] of CR) { const h = topY(cx, cz); set(cx, h, cz, 9); }
     placeLander(13, 23);
@@ -677,7 +725,7 @@ const GEN = {
       h = Math.max(2, Math.min(SY - 4, Math.round(h)));
       col(x, z, h, cap ? 17 : river ? 18 : 15, 2, 16, 0, 16);
       if (!cap) caves(x, z, h, 221);
-      ores(x, z, h, 9, .022, 31); ores(x, z, h - 3, 24, .004, 37);
+      ores(x, z, h, 9, .03, 31); ores(x, z, h - 3, 24, .006, 37);
     }
     placeLander(12, 23);
   },
@@ -685,12 +733,12 @@ const GEN = {
     base = { x: 30, z: 34 };
     const CR = [[12, 20, 7, 4], [44, 14, 5, 3], [54, 40, 8, 4], [20, 48, 6, 3], [36, 54, 4, 2]];
     for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
-      let h = 12 + fbm(x / 16, z / 16, 41, 4) * 6;
+      let h = 12 + fbm(x / (SX / 4), z / (SX / 4), 41, 4) * 6;
       for (const c of CR) h += crater(x, z, c[0], c[1], c[2], c[3], 1.6);
       h += crater(x, z, 50, 6, 6, 6, 2.5);
       h = Math.max(2, Math.min(SY - 10, Math.round(h)));
       col(x, z, h, 19, 3, 19, 0, 19);
-      const pd = Math.hypot(((x - 50 + 32) % 64 + 64) % 64 - 32, z - 6) / 6;
+      const pd = Math.hypot(((x - 50 + SX / 2) % SX + SX) % SX - SX / 2, z - 6) / 6;
       if (pd < .9) { SH[x + SX * z] = 1; if (pd < .5) { set(x, h, z, 14); set(x, h - 1, z, 14); } }
       if (pd >= 1) caves(x, z, h, 231);
       ores(x, z, h, 9, .05, 43);
@@ -1032,7 +1080,7 @@ const SUITS = {
 const DEF = () => ({
   planet: "earth", inv: { 33: 0 }, mined: {}, gear: { rocket: false, insul: false, pressure: false, batt: 0, rtg: false },
   done: {}, logs: [], dex: {}, seen: {}, edits: {}, visited: { earth: true }, best: {}, time: {},
-  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {},
+  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {}, hot: [0, 0, 0, 0, 0, 0, 0, 0, 0], piles: [],
 });
 // 곡괭이: 단계가 높을수록 빨리 캐고, 더 단단한 광석을 캘 수 있어요
 const PICKS = [
@@ -1072,26 +1120,39 @@ function toBase() {
   if (S.planet === "venus") P.pos.set(base.x + 2.5, VENUS_BASE + .01, base.z + .5);
 }
 const prevSKL = new Uint8Array(SX * SY * SZ), prevLT = new Uint8Array(SX * SY * SZ);
-function relight() {
-  prevSKL.set(SKL); prevLT.set(LT); computeLight();
-  const n = SX / CH, dirty = new Set();
-  for (let i = 0; i < W.length; i++) if (SKL[i] !== prevSKL[i] || LT[i] !== prevLT[i]) {
-    const x = i % SX, z = Math.floor(i / SX) % SZ, cx = Math.floor(x / CH), cz = Math.floor(z / CH);
+function forBox(xa, xb, za, zb, fn) { for (let xx = xa; xx <= xb; xx++) { const x = wrapX ? ((xx % SX) + SX) % SX : xx; if (x < 0 || x >= SX) continue; for (let z = Math.max(0, za); z <= Math.min(SZ - 1, zb); z++) fn(x, z); } }
+// 바뀐 칸에서 16칸 안만 빛을 지우고 다시 퍼뜨려요(빛은 15칸까지만 가니까 그 밖은 그대로)
+function relight(x0, x1, z0, z1) {
+  const ax = x0 - 16, bx = x1 + 16, az = z0 - 16, bz = z1 + 16, inBox = (x, z) => { let xx = x; if (wrapX) { while (xx < ax) xx += SX; while (xx > bx) xx -= SX; } return xx >= ax && xx <= bx && z >= az && z <= bz; };
+  forBox(ax - 16, bx + 16, az - 16, bz + 16, (x, z) => { for (let y = 0; y < SY; y++) { const i = I(x, y, z); prevSKL[i] = SKL[i]; prevLT[i] = LT[i]; } });
+  let n = 0, m = 0; const src = [];
+  forBox(ax, bx, az, bz, (x, z) => {
+    let sky = true;
+    for (let y = SY - 1; y >= 0; y--) { const i = I(x, y, z); SKL[i] = 0; LT[i] = 0; if (sky && passLight(W[i])) { SKL[i] = 15; lightQ[n++] = i; } else sky = false; const B = W[i] && BLOCKS[W[i]]; if (B && B.light) { LT[i] = B.light; src.push(i); } }
+  });
+  const ring = [];
+  forBox(ax - 1, bx + 1, az - 1, bz + 1, (x, z) => { if (!inBox(x, z)) for (let y = 0; y < SY; y++) ring.push(I(x, y, z)); });
+  ring.forEach(i => { if (SKL[i] > 1) lightQ[n++] = i; }); spreadLight(SKL, n);
+  src.forEach(i => { lightQ[m++] = i; }); ring.forEach(i => { if (LT[i] > 1) lightQ[m++] = i; }); spreadLight(LT, m);
+  const nC = SX / CH, dirty = new Set();
+  forBox(ax - 16, bx + 16, az - 16, bz + 16, (x, z) => { for (let y = 0; y < SY; y++) { const i = I(x, y, z); if (SKL[i] === prevSKL[i] && LT[i] === prevLT[i]) continue;
+    const cx = Math.floor(x / CH), cz = Math.floor(z / CH), n = nC;
     dirty.add(cx + "," + cz);
     // 덩어리 경계의 칸은 옆 덩어리 면의 밝기에도 쓰여요
     if (x % CH === 0) dirty.add(((cx - 1 + n) % n) + "," + cz); if (x % CH === CH - 1) dirty.add(((cx + 1) % n) + "," + cz);
     if (z % CH === 0 && cz > 0) dirty.add(cx + "," + (cz - 1)); if (z % CH === CH - 1 && cz < n - 1) dirty.add(cx + "," + (cz + 1));
-  }
+    break; } });
   return dirty;
 }
 function editMany(L) {
   const ch = new Set(), n = SX / CH;
   L.forEach(([x, y, z, b]) => { if (wrapX) x = ((x % SX) + SX) % SX; set(x, y, z, b); (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b; net.send({ t: "edit", pk: S.planet, x, y, z, b }); ch.add(Math.floor(x / CH) + "," + Math.floor(z / CH)); });
-  const dirty = relight(); ch.forEach(k => dirty.add(k)); dirty.forEach(k => { const [a, c] = k.split(",").map(Number); if (a >= 0 && c >= 0 && a < n && c < n) buildChunk(a, c); }); updateWrapClones();
+  const xs = L.map(e => e[0]), zs = L.map(e => e[2]);
+  const dirty = L.length ? relight(Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)) : new Set(); ch.forEach(k => dirty.add(k)); dirty.forEach(k => { const [a, c] = k.split(",").map(Number); if (a >= 0 && c >= 0 && a < n && c < n) buildChunk(a, c); }); updateWrapClones();
 }
 function edit(x, y, z, b, remote) {
   if (wrapX) x = ((x % SX) + SX) % SX;
-  set(x, y, z, b); const dirty = relight(); rebuildAt(x, z, dirty); updateWrapClones();
+  set(x, y, z, b); const dirty = relight(x, x, z, z); rebuildAt(x, z, dirty); updateWrapClones();
   (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b;
   if (!remote) net.send({ t: "edit", pk: S.planet, x, y, z, b });
 }
@@ -1178,18 +1239,32 @@ const DEATH = {
   hot: ["우주복이 너무 뜨거워졌어요", (pk) => pk === "mercury" ? "수성의 낮 쪽은 약 430 °C예요. 대기가 없어서 햇빛을 막아 줄 것이 없어요. 낮과 밤의 경계(새벽 띠)에 머물거나 단열 우주복을 만드세요." : pk === "venus" ? "금성 표면은 두꺼운 이산화 탄소 대기가 열을 가두는 온실 효과 때문에 약 465 °C예요. 수성보다 태양에서 멀지만 더 뜨거워요." : pk === "moon" ? "달의 낮은 100 °C가 넘어요. 대기가 없어 햇빛이 그대로 내리쬐어요. 전력이 떨어지면 우주복이 식혀 주지 못해요." : "냉각에 쓸 전력이 떨어졌어요."],
   cold: ["우주복이 얼어붙었어요", (pk) => pk === "moon" ? "달의 밤과 햇빛이 들지 않는 구덩이는 영하 170 °C 아래예요. 대기가 없어서 열을 붙잡아 두지 못해요." : pk === "mercury" ? "수성의 밤 쪽은 영하 180 °C예요. 대기가 없어서 낮의 열이 금방 우주로 빠져나가요." : pk === "mars" ? "화성은 대기가 아주 얇아서(지구의 약 1 %) 밤에 영하 90 °C까지 떨어져요. 먼지 폭풍이 오면 햇빛까지 막혀요." : PLANETS[pk].au > 5 ? `${PLANETS[pk].name}${josa(PLANETS[pk].name, "은", "는")} 태양에서 ${PLANETS[pk].au} AU나 떨어져 있어서 햇빛이 지구의 ${fmtSun(PLANETS[pk].solar)}배뿐이에요. 아주 춥고 태양광 패널도 거의 쓸모가 없어요. 원자력 전지(RTG)와 단열이 잘 되는 우주복이 필요해요.` : "난방에 쓸 전력이 떨어졌어요."],
   pressure: ["기압에 짓눌렸어요", (pk) => PLANETS[pk].gas ? `${PLANETS[pk].name}의 구름 아래로 내려갈수록 기체가 점점 빽빽해져 기압이 수백, 수천 기압까지 올라가요. 목성형 행성에는 딛고 설 단단한 땅이 없어요.` : "금성 표면의 기압은 지구의 약 92배예요. 바닷속 900 m에서 받는 압력과 비슷해서, 내압 냉각복 없이는 버틸 수 없어요."],
-  robot: ["고장 난 로봇에게 당했어요", () => "어두운 곳에서는 고장 난 탐사 로봇이 나타나요. 밝은 곳에는 생기지 않으니 횃불이나 전등으로 기지 주변과 굴을 밝혀 두세요. 곡괭이가 좋을수록 로봇을 빨리 멈출 수 있어요."],
+  robot: ["고장 난 로봇에게 당했어요", () => "어두운 곳에서는 고장 난 탐사 로봇이 나타나요. 밝은 곳에는 생기지 않으니 횃불이나 전등으로 기지 주변과 굴을 밝혀 두세요. 로봇마다 피하는 법이 달라요. 돌격 로봇이 번쩍이면 옆으로 비키고, 레이저 조준선이 보이면 블록 뒤에 숨고, 자폭 로봇이 깜박이면 달아나고, 대형 로봇이 팔을 들면 점프하세요. 칼을 만들면 더 세게 때려요."],
   meteor: ["운석에 맞았어요", (pk) => `${PLANETS[pk].name}에는 대기가 없어서 운석이 타 없어지지 않고 그대로 떨어져요. 붉은 원이 보이면 바로 원 밖으로 피하세요.`],
   rad: ["방사선을 너무 많이 쬐었어요", (pk) => pk === "europa" ? "유로파는 목성의 강한 자기장에 붙잡힌 고에너지 입자 속을 돌아요. 경보가 울리면 얼음 속을 파고 들어가거나 지붕 아래로 피하세요." : `${PLANETS[pk].name}에는 지구처럼 태양 방사선을 막아 줄 두꺼운 대기와 자기장이 없어요. 태양 폭풍 경보가 울리면 땅속이나 지붕 아래로 피하세요.`],
+  pvp: ["다른 탐사 대원에게 쓰러졌어요", () => `${pvpBy || "다른 대원"}에게 맞았어요. 방장이 '플레이어끼리 대결'을 켜 두었어요. 기지 코어 6칸 안은 안전 구역이라 맞지 않아요.`],
   abyss: ["끝없이 가라앉았어요", (pk) => `${PLANETS[pk].name}${josa(PLANETS[pk].name, "은", "는")} 대부분 수소와 헬륨 같은 기체로 된 목성형 행성이에요. 아래로 내려가면 기체가 점점 짙어질 뿐 단단한 땅이 나오지 않아요.`],
 };
+let pvpBy = "";
+// 대결에서 맞았을 때(네트워크로 받은 값이라 피해를 12로 제한)
+function takeHit(dmg, who, ax, az) {
+  if (!$("startOv").hidden || S.hp <= 0) return;
+  if (Math.hypot(P.pos.x - base.x - .5, P.pos.z - base.z - .5) < SAFE_R) return;
+  S.hp -= Math.max(0, Math.min(12, dmg || 0)); cause = "pvp"; pvpBy = who; hurtT = 1; lastHurt = gameT; sfx.hurt();
+  const dx = P.pos.x - ax, dz = P.pos.z - az, L = Math.hypot(dx, dz) || 1; P.vel.x += dx / L * 5; P.vel.z += dz / L * 5; P.vel.y = Math.max(P.vel.y, 3);
+  toast(`${who}에게 맞았어요! 체력 ${Math.max(0, Math.round(S.hp))}`, 1200);
+  if (S.hp <= 0) die();
+}
 function die() {
   const c = DEATH[cause] || ["쓰러졌어요", () => "기지에서 다시 시작해요."];
   const pk = S.planet;
-  for (const id in S.inv) if (+id >= 100 || (BLOCKS[id] && !BLOCKS[id].device && !BLOCKS[id].solar)) S.inv[id] = Math.floor(S.inv[id] * .7);
+  // 가진 물건을 모두 쓰러진 자리에 떨어뜨려요(장비는 몸에 남아요). 기체 행성은 바닥이 없어서 기지 발판에 떨어뜨려요
+  const items = {}; let n = 0;
+  for (const id in S.inv) if (S.inv[id] > 0) { items[id] = S.inv[id]; n += S.inv[id]; S.inv[id] = 0; }
+  if (n) { const gas = PLANETS[pk].gas; makePile(items, gas ? base.x + 4.5 : P.pos.x, gas ? base.y + 1 : P.pos.y + .2, gas ? base.z + .5 : P.pos.z, "death"); }
   S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; toBase(); clearMobs();
-  showLog({ no: "구조 요청 · 기지로 이송됨", t: c[0], ev: `쓰러진 곳: ${PLANETS[pk].name} · 바깥 기온 ${Math.round(env.T)} °C · 기압 ${fmtP(env.Pa)} · 자원 30 %를 잃었어요`, x: c[1](pk), dead: true });
-  sfx.die(); renderHotbar();
+  showLog({ no: "구조 요청 · 기지로 이송됨", t: c[0], ev: `쓰러진 곳: ${PLANETS[pk].name} · 바깥 기온 ${Math.round(env.T)} °C · 기압 ${fmtP(env.Pa)} · ${n ? `가진 물건 ${n}개를 쓰러진 자리에 떨어뜨렸어요. 빛 기둥을 찾아가 30분 안에 주우세요` : "떨어뜨린 물건 없음"}`, x: c[1](pk), dead: true });
+  sfx.die(); renderHotbar(); save();
 }
 
 /* ═════════════ 물리 ═════════════ */
@@ -1265,8 +1340,8 @@ function mineTick(dt, h) {
   if (!wantMine || !h) { mining = null; crack.material.opacity = 0; return; }
   const b = h.b, B = BLOCKS[b];
   if (!B || B.h > 1e6) { if (!mining || mining.key !== "x") toast(`${itemName(b)}${josa(itemName(b), "은", "는")} 캘 수 없어요`); mining = { key: "x" }; return; }
-  const tier = B.tier || 0, tool = S.tool || 0;
-  if (tier > tool) { if (!mining || mining.key !== "x") toast(`${B.n}${josa(B.n, "은", "는")} ${PICKS[tier].n} 이상으로 캘 수 있어요`, 2200); mining = { key: "x" }; return; }
+  const tier = B.tier || 0, tool = heldTier();
+  if (tier > tool) { if (!mining || mining.key !== "x") toast(bestTier() >= tier ? `곡괭이를 손에 드세요(1~9 칸). ${B.n}${josa(B.n, "은", "는")} ${PICKS[tier].n} 이상이 필요해요` : `${B.n}${josa(B.n, "은", "는")} ${PICKS[tier].n} 이상으로 캘 수 있어요`, 2400); mining = { key: "x" }; return; }
   const key = h.x + "," + h.y + "," + h.z;
   if (!mining || mining.key !== key) mining = { key, t: 0 };
   mining.t += dt;
@@ -1284,13 +1359,25 @@ function mineTick(dt, h) {
     mining = null; crack.material.opacity = 0; renderHotbar();
   }
 }
-const HOT_FIRST = [36, 37, 35, 31, 30, 32];
+const HOT_FIRST = [120, 121, 122, 123, 124, 125, 36, 37, 35, 31, 30, 32];
+const heldId = () => S.hot[sel] || 0, heldTier = () => (TOOLS[heldId()] || {}).tier || 0;
+// 칸 정리: 다 쓴 칸은 비우고, 새로 생긴 블록·도구는 빈 칸에 넣어요
+function syncHot() {
+  if (!Array.isArray(S.hot) || S.hot.length !== 9) S.hot = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  S.hot = S.hot.map(id => id && (S.inv[id] || 0) > 0 ? +id : 0);
+  S.known = S.known || {};
+  const want = Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0 && (TOOLS[i] || (i < 100 && BLOCKS[i])) && !S.hot.includes(i) && !S.known[i]);
+  Object.keys(S.inv).forEach(i => { if (S.inv[i] > 0) S.known[i] = true; else delete S.known[i]; });
+  const rk = (i) => { const k = HOT_FIRST.indexOf(i); return k < 0 ? 100 + i : k; };
+  want.sort((a, b) => rk(a) - rk(b)).forEach(i => { const e = S.hot.indexOf(0); if (e >= 0) S.hot[e] = i; });
+}
 function hotIds() { const rk = (i) => { const k = HOT_FIRST.indexOf(i); return k < 0 ? 100 + i : k; }; return Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0 && i < 100 && BLOCKS[i]).sort((a, b) => rk(a) - rk(b)).slice(0, 9); }
 let sel = 0, mode = "dig";
 function place() {
   if (paused) return;
   const h = raycast(6); if (!h) { window.__why = 'nohit'; return; }
-  const id = hotIds()[sel]; if (!id) { toast("놓을 블록이 없어요"); return; }
+  const id = heldId(); if (!id || !(S.inv[id] > 0)) { toast("고른 칸이 비었어요. 가방(I)에서 넣을 수 있어요"); return; }
+  if (!BLOCKS[id]) { toast(`${itemName(id)}${josa(itemName(id), "은", "는")} 놓을 수 없어요`); return; }
   if (id === 36 && !PLANETS[S.planet].breath) { toast(`횃불에 불이 붙지 않아요. 불이 타려면 산소가 필요한데 ${PLANETS[S.planet].name}에는 숨 쉴 산소가 거의 없어요. 전기로 켜는 전등을 쓰세요.`, 4200); sfx.fizz(); return; }
   const x = h.x + h.n[0], y = h.y + h.n[1], z = h.z + h.n[2];
   if (y >= SY || SOLID(get(x, y, z))) return;
@@ -1333,6 +1420,9 @@ const RECIPES = [
   { id: "pick1", n: "돌 곡괭이", need: { 7: 2, 4: 3 }, pick: 1, cat: "tool", use: "석탄·철·구리·황 광석을 캘 수 있어요. 캐는 속도 1.8배." },
   { id: "pick2", n: "철 곡괭이", need: { 7: 2, 100: 3 }, pick: 2, cat: "tool", use: "금·다이아몬드·티타늄·토륨 광석까지 캘 수 있어요. 캐는 속도 2.6배." },
   { id: "pick3", n: "다이아몬드 곡괭이", need: { 7: 2, 111: 3 }, pick: 3, cat: "tool", use: "가장 단단한 날. 캐는 속도 4배, 로봇도 세게 때려요." },
+  { id: "sword1", n: "돌 칼", need: { 7: 1, 4: 2 }, tool: 123, cat: "tool", use: "로봇에게 주는 피해 6 (맨손 2, 곡괭이 4~8). 캐는 데는 쓸 수 없어요." },
+  { id: "sword2", n: "철 칼", need: { 7: 1, 100: 2 }, tool: 124, cat: "tool", use: "피해 8. 로봇을 두 번이면 멈춰요." },
+  { id: "sword3", n: "다이아몬드 칼", need: { 7: 1, 111: 2 }, tool: 125, cat: "tool", use: "피해 11. 가장 강한 무기예요." },
   { id: 30, n: "태양광 패널", need: { 101: 2, 100: 1 }, out: 30, use: "기지 코어 6칸 안에 놓으면 해가 있을 때 전력을 만들어요. 태양에서 가까운 행성일수록 많이 만들어요." },
   { id: 31, n: "관측 장치", need: { 100: 1, 101: 2 }, out: 31, use: "땅에 놓으면 그 행성의 중력·기압·햇빛 세기를 재서 도감에 기록해요." },
   { id: 32, n: "유리 패널 ×2", need: { 101: 2 }, out: 32, count: 2, use: "투명한 벽. 황산에도 녹지 않아요." },
@@ -1349,30 +1439,40 @@ function nearTable() {
   for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -3; dy <= 3; dy++) { const b = get(px + dx, py + dy, pz + dz); if (b === 33 || (b === 35 && Math.abs(dx) <= 4 && Math.abs(dz) <= 4)) return true; }
   return false;
 }
-const owned = (r) => (r.gear && r.gear !== "batt" && S.gear[r.gear]) || (r.gear === "batt" && S.gear.batt >= 3) || (r.pick && (S.tool || 0) >= r.pick);
+const owned = (r) => (r.gear && r.gear !== "batt" && S.gear[r.gear]) || (r.gear === "batt" && S.gear.batt >= 3) || (r.pick && S.inv[TOOL_OF[r.pick]] > 0) || (r.tool && S.inv[r.tool] > 0);
 const hasAll = (r, k = 1) => Object.entries(r.need).every(([id, n]) => (S.inv[id] || 0) >= n * k);
 function canMake(r) { return hasAll(r) && !owned(r) && (r.hand || nearTable()); }
 function maxMake(r) { if (!r.out) return canMake(r) ? 1 : 0; let k = 0; while (k < 64 && hasAll(r, k + 1)) k++; return r.hand || nearTable() ? k : 0; }
 function makeIt(r, k) {
   for (let i = 0; i < k; i++) {
     Object.entries(r.need).forEach(([id, n]) => S.inv[id] -= n);
-    if (r.pick) { S.tool = r.pick; toast(`${r.n} 완성! 이제 더 빨리, 더 단단한 광석까지 캘 수 있어요`, 2500); }
+    if (r.pick) { const tid = TOOL_OF[r.pick]; S.inv[tid] = 1; S.tool = Math.max(S.tool || 0, r.pick); syncHot(); if (S.hot.includes(tid)) sel = S.hot.indexOf(tid); toast(`${r.n} 완성! 손에 들고 캐면 더 빨리, 더 단단한 광석까지 캘 수 있어요`, 2500); }
+    else if (r.tool) { S.inv[r.tool] = 1; syncHot(); if (S.hot.includes(r.tool)) sel = S.hot.indexOf(r.tool); toast(`${r.n} 완성! 손에 들고 로봇을 때리세요`, 2600); }
     else if (r.gear === "batt") { S.gear.batt++; S.pw += 50; } else if (r.gear) S.gear[r.gear] = true; else S.inv[r.out] = (S.inv[r.out] || 0) + (r.count || 1);
   }
   sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save();
 }
 let craftTab = "all";
 const CTABS = [["all", "전체"], ["block", "블록"], ["tool", "도구"], ["gear", "장비"]];
+function pickIcon(t) { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d"); g.fillStyle = "#8a5a2e"; for (let i = 0; i < 10; i++) g.fillRect(3 + i, 13 - i, 2, 2); g.fillStyle = PICKS[t].col; g.fillRect(6, 2, 8, 2); g.fillRect(12, 2, 2, 7); g.fillRect(4, 3, 3, 2); return c; }
+function swordIcon(col) {
+  const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d");
+  g.fillStyle = "#8a5a2e"; for (let i = 0; i < 3; i++) g.fillRect(2 + i, 12 - i, 2, 2);
+  g.fillStyle = "#555a66"; g.fillRect(3, 8, 2, 2); g.fillRect(4, 9, 2, 2); g.fillRect(6, 11, 2, 2); g.fillRect(7, 12, 2, 2);
+  g.fillStyle = col; for (let i = 0; i < 8; i++) g.fillRect(6 + i, 8 - i, 2, 2);
+  g.fillStyle = "#ffffff88"; for (let i = 0; i < 6; i++) g.fillRect(7 + i, 8 - i, 1, 1); return c;
+}
 function recipeIcon(r) {
   if (r.out) return iconCanvas(r.out);
-  if (r.pick) { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d"); g.fillStyle = "#8a5a2e"; for (let i = 0; i < 10; i++) g.fillRect(3 + i, 13 - i, 2, 2); g.fillStyle = PICKS[r.pick].col; g.fillRect(6, 2, 8, 2); g.fillRect(12, 2, 2, 7); g.fillRect(4, 3, 3, 2); return c; }
+  if (r.pick) return pickIcon(r.pick);
+  if (r.tool) return iconCanvas(r.tool);
   return iconCanvas(r.id === "batt" ? 100 : r.id === "pressure" ? 102 : r.id === "insul" ? 11 : r.id === "rtg" ? 104 : 34);
 }
 function openCraft() {
   pause(true);
   const near = nearTable();
   const w = $("craftWhere"); w.className = near ? "ok" : "";
-  w.textContent = near ? `제작대 근처예요. 모든 것을 만들 수 있어요. 지금 도구: ${PICKS[S.tool || 0].n}` : `제작대가 근처에 없어요. 여기서는 제작대·횃불만 만들 수 있어요. 제작대 4칸 안이나 기지 코어 6칸 안으로 가세요. 지금 도구: ${PICKS[S.tool || 0].n}`;
+  w.textContent = near ? `제작대 근처예요. 모든 것을 만들 수 있어요. 가장 좋은 도구: ${PICKS[bestTier()].n}` : `제작대가 근처에 없어요. 여기서는 제작대·횃불만 만들 수 있어요. 제작대 4칸 안이나 기지 코어 6칸 안으로 가세요. 가장 좋은 도구: ${PICKS[bestTier()].n}`;
   const inv = $("invList"); inv.innerHTML = "";
   const ids = Object.keys(S.inv).filter(i => S.inv[i] > 0);
   if (!ids.length) inv.innerHTML = `<span>아직 가진 자원이 없어요</span>`;
@@ -1714,21 +1814,47 @@ function renderGauges() {
   set1("gO2", S.o2, 100, PLANETS[S.planet].breath ? "공기" : Math.round(S.o2), S.o2 < 25);
   set1("gPw", S.pw, maxPw(), Math.round(S.pw), S.pw < 20);
   const st = $("gSt"); st.querySelector("i").style.width = Math.max(4, Math.min(100, (S.st + 40) / 120 * 100)) + "%"; st.querySelector("i").style.background = S.st > 45 ? "var(--bad)" : S.st < 0 ? "var(--ice)" : "var(--good)"; st.querySelector(".v").textContent = Math.round(S.st) + "°"; st.classList.toggle("danger", S.st > 45 || S.st < 0);
-  $("suitName").textContent = `${suit().n}${S.gear.batt ? ` · 배터리 +${S.gear.batt * 50}` : ""} · ${PICKS[S.tool || 0].n}`;
+  $("suitName").textContent = `${suit().n}${S.gear.batt ? ` · 배터리 +${S.gear.batt * 50}` : ""} · 손: ${heldId() ? itemName(heldId()) : "맨손"}`;
 }
 function renderHotbar() {
-  const hb = $("hotbar"); hb.innerHTML = ""; const ids = hotIds();
-  if (sel >= ids.length) sel = Math.max(0, ids.length - 1);
+  syncHot();
+  const hb = $("hotbar"); hb.innerHTML = "";
   if (typeof updateHeld === "function") updateHeld();
-  if (!ids.length) { hb.innerHTML = `<span style="padding:12px 14px;color:var(--ink-dim);font-weight:700">놓을 수 있는 블록이 여기 모여요</span>`; $("hotName").hidden = true; return; }
-  ids.forEach((id, i) => {
-    const b = document.createElement("button"); b.className = "slot click" + (i === sel ? " on" : ""); b.title = itemName(id);
-    b.appendChild(iconCanvas(id)); b.insertAdjacentHTML("beforeend", `<span>${S.inv[id]}</span>`);
-    b.onclick = () => { sel = i; if (isTouch && mode !== "place") $("tMode").click(); renderHotbar(); };
+  S.hot.forEach((id, i) => {
+    const b = document.createElement("button"); b.className = "slot click" + (i === sel ? " on" : "") + (id ? "" : " empty"); b.title = id ? itemName(id) : `${i + 1}번 칸 (비었음)`;
+    if (id) { b.appendChild(iconCanvas(id)); if (!TOOLS[id]) b.insertAdjacentHTML("beforeend", `<span>${S.inv[id]}</span>`); }
+    b.insertAdjacentHTML("beforeend", `<em>${i + 1}</em>`);
+    b.onclick = () => { sel = i; if (isTouch && BLOCKS[id] && mode !== "place") $("tMode").click(); if (isTouch && TOOLS[id] && mode === "place") $("tMode").click(); renderHotbar(); };
     hb.appendChild(b);
   });
-  $("hotName").hidden = false; $("hotName").textContent = itemName(ids[sel]);
+  const id = heldId(); $("hotName").hidden = false; $("hotName").textContent = id ? itemName(id) : "맨손";
+  if (!$("invOv").hidden) renderInv();
 }
+/* 가방과 장비 창 */
+function renderInv() {
+  const he = $("hotEdit"); he.innerHTML = "";
+  S.hot.forEach((id, i) => { const b = document.createElement("button"); b.className = "slot" + (i === sel ? " on" : "") + (id ? "" : " empty"); if (id) { b.appendChild(iconCanvas(id)); if (!TOOLS[id]) b.insertAdjacentHTML("beforeend", `<span>${S.inv[id]}</span>`); } b.insertAdjacentHTML("beforeend", `<em>${i + 1}</em>`); b.onclick = () => { sel = i; renderHotbar(); }; he.appendChild(b); });
+  const ids = Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0);
+  const fill = (el, list, empty) => { el.innerHTML = ""; if (!list.length) el.innerHTML = `<small>${empty}</small>`;
+    list.forEach(id => { const b = document.createElement("button"); b.className = "slot" + (S.hot.includes(id) ? " inhot" : ""); b.title = itemName(id); b.appendChild(iconCanvas(id)); if (!TOOLS[id]) b.insertAdjacentHTML("beforeend", `<span>${S.inv[id]}</span>`);
+      b.insertAdjacentHTML("beforeend", `<label>${itemName(id)}</label>`);
+      b.onclick = () => { if (bagMode !== "put") { dropItem(id, bagMode === "all"); return; } const was = S.hot.indexOf(id); if (was >= 0) S.hot[was] = S.hot[sel]; S.hot[sel] = id; sfx.pop(); renderHotbar(); }; el.appendChild(b); }); };
+  const bm = $("bagMode"); bm.innerHTML = "";
+  [["put", "누르면 단축 칸에 넣기"], ["one", "누르면 1개 버리기"], ["all", "누르면 전부 버리기"]].forEach(([k, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = bagMode === k ? "on" : ""; b.onclick = () => { bagMode = k; renderInv(); }; bm.appendChild(b); });
+  fill($("bagTools"), ids.filter(i => TOOLS[i]), "제작대에서 곡괭이와 칼을 만들어 보세요");
+  fill($("bagBlocks"), ids.filter(i => i < 100 && BLOCKS[i]), "캐거나 만든 블록이 여기 모여요");
+  fill($("bagMats"), ids.filter(i => MATS[i]), "광석을 캐면 재료가 모여요");
+  const eq = [
+    ["손에 든 것", heldId() ? itemName(heldId()) : "맨손", (TOOLS[heldId()] || {}).dmg ? `공격 피해 ${atkDmg()} (맨손 2) · 캐는 속도는 맨손과 같아요` : heldTier() ? `캐는 속도 ${PICKS[heldTier()].sp}배 · 로봇 피해 ${PICKS[heldTier()].dmg}` : "곡괭이를 들면 더 빨리 캐요"],
+    ["우주복", suit().n, `${suit().pr}기압까지 · 단열 ${Math.round(suit().ins * 100)}%`],
+    ["배터리 팩", `${S.gear.batt} / 3`, `전력 한도 ${maxPw()}`],
+    ["원자력 전지", S.gear.rtg ? "있음" : "없음", S.gear.rtg ? "햇빛 없이도 전기를 만들어요" : "토륨 3, 철 4로 만들어요"],
+    ["로켓", S.gear.rocket ? "있음" : "없음", S.gear.rocket ? "발사대에서 우주 지도(M)" : "철 6, 규소 4로 만들어요"],
+  ];
+  $("equipList").innerHTML = eq.map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><small>${c}</small></div>`).join("");
+}
+let bagMode = "put";
+function openInv() { bagMode = "put"; pause(true); renderInv(); $("invOv").hidden = false; }
 let toastT = 0;
 function toast(t, ms = 1300) { const el = $("toast"); el.textContent = t; el.hidden = false; toastT = performance.now() + ms; }
 function showFact(t, x) { const el = $("fact"); el.innerHTML = "<b></b><span></span>"; el.querySelector("b").textContent = t; el.querySelector("span").textContent = x; el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => { el.hidden = true; }, 9000); sfx.quest(); }
@@ -1738,6 +1864,9 @@ function showLog(L) {
   $("logOv").hidden = false; $("logClose").focus();
 }
 $("logClose").onclick = () => { $("logOv").hidden = true; resume(); };
+$("bInv").onclick = openInv; $("invClose").onclick = () => { $("invOv").hidden = true; resume(); };
+$("hotClear").onclick = () => { S.hot[sel] = 0; renderHotbar(); };
+$("dropOne").onclick = () => dropHeld(false); $("dropAll").onclick = () => dropHeld(true);
 function openDex() {
   pause(true);
   const rows = ORDER.map(pk => {
@@ -1834,29 +1963,40 @@ let locked = false, isTouch = false;
 function pause(p) { paused = p; wantMine = false; if (p) { try { document.exitPointerLock(); } catch (e) {} for (const k in keys) keys[k] = false; stickV = { x: 0, y: 0 }; touchJump = false; recall = 0; } }
 addEventListener("keydown", (e) => {
   if (e.target && e.target.tagName === "INPUT") return;
-  const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden || !$("setOv").hidden;
+  const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden || !$("setOv").hidden || !$("invOv").hidden;
   if (e.code === "KeyE" && $("startOv").hidden && $("logOv").hidden) { if (!$("craftOv").hidden) $("craftClose").click(); else if (!anyOv) openCraft(); return; }
+  if (e.code === "KeyI" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("invOv").hidden) $("invClose").click(); else if (!anyOv) openInv(); return; }
   if (e.code === "KeyJ" && $("startOv").hidden && $("logOv").hidden) { if (!$("dexOv").hidden) $("dexClose").click(); else if (!anyOv) openDex(); return; }
   if (e.code === "KeyM" && $("startOv").hidden && $("logOv").hidden) { if (!$("mapOv").hidden) $("mapClose").click(); else if (!anyOv) openMap(); return; }
   if (e.code === "KeyO" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("setOv").hidden) $("setClose").click(); else if (!anyOv) openSet(); return; }
   if (e.code === "KeyC" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("lookOv").hidden) $("lookClose").click(); else if (!anyOv) openLook(); return; }
   if (paused) return;
   if (e.code === "KeyV") { toggleView(); return; }
+  if (e.code === "KeyQ") { dropHeld(e.shiftKey); return; }
+  if (isTouch && SET.input === "auto" && /^(Key[WASD]|Space|Arrow)/.test(e.code)) useTouch(false);
   keys[e.code] = true; if (e.code === "Space") e.preventDefault();
   if (/^Digit[1-9]$/.test(e.code)) { sel = +e.code.slice(5) - 1; renderHotbar(); }
 });
 addEventListener("keyup", (e) => { keys[e.code] = false; });
 document.addEventListener("pointerlockchange", () => { locked = document.pointerLockElement === canvas; if (locked) lockFails = 0; wantMine = false; for (const k in drags) delete drags[k]; });
 document.addEventListener("mousemove", (e) => { if (locked && !paused) look(e.movementX, e.movementY, .0024); });
-addEventListener("wheel", (e) => { const n = hotIds().length; if (n && !paused) { sel = (sel + (e.deltaY > 0 ? 1 : n - 1)) % n; renderHotbar(); } }, { passive: true });
+addEventListener("wheel", (e) => { if (!paused) { sel = (sel + (e.deltaY > 0 ? 1 : 8)) % 9; renderHotbar(); } }, { passive: true });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-const SET = (() => { const d = { sens: 1, vol: .8, inv: false }; try { return Object.assign(d, JSON.parse(localStorage.getItem("spacecraft2-set") || "{}")); } catch (e) { return d; } })();
+const SET = (() => { const d = { sens: 1, vol: .8, inv: false, input: "auto" }; try { return Object.assign(d, JSON.parse(localStorage.getItem("spacecraft2-set") || "{}")); } catch (e) { return d; } })();
 function look(dx, dy, s) { s *= SET.sens; P.yaw -= dx * s; P.pitch = Math.max(-1.55, Math.min(1.55, P.pitch - dy * s * (SET.inv ? -1 : 1))); }
 function openSet() {
   if ($("startOv").hidden) pause(true);
   $("sSens").value = SET.sens; $("sVol").value = SET.vol; $("sInv").checked = SET.inv; showSet(); $("setOv").hidden = false;
 }
-function showSet() { $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
+function showInput() {
+  const box = $("sInput"); box.innerHTML = "";
+  [["auto", "자동"], ["mouse", "마우스·키보드"], ["touch", "터치 버튼"]].forEach(([k, t]) => {
+    const b = document.createElement("button"); b.textContent = t; b.className = SET.input === k ? "on" : "";
+    b.onclick = () => { SET.input = k; saveSet(); if (k !== "auto") useTouch(k === "touch"); showInput(); }; box.appendChild(b);
+  });
+  $("sInputNote").textContent = `지금은 ${isTouch ? "터치 버튼으로" : "마우스·키보드로"} 조작해요. ` + (SET.input === "auto" ? "자동: 마우스를 누르거나 WASD를 치면 마우스로, 화면을 손가락으로 누르면 터치로 바뀌어요." : "자동으로 바뀌지 않아요.");
+}
+function showSet() { showInput(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
 function saveSet() { SET.sens = +$("sSens").value; SET.vol = +$("sVol").value; SET.inv = $("sInv").checked; showSet(); setAir(S.planet); try { localStorage.setItem("spacecraft2-set", JSON.stringify(SET)); } catch (e) {} }
 ["sSens", "sVol", "sInv"].forEach(id => $(id).addEventListener("input", saveSet));
 $("sVol").addEventListener("change", () => sfx.pop());
@@ -1872,10 +2012,11 @@ document.addEventListener("pointerlockerror", lockFail);
 function resume() { pause(false); for (const k in drags) delete drags[k]; wantMine = false; lockMouse(); }
 canvas.addEventListener("pointerdown", (e) => {
   if (paused) return;
-  if (e.pointerType === "mouse") {
+  if (e.pointerType === "mouse" && SET.input !== "touch") {
+    if (isTouch) useTouch(false);
     if (locked) { if (e.button === 2) place(); else wantMine = true; return; }
     if (!noLock) { lockMouse(); return; }
-  } else { isTouch = true; $("touch").hidden = false; }
+  } else if (SET.input !== "mouse") useTouch(true);
   drags[e.pointerId] = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0, btn: e.button, type: e.pointerType, hold: false };
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
 });
@@ -1911,7 +2052,14 @@ function recallTick(dt) {
   $("recallBar").style.width = Math.min(100, recall / 1.5 * 100) + "%";
   if (recall >= 1.5) { recall = 0; recallHeld = false; keys.KeyR = false; toBase(); toast("기지로 귀환했어요"); sfx.place(); }
 }
-function showHud(v) { ["mission", "env", "gauges", "cross", "hotbar", "tools", "compass"].forEach(id => $(id).hidden = !v); $("touch").hidden = !(v && isTouch); }
+let hudOn = false;
+// 터치 버튼 ↔ 마우스 시점. 터치되는 노트북은 마우스를 쓰면 다시 마우스로 돌아와요
+function useTouch(t) {
+  if (isTouch === t) return; isTouch = t; $("touch").hidden = !(hudOn && t);
+  if (t) { try { document.exitPointerLock(); } catch (e) {} } else { noLock = !canvas.requestPointerLock; lockFails = 0; }
+  if (!$("setOv").hidden) showInput();
+}
+function showHud(v) { hudOn = v; ["mission", "env", "gauges", "cross", "hotbar", "tools", "compass"].forEach(id => $(id).hidden = !v); $("touch").hidden = !(v && isTouch); }
 
 /* ═════════════ 캐릭터·손·아이템·시점 ═════════════ */
 const LOOK_OPT = {
@@ -1989,99 +2137,308 @@ function dropTick(dt) {
     return true;
   });
 }
+/* ═════════════ 떨어진 물건 더미(버린 것·쓰러진 자리) ═════════════ */
+const PILE_LIFE = 30 * 60 * 1000, pileMesh = {};
+const okItem = (id) => !!(BLOCKS[id] || MATS[id] || TOOLS[id]);
+function cleanItems(it) {
+  const o = {}; let n = 0;
+  if (it && typeof it === "object") for (const k in it) { const id = +k, c = Math.floor(+it[k]); if (okItem(id) && c > 0 && n < 80) { o[id] = Math.min(c, 9999); n++; } }
+  return n ? o : null;
+}
+function cleanPile(q) {
+  const items = cleanItems(q.items);
+  if (!items || typeof q.id !== "string" || q.id.length > 16 || !PLANETS[q.pk] || ![q.x, q.y, q.z].every(Number.isFinite)) return null;
+  return { id: q.id, pk: q.pk, x: +q.x, y: +q.y, z: +q.z, items, kind: q.kind === "death" ? "death" : "drop", col: /^#[0-9a-f]{6}$/i.test(q.col) ? q.col : "#ffffff", t: Date.now() };
+}
+function groundY(x, y, z) {
+  let yy = Math.max(1, Math.min(SY - 2, Math.floor(y)));
+  while (yy < SY - 2 && SOLID(get(x, yy, z))) yy++;
+  while (yy > 1 && !SOLID(get(x, yy - 1, z))) yy--;
+  return yy;
+}
+function addPile(p) {
+  S.piles = (S.piles || []).filter(q => Date.now() - q.t < PILE_LIFE);
+  if (S.piles.some(q => q.id === p.id)) return;
+  S.piles.push(p); if (S.piles.length > 80) S.piles.shift();
+}
+function removePile(id, tell) { S.piles = (S.piles || []).filter(q => q.id !== id); if (tell) net.send({ t: "pick", id }); }
+function makePile(items, x, y, z, kind) {
+  const bx = Math.floor(x), bz = Math.floor(z), dth = kind === "death";
+  const p = { id: Math.random().toString(36).slice(2, 10), pk: S.planet, x: dth ? bx + .5 : x, y: groundY(bx, y, bz), z: dth ? bz + .5 : z, items, kind, col: net.myColor, t: Date.now() };
+  addPile(Object.assign({ own: true }, p)); net.send({ t: "pile", p });
+  return p;
+}
+function buildPile(p) {
+  const g = new THREE.Group();
+  if (p.kind === "death") {
+    box(.62, .44, .46, lam("#7a4a22"), 0, .22, 0, g); box(.66, .1, .5, lam("#5a3416"), 0, .46, 0, g); box(.12, .14, .04, lam("#e8c040"), 0, .32, .25, g);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, 14, 6, 1, true), new THREE.MeshBasicMaterial({ color: p.col, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide }));
+    beam.position.y = 7; g.add(beam);
+  } else {
+    Object.keys(p.items).map(Number).slice(0, 3).forEach((id, i) => {
+      let m;
+      if (TOOLS[id]) { m = toolMesh(id); m.rotation.set(0, 0, .8); m.scale.setScalar(.9); } else { m = new THREE.Mesh(itemGeo(id), itemMat); m.scale.setScalar(.28); }
+      m.position.set(i * .14, .22 + i * .08, 0); g.add(m);
+    });
+  }
+  g.position.set(p.x, p.y, p.z); scene.add(g); return g;
+}
+function pileTick(dt) {
+  const now = Date.now(), L = S.piles || [];
+  for (const id in pileMesh) if (!L.some(q => q.id === id && q.pk === S.planet)) { scene.remove(pileMesh[id]); delete pileMesh[id]; }
+  let take = null;
+  for (const p of L) {
+    if (p.pk !== S.planet) continue;
+    const m = pileMesh[p.id] || (pileMesh[p.id] = buildPile(p));
+    if (p.kind === "death") m.rotation.y += dt * .6; else { m.rotation.y += dt * 2.2; m.position.y = p.y + Math.sin(now / 300) * .05; }
+    if (paused || net.teacher || take) continue;
+    if (now - p.t < (p.own ? (p.kind === "death" ? 0 : 1000) : 600)) continue;
+    let dx = p.x - P.pos.x; if (wrapX) dx = ((dx + SX / 2) % SX + SX) % SX - SX / 2;
+    const near = Math.hypot(dx, p.z - P.pos.z) < 1.4 && Math.abs(p.y - P.pos.y) < 2;
+    if (p.own && p.kind === "drop" && !p.away) { if (!near) p.away = true; continue; } // 내가 버린 것은 한 번 떨어졌다가 다시 와야 주워요
+    if (near) take = p;
+  }
+  if (S.piles && S.piles.some(q => now - q.t > PILE_LIFE)) S.piles = S.piles.filter(q => now - q.t <= PILE_LIFE);
+  if (!take) return;
+  let n = 0; for (const id in take.items) { S.inv[id] = (S.inv[id] || 0) + take.items[id]; n += take.items[id]; }
+  removePile(take.id, true); sfx.pop();
+  toast(take.kind === "death" ? `떨어뜨린 물건 ${n}개를 주웠어요` : `${Object.keys(take.items).map(Number).map(itemName).join(", ")} ${n}개를 주웠어요`, 1600);
+  renderHotbar(); save();
+}
+// Q: 손에 든 것 1개, Shift+Q: 그 칸 전부 버리기
+function dropHeld(all) { dropItem(heldId(), all); }
+// 가방이나 손에 든 어떤 물건이든(블록·재료·도구) 앞에 떨어뜨려요
+function dropItem(id, all) {
+  if (!id || !(S.inv[id] > 0)) { toast("손에 든 것이 없어요"); return; }
+  const n = all ? S.inv[id] : 1; S.inv[id] -= n;
+  const f = new THREE.Vector3(); camera.getWorldDirection(f); f.y = 0; if (f.lengthSq() < 1e-6) f.set(0, 0, -1); f.normalize();
+  // 앞이 막혀 있으면 옆이나 뒤로 던져요
+  let x = P.pos.x, z = P.pos.z;
+  for (const r of [0, .8, -.8, 1.6, -1.6, Math.PI]) {
+    const cx = P.pos.x + (f.x * Math.cos(r) - f.z * Math.sin(r)) * 2, cz = P.pos.z + (f.x * Math.sin(r) + f.z * Math.cos(r)) * 2;
+    if (!SOLID(get(Math.floor(cx), Math.floor(P.pos.y + .5), Math.floor(cz)))) { x = cx; z = cz; break; }
+  }
+  makePile({ [id]: n }, x, P.pos.y + .5, z, "drop");
+  sfx.pop(); toast(`${itemName(id)} ${n}개를 버렸어요`); renderHotbar(); save();
+}
 /* ═════════════ 고장 난 탐사 로봇 ═════════════ */
 // 어두운 곳(밤·굴 속)에서 나타나 쫓아와요. 밝은 빛(횃불·전등·한낮 햇빛) 곁에는 생기지 않아요.
-const MOB_W = .3, MOB_H = 1.3;
+// 로봇마다 생김새와 공격이 달라요. 처음 만나면 피하는 법과 과학 원리를 알려 줘요.
+const MOBT = {
+  scout: { n: "정찰 로봇", hp: 10, sp: 2.4, w: .3, h: 1.3, sc: 1, col: ["#6f7686", "#3a3f4a"], eye: 0xff3b3b, wt: 40, drop: [[100, 1], [109, .45]],
+    fact: "가까이 다가와 팔로 쳐요. 맨손보다 칼이나 곡괭이로 때리면 더 빨리 멈춰요." },
+  charger: { n: "돌격 로봇", hp: 14, sp: 1.9, w: .36, h: 1.25, sc: 1.05, col: ["#c8682c", "#4a2c1a"], eye: 0xffd040, wt: 22, drop: [[100, 2], [108, .6]],
+    fact: "몸이 주황색으로 번쩍이면 곧장 돌진해요. 옆으로 비켜서세요! 무거운 몸은 빨리 달리면 바로 멈추지 못해서(관성) 벽에 부딪혀 잠깐 멈춰요. 그때 때리면 피해가 두 배예요." },
+  laser: { n: "레이저 로봇", hp: 8, sp: 2, w: .28, h: 1.5, sc: 1, col: ["#3d6fa8", "#1c2a3e"], eye: 0x40e0ff, wt: 18, drop: [[109, 1], [110, .3], [101, .6]],
+    fact: "멀리서 붉은 조준선을 겨눈 뒤 레이저를 쏴요. 빛은 곧게 나아가서(빛의 직진) 블록 뒤에 숨거나 조준선이 밝아질 때 옆으로 움직이면 피할 수 있어요." },
+  bomber: { n: "자폭 로봇", hp: 5, sp: 3.6, w: .26, h: .8, sc: 1, col: ["#9a9f2a", "#30321a"], eye: 0xff2020, wt: 15, drop: [[102, 1], [108, 1]],
+    fact: "가까이 오면 불빛이 빠르게 깜박이다 터져요. 깜박이면 바로 멀리 달아나세요. 공기가 없는 달·수성에서는 소리가 전해지지 않아서 삐 소리가 작게만 들려요. 불빛을 보세요!" },
+  heavy: { n: "대형 굴착 로봇", hp: 40, sp: 1.25, w: .55, h: 2.1, sc: 1.6, col: ["#d8b23a", "#2d2d30"], eye: 0xff6020, wt: 5, drop: [[100, 3], [110, .7], [111, .5]],
+    fact: "두 팔을 높이 들면 땅을 내리쳐 충격파를 일으켜요. 그 순간 점프하면 피할 수 있어요. 중력이 약한 달·화성에서는 더 높이 오래 떠 있어서 피하기 쉬워요." },
+};
 let mobs = [], mobSpawnT = 0, atkCD = 0;
-function buildRobot() {
-  const g = new THREE.Group(), body = lam("#6f7686"), dark = lam("#3a3f4a"), eye = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
-  box(.5, .45, .4, body, 0, .8, 0, g); box(.38, .3, .34, dark, 0, 1.15, 0, g);
-  box(.09, .06, .02, eye, -.09, 1.17, -.18, g); box(.09, .06, .02, eye, .09, 1.17, -.18, g);
-  box(.04, .2, .04, dark, .12, 1.38, 0, g); box(.08, .08, .08, eye, .12, 1.5, 0, g);
+const laserGeo = new THREE.BoxGeometry(.035, .035, 1);
+function buildRobot(type = "scout") {
+  const T = MOBT[type], g = new THREE.Group(), body = lam(T.col[0]), dark = lam(T.col[1]), eye = new THREE.MeshBasicMaterial({ color: T.eye });
   const limb = (x, y, w, h, m) => { const p = new THREE.Group(); p.position.set(x, y, 0); box(w, h, w, m, 0, -h / 2, 0, p); g.add(p); return p; };
-  g.userData = { legs: [limb(-.14, .58, .13, .58, dark), limb(.14, .58, .13, .58, dark)], arms: [limb(-.31, 1, .1, .45, body), limb(.31, 1, .1, .45, body)], mats: [body, dark], base: [new THREE.Color("#6f7686"), new THREE.Color("#3a3f4a")] };
+  let legs, arms = [], lamp = null;
+  if (type === "bomber") {
+    box(.46, .4, .46, body, 0, .42, 0, g); box(.3, .06, .3, dark, 0, .65, 0, g); box(.12, .08, .02, eye, 0, .48, -.24, g);
+    lamp = box(.12, .12, .12, new THREE.MeshBasicMaterial({ color: 0x441010 }), 0, .74, 0, g);
+    legs = [limb(-.16, .22, .1, .22, dark), limb(.16, .22, .1, .22, dark)];
+  } else if (type === "laser") {
+    box(.36, .5, .32, body, 0, .95, 0, g); box(.3, .26, .3, dark, 0, 1.32, 0, g); box(.16, .16, .06, eye, 0, 1.32, -.17, g);
+    box(.06, .32, .06, dark, .2, 1.05, -.1, g); box(.08, .08, .3, eye, .2, 1.18, -.25, g);
+    legs = [limb(-.12, .7, .1, .7, dark), limb(.12, .7, .1, .7, dark)]; arms = [limb(-.24, 1.15, .08, .4, body)];
+  } else {
+    box(type === "charger" ? .62 : .5, .45, .4, body, 0, .8, 0, g); box(.38, .3, .34, dark, 0, 1.15, 0, g);
+    box(.09, .06, .02, eye, -.09, 1.17, -.18, g); box(.09, .06, .02, eye, .09, 1.17, -.18, g);
+    if (type === "charger") { box(.08, .08, .26, dark, -.2, 1.25, -.22, g); box(.08, .08, .26, dark, .2, 1.25, -.22, g); box(.5, .12, .08, dark, 0, .7, -.24, g); }
+    else if (type === "heavy") { box(.52, .08, .42, dark, 0, .62, 0, g); box(.52, .08, .42, dark, 0, .9, 0, g); box(.14, .14, .14, eye, 0, 1.36, 0, g); }
+    else { box(.04, .2, .04, dark, .12, 1.38, 0, g); box(.08, .08, .08, eye, .12, 1.5, 0, g); }
+    legs = [limb(-.14, .58, .13, .58, dark), limb(.14, .58, .13, .58, dark)];
+    arms = [limb(-.31, 1, type === "heavy" ? .16 : .1, .45, body), limb(.31, 1, type === "heavy" ? .16 : .1, .45, body)];
+  }
+  g.scale.setScalar(T.sc);
+  g.userData = { legs, arms, lamp, mats: [body, dark], base: [new THREE.Color(T.col[0]), new THREE.Color(T.col[1])] };
   return g;
 }
-function mobHits(px, py, pz) {
-  for (let x = Math.floor(px - MOB_W); x <= Math.floor(px + MOB_W); x++) for (let y = Math.floor(py); y <= Math.floor(py + MOB_H - .001); y++)
-    for (let z = Math.floor(pz - MOB_W); z <= Math.floor(pz + MOB_W); z++) if (SOLID(get(x, y, z))) return true;
+function mobHits(px, py, pz, w = .3, h = 1.3) {
+  for (let x = Math.floor(px - w); x <= Math.floor(px + w); x++) for (let y = Math.floor(py); y <= Math.floor(py + h - .001); y++)
+    for (let z = Math.floor(pz - w); z <= Math.floor(pz + w); z++) if (SOLID(get(x, y, z))) return true;
   return false;
 }
 const mobFree = () => PLANETS[S.planet].gas || S.planet === "venus" || net.teacher;
 function brightAt(x, y, z) { const [sk, bl] = lightAt(x, y, z); return Math.max(env.e > .05 ? sk : Math.round(sk * .15), bl); }
-function clearMobs() { mobs.forEach(m => scene.remove(m.g)); mobs = []; }
-function spawnMob() {
+function clearMobs() { mobs.forEach(m => { scene.remove(m.g); if (m.beam) scene.remove(m.beam); }); mobs = []; }
+// 두 점 사이에 블록이 있으면 레이저(빛)가 막혀요
+function clearLine(ax, ay, az, bx, by, bz) {
+  const L = Math.hypot(bx - ax, by - ay, bz - az), n = Math.ceil(L / .25);
+  for (let i = 1; i < n; i++) { const t = i / n; if (SOLID(get(Math.floor(ax + (bx - ax) * t), Math.floor(ay + (by - ay) * t), Math.floor(az + (bz - az) * t)))) return false; }
+  return true;
+}
+function pickType() {
+  let tot = 0; for (const k in MOBT) tot += MOBT[k].wt;
+  let r = Math.random() * tot; for (const k in MOBT) { r -= MOBT[k].wt; if (r <= 0) return k; } return "scout";
+}
+function spawnMob(type) {
   const cap = S.planet === "earth" && env.e < 0 ? 6 : 4; if (mobs.length >= cap) return;
-  const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 12;
+  type = MOBT[type] ? type : pickType();
+  if (type === "heavy" && mobs.some(m => m.type === "heavy")) type = "scout";
+  const T = MOBT[type], a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 12;
   let x = Math.floor(P.pos.x + Math.cos(a) * d), z = Math.floor(P.pos.z + Math.sin(a) * d);
   if (wrapX) x = ((x % SX) + SX) % SX; else if (x < 1 || x >= SX - 1) return;
   if (z < 1 || z >= SZ - 1 || Math.hypot(x - base.x, z - base.z) < 12) return;
-  const top = topY(x, z), ys = [];
-  for (let y = 1; y <= top + 1; y++) if (!SOLID(get(x, y, z)) && !SOLID(get(x, y + 1, z)) && SOLID(get(x, y - 1, z)) && !LIQ(get(x, y, z)) && brightAt(x, y, z) < 5) ys.push(y);
+  const top = topY(x, z), ys = [], tall = T.h > 1.6;
+  for (let y = 1; y <= top + 1; y++) if (!SOLID(get(x, y, z)) && !SOLID(get(x, y + 1, z)) && (!tall || !SOLID(get(x, y + 2, z))) && SOLID(get(x, y - 1, z)) && !LIQ(get(x, y, z)) && brightAt(x, y, z) < 5) ys.push(y);
   if (!ys.length) return;
-  const g = buildRobot(); scene.add(g);
-  mobs.push({ g, p: new THREE.Vector3(x + .5, ys[Math.floor(Math.random() * ys.length)], z + .5), v: new THREE.Vector3(), hp: 10, cd: 0, ground: false, walk: 0, seen: false, burn: 0, flash: 0, wander: Math.random() * 7 });
+  const g = buildRobot(type); scene.add(g);
+  const m = { type, T, g, p: new THREE.Vector3(x + .5, ys[Math.floor(Math.random() * ys.length)], z + .5), v: new THREE.Vector3(), hp: T.hp, cd: 1 + Math.random(), ground: false, walk: 0, seen: false, burn: 0, flash: 0, wander: Math.random() * 7, st: "go", stT: 0 };
+  mobs.push(m); return m;
+}
+function hurtBy(dmg, kx, kz, kick = 6) {
+  S.hp -= dmg; cause = "robot"; hurtT = 1; lastHurt = gameT; sfx.hurt();
+  const L = Math.hypot(kx, kz) || 1; P.vel.x += kx / L * kick; P.vel.z += kz / L * kick; P.vel.y = Math.max(P.vel.y, 3);
+}
+function meetMob(m) {
+  S.mobSeen = S.mobSeen || {}; if (S.mobSeen[m.type]) return; S.mobSeen[m.type] = true;
+  showFact(`새 로봇: ${m.T.n}`, m.T.fact); S.logs.push({ id: "mob" + m.type, pk: S.planet, t: `로봇 발견: ${m.T.n}`, ev: `${PLANETS[S.planet].name}에서 ${m.T.n}${josa(m.T.n, "을", "를")} 처음 만났어요.`, x: m.T.fact });
 }
 function mobTick(dt) {
   if (mobFree()) { if (mobs.length) clearMobs(); return; }
   if ((mobSpawnT += dt) > 1.6) { mobSpawnT = 0; spawnMob(); }
-  const g = G_EARTH * PLANETS[S.planet].g, dayK = smooth(-.12, .25, env.e);
+  const g = G_EARTH * PLANETS[S.planet].g, dayK = smooth(-.12, .25, env.e), quiet = PLANETS[S.planet].airless;
   mobs = mobs.filter(m => {
+    const T = m.T, u = m.g.userData;
     let dx = P.pos.x - m.p.x; if (wrapX) dx = ((dx + SX / 2) % SX + SX) % SX - SX / 2;
-    const dz = P.pos.z - m.p.z, dist = Math.hypot(dx, dz), dy = P.pos.y - m.p.y;
-    if (dist > 40) { scene.remove(m.g); return false; }
+    const dz = P.pos.z - m.p.z, dist = Math.hypot(dx, dz) || .001, dy = P.pos.y - m.p.y;
+    const gone = () => { scene.remove(m.g); if (m.beam) scene.remove(m.beam); return false; };
+    if (dist > 40) return gone();
     const fx = Math.floor(m.p.x), fy = Math.floor(m.p.y + .5), fz = Math.floor(m.p.z), [sk, bl] = lightAt(fx, fy, fz);
     // 한낮 햇빛 아래에서는 센서가 과열돼 멈춰요
-    if (env.e > .1 && sk >= 13) { m.burn += dt; if (m.burn > 1.5) { burst(fx, fy, fz, 23); sfx.fizz(); scene.remove(m.g); return false; } }
-    let wx = 0, wz = 0;
-    if (dist < 18 && Math.abs(dy) < 8) { wx = dx / dist * 2.4; wz = dz / dist * 2.4; if (!m.seen) { m.seen = true; sfx.beep(); } }
-    else { m.wander += dt * .4; wx = Math.cos(m.wander) * .8; wz = Math.sin(m.wander * 1.3) * .8; }
-    m.v.x += (wx - m.v.x) * Math.min(1, dt * 6); m.v.z += (wz - m.v.z) * Math.min(1, dt * 6); m.v.y -= g * dt; if (m.v.y < -30) m.v.y = -30;
-    let blocked = false;
-    m.p.x += m.v.x * dt; if (mobHits(m.p.x, m.p.y, m.p.z)) { m.p.x -= m.v.x * dt; blocked = true; }
-    m.p.z += m.v.z * dt; if (mobHits(m.p.x, m.p.y, m.p.z)) { m.p.z -= m.v.z * dt; blocked = true; }
-    m.p.y += m.v.y * dt;
-    if (mobHits(m.p.x, m.p.y, m.p.z)) { if (m.v.y < 0) { m.p.y = Math.floor(m.p.y) + 1; if (mobHits(m.p.x, m.p.y, m.p.z)) m.p.y -= m.v.y * dt; m.ground = true; } else m.p.y -= m.v.y * dt; m.v.y = 0; } else m.ground = false;
-    if (blocked && m.ground) m.v.y = JUMP_V * .95;
-    if (wrapX) m.p.x = ((m.p.x % SX) + SX) % SX;
-    if (m.p.y < -5) { scene.remove(m.g); return false; }
-    // 공격
-    m.cd -= dt;
-    if (dist < 1.25 && dy > -1.4 && dy < 1.6 && m.cd <= 0 && !paused) {
-      m.cd = 1.1; S.hp -= 12; cause = "robot"; hurtT = 1; lastHurt = gameT; sfx.hurt(); P.vel.x += dx / dist * 6; P.vel.z += dz / dist * 6; P.vel.y = Math.max(P.vel.y, 3);
+    if (env.e > .1 && sk >= 13) { m.burn += dt; if (m.burn > 1.5) { burst(fx, fy, fz, 23); sfx.fizz(); return gone(); } }
+    const sees = dist < 18 && Math.abs(dy) < 8;
+    if (sees && !m.seen) { m.seen = true; sfx.beep(); meetMob(m); }
+    m.stT += dt; m.cd -= dt;
+    const ex = m.p.x, ey = m.p.y + T.h * .85, ez = m.p.z, px = m.p.x + dx, py = P.pos.y + .9, pz = m.p.z + dz;
+    let wx = 0, wz = 0, face = true;
+    if (!sees) { m.wander += dt * .4; wx = Math.cos(m.wander) * .8; wz = Math.sin(m.wander * 1.3) * .8; m.st = "go"; }
+    else if (m.type === "charger") {
+      if (m.st === "go") { wx = dx / dist * T.sp; wz = dz / dist * T.sp; if (dist < 9 && m.cd <= 0 && m.ground && Math.abs(dy) < 2 && clearLine(ex, ey, ez, px, py, pz)) { m.st = "wind"; m.stT = 0; m.dir = [dx / dist, dz / dist]; tone(180, .6, "sawtooth", quiet ? .015 : .06, 0, 420); } }
+      else if (m.st === "wind") { m.flash = .6 + .4 * Math.sin(m.stT * 30); m.dir = [dx / dist, dz / dist]; if (m.stT > .8) { m.st = "dash"; m.stT = 0; m.hit = false; } }
+      else if (m.st === "dash") { face = false; wx = m.dir[0] * 10; wz = m.dir[1] * 10; if (m.stT > .7) { m.st = "go"; m.cd = 2.5; } }
+      else if (m.st === "stun") { face = false; if (Math.random() < dt * 6) burst(fx, fy + 1, fz, 23); if (m.stT > 1.6) { m.st = "go"; m.cd = 2; } }
+    } else if (m.type === "laser") {
+      if (m.st === "go") {
+        const k = dist < 5 ? -1 : dist > 10 ? 1 : 0; wx = dx / dist * T.sp * k + (-dz / dist) * Math.sin(gameT * .7 + m.wander) * 1.2; wz = dz / dist * T.sp * k + (dx / dist) * Math.sin(gameT * .7 + m.wander) * 1.2;
+        if (dist < 14 && m.cd <= 0 && clearLine(ex, ey, ez, px, py, pz)) { m.st = "aim"; m.stT = 0; tone(600, 1, "sine", quiet ? .01 : .035, 0, 1400); }
+      } else if (m.st === "aim") {
+        if (m.stT < .75) m.aimAt = [px, py, pz]; // 마지막 0.35초는 조준이 고정돼요 → 그때 옆으로 움직이면 피해요
+        if (m.stT > 1.1) {
+          const [ax, ay, az] = m.aimAt, ux = ax - ex, uy = ay - ey, uz = az - ez, L = Math.hypot(ux, uy, uz) || 1;
+          let far = 30; for (let t = .5; t < 30; t += .25) if (SOLID(get(Math.floor(ex + ux / L * t), Math.floor(ey + uy / L * t), Math.floor(ez + uz / L * t)))) { far = t; break; }
+          const t = Math.max(0, Math.min(far, (px - ex) * ux / L + (py - ey) * uy / L + (pz - ez) * uz / L));
+          const miss = Math.hypot(ex + ux / L * t - px, ey + uy / L * t - py, ez + uz / L * t - pz);
+          if (miss < .7 && t < far && !paused) hurtBy(10, ux, uz, 3);
+          m.shot = .18; m.shotL = far; tone(1800, .18, "sawtooth", quiet ? .01 : .05, 0, 300);
+          m.st = "go"; m.cd = 2.6;
+        }
+      }
+    } else if (m.type === "bomber") {
+      if (m.st === "go") { wx = dx / dist * T.sp; wz = dz / dist * T.sp; if (dist < 2 && Math.abs(dy) < 1.6) { m.st = "fuse"; m.stT = 0; m.bp = 0; } }
+      else if (m.st === "fuse") {
+        wx = dx / dist * 1.2; wz = dz / dist * 1.2;
+        const rate = .25 - .18 * Math.min(1, m.stT / 1.3); if ((m.bp -= dt) <= 0) { m.bp = rate; tone(1500, .06, "square", quiet ? .008 : .05); }
+        if (u.lamp) u.lamp.material.color.setHex(Math.sin(m.stT / rate * Math.PI) > 0 ? 0xff3030 : 0x441010);
+        if (m.stT > 1.3) {
+          const d3 = Math.hypot(dx, dy, dz); burst(fx, fy, fz, 23); burst(fx, fy + 1, fz, 9); sfx.boom(quiet ? .15 : 1);
+          if (d3 < 3.2 && !paused) hurtBy(28 * (1 - d3 / 3.2) + 4, dx, dz, 9);
+          return gone();
+        }
+      }
+    } else if (m.type === "heavy") {
+      if (m.st === "go") { wx = dx / dist * T.sp; wz = dz / dist * T.sp; if (dist < 3.4 && m.cd <= 0) { m.st = "wind"; m.stT = 0; tone(90, 1, "sawtooth", quiet ? .02 : .07, 0, 220); } }
+      else if (m.st === "wind") { if (m.stT > 1) {
+          burst(fx, Math.floor(m.p.y) - 1, fz, 4); burst(fx + 1, Math.floor(m.p.y) - 1, fz, 4); burst(fx - 1, Math.floor(m.p.y) - 1, fz + 1, 4); sfx.boom(quiet ? .1 : .7);
+          if (dist < 4.2 && P.ground && Math.abs(dy) < 1.5 && !paused) { hurtBy(16, dx, dz, 7); P.vel.y = Math.max(P.vel.y, 6); }
+          m.st = "go"; m.cd = 2.8; } }
+    } else {
+      wx = dx / dist * T.sp; wz = dz / dist * T.sp;
     }
+    m.v.x += (wx - m.v.x) * Math.min(1, dt * (m.st === "dash" ? 12 : 6)); m.v.z += (wz - m.v.z) * Math.min(1, dt * (m.st === "dash" ? 12 : 6)); m.v.y -= g * dt; if (m.v.y < -30) m.v.y = -30;
+    if (m.st === "wind" || m.st === "aim" || m.st === "stun") { m.v.x *= .8; m.v.z *= .8; }
+    let blocked = false;
+    m.p.x += m.v.x * dt; if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) { m.p.x -= m.v.x * dt; blocked = true; }
+    m.p.z += m.v.z * dt; if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) { m.p.z -= m.v.z * dt; blocked = true; }
+    m.p.y += m.v.y * dt;
+    if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) { if (m.v.y < 0) { m.p.y = Math.floor(m.p.y) + 1; if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) m.p.y -= m.v.y * dt; m.ground = true; } else m.p.y -= m.v.y * dt; m.v.y = 0; } else m.ground = false;
+    if (m.st === "dash" && blocked && m.stT > .1) { m.st = "stun"; m.stT = 0; m.v.set(0, 0, 0); burst(fx, fy + 1, fz, 23); sfx.hit(); }
+    else if (blocked && m.ground && m.st === "go") m.v.y = JUMP_V * .95;
+    if (wrapX) m.p.x = ((m.p.x % SX) + SX) % SX;
+    if (m.p.y < -5) return gone();
+    // 몸으로 부딪히는 공격
+    if (!paused && dy > -1.4 && dy < T.h + .3) {
+      if (m.st === "dash" && !m.hit && dist < 1.3) { m.hit = true; hurtBy(18, dx, dz, 10); }
+      else if ((m.type === "scout" || (m.type === "charger" && m.st === "go")) && dist < 1.25 && m.cd <= 0) { m.cd = 1.1; hurtBy(12, dx, dz); }
+    }
+    // 레이저 조준선
+    if (m.type === "laser" && (m.st === "aim" || m.shot > 0)) {
+      if (!m.beam) { m.beam = new THREE.Mesh(laserGeo, new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: .5, depthWrite: false })); scene.add(m.beam); }
+      const [ax, ay, az] = m.aimAt || [px, py, pz], L = m.shot > 0 ? m.shotL : Math.hypot(ax - ex, ay - ey, az - ez);
+      m.beam.position.set(ex, ey, ez); m.beam.lookAt(ax, ay, az); m.beam.translateZ(L / 2); m.beam.scale.set(m.shot > 0 ? 4 : 1, m.shot > 0 ? 4 : 1, L);
+      m.beam.material.opacity = m.shot > 0 ? .95 : m.stT > .75 ? .9 : .3 + .2 * Math.sin(m.stT * 20); m.beam.material.color.setHex(m.shot > 0 ? 0xffe0e0 : 0xff3030);
+      m.beam.visible = true; if (m.shot > 0) m.shot -= dt;
+    } else if (m.beam) m.beam.visible = false;
     // 그리기: 주변 밝기만큼 보이고, 맞으면 붉게 번쩍
-    m.flash = Math.max(0, m.flash - dt * 4);
-    const lk = .32 + .68 * Math.max(dayK * sk / 15, bl / 15);
-    m.g.userData.mats.forEach((mt, i) => { mt.color.copy(m.g.userData.base[i]).multiplyScalar(lk); if (m.flash) mt.color.lerp(cB.set(0xff3030), m.flash); });
-    m.g.position.copy(m.p); m.g.rotation.y = Math.atan2(-dx, -dz);
+    if (m.st !== "wind") m.flash = Math.max(0, m.flash - dt * 4);
+    const lk = .32 + .68 * Math.max(dayK * sk / 15, bl / 15), fc = m.type === "charger" && m.st === "wind" ? 0xffa020 : 0xff3030;
+    u.mats.forEach((mt, i) => { mt.color.copy(u.base[i]).multiplyScalar(lk); if (m.flash) mt.color.lerp(cB.set(fc), m.flash); });
+    m.g.position.copy(m.p); if (face) m.g.rotation.y = Math.atan2(-dx, -dz); else if (m.dir) m.g.rotation.y = Math.atan2(-m.dir[0], -m.dir[1]);
     const sp = Math.hypot(m.v.x, m.v.z); m.walk += dt * sp * 2.2;
-    const sw = Math.sin(m.walk * 3) * Math.min(1, sp / 2) * .7, u = m.g.userData;
-    u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw; u.arms[0].rotation.x = -sw - (dist < 3 ? 1.2 : 0); u.arms[1].rotation.x = sw - (dist < 3 ? 1.2 : 0);
+    const sw = Math.sin(m.walk * 3) * Math.min(1, sp / 2) * .7;
+    if (u.legs) { u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw; }
+    const up = m.type === "heavy" && m.st === "wind" ? -2.8 * Math.min(1, m.stT * 2) : null;
+    u.arms.forEach((a, i) => { a.rotation.x = up != null ? up : (i ? sw : -sw) - (dist < 3 ? 1.2 : 0); });
+    if (m.type === "laser" && u.arms[0]) u.arms[0].rotation.x = m.st === "aim" ? -1.5 : -sw;
     return true;
   });
   if (S.hp <= 0 && cause === "robot") die();
 }
 // 조준한 곳에 로봇이 있으면 캐는 대신 때려요
+const atkDmg = () => (TOOLS[heldId()] || {}).dmg || PICKS[heldTier()].dmg;
 function attackTick(dt) {
-  atkCD -= dt; if (!wantMine || !mobs.length) return false;
+  atkCD -= dt; const pv = net.pvp && !net.teacher;
+  if (!wantMine || (!mobs.length && !pv)) return false;
   const o = third ? new THREE.Vector3(P.pos.x, P.pos.y + EYE, P.pos.z) : camera.position.clone(), d = new THREE.Vector3(); camera.getWorldDirection(d);
-  let best = null, bt = 3.6;
-  for (const m of mobs) {
-    const c = m.p.clone(); c.y += .8; if (wrapX) { let ddx = c.x - o.x; ddx = ((ddx + SX / 2) % SX + SX) % SX - SX / 2; c.x = o.x + ddx; }
-    const t = c.clone().sub(o).dot(d); if (t < 0 || t > bt) continue;
-    if (o.clone().addScaledVector(d, t).distanceTo(c) < .6) { best = m; bt = t; }
+  let best = null, who = null, bt = 3.6;
+  const aim = (c, r) => {
+    if (wrapX) { let ddx = c.x - o.x; ddx = ((ddx + SX / 2) % SX + SX) % SX - SX / 2; c.x = o.x + ddx; }
+    const t = c.clone().sub(o).dot(d); return t >= 0 && t <= bt && o.clone().addScaledVector(d, t).distanceTo(c) < r ? t : -1;
+  };
+  for (const m of mobs) { const c = m.p.clone(); c.y += m.T.h * .6; const t = aim(c, .6 * m.T.sc); if (t >= 0) { best = m; bt = t; } }
+  // 대결이 켜져 있으면 같은 행성의 다른 대원도 때릴 수 있어요
+  if (pv) for (const id in net.others) {
+    const q = net.others[id]; if (q.pk !== S.planet || !q.mesh || !q.mesh.visible) continue;
+    for (const hy of [.5, 1.3]) { const t = aim(new THREE.Vector3(q.mesh.position.x, q.mesh.position.y + hy, q.mesh.position.z), .5); if (t >= 0) { best = null; who = id; bt = t; } }
   }
-  if (!best) return false;
+  if (!best && !who) return false;
+  if (who) {
+    if (atkCD <= 0) {
+      atkCD = .45; swing = .001; const q = net.others[who];
+      if (Math.hypot(q.x - base.x - .5, q.z - base.z - .5) < SAFE_R) toast("기지 코어 근처는 안전 구역이라 맞지 않아요");
+      else { net.send({ t: "hit", to: who, dmg: atkDmg() }); sfx.hit(); }
+    }
+    return true;
+  }
   if (atkCD <= 0) {
-    atkCD = .45; swing = .001; best.hp -= PICKS[S.tool || 0].dmg; best.flash = 1; sfx.hit();
-    best.v.addScaledVector(d, 7); best.v.y = 3.5;
+    atkCD = .45; swing = .001; const crit = best.st === "stun"; best.hp -= atkDmg() * (crit ? 2 : 1); best.flash = 1; sfx.hit(); if (crit) toast("멈춘 틈에 두 배 피해!", 900);
+    best.v.addScaledVector(d, best.type === "heavy" ? 2 : 7); best.v.y = best.type === "heavy" ? 1 : 3.5;
     if (best.hp <= 0) {
       const x = Math.floor(best.p.x), y = Math.floor(best.p.y + .5), z = Math.floor(best.p.z);
-      burst(x, y, z, 23); burst(x, y, z, 9); sfx.boom(.5); scene.remove(best.g); mobs = mobs.filter(m => m !== best);
-      const got = [100]; if (Math.random() < .45) got.push(109);
+      burst(x, y, z, 23); burst(x, y, z, 9); sfx.boom(.5); scene.remove(best.g); if (best.beam) scene.remove(best.beam); mobs = mobs.filter(m => m !== best);
+      const got = []; best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); });
       got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
-      S.kills = (S.kills || 0) + 1; toast(`로봇을 멈췄어요! 부품에서 ${got.map(itemName).join(", ")}`, 1800); renderHotbar();
+      S.kills = (S.kills || 0) + 1; toast(`${best.T.n}${josa(best.T.n, "을", "를")} 멈췄어요! 부품에서 ${got.map(itemName).join(", ")}`, 1800); renderHotbar();
     }
   }
   return true;
@@ -2092,7 +2449,7 @@ const handHemi = new THREE.HemisphereLight(0xffffff, 0x555555, .8); handScene.ad
 const handSun = new THREE.DirectionalLight(0xffffff, .6); handSun.position.set(-1, 2, 1); handScene.add(handSun);
 const handRig = new THREE.Group(); handScene.add(handRig);
 const handArm = new THREE.Group(); handRig.add(handArm);
-let armMesh = null, heldMesh = null, heldId = null;
+let armMesh = null, heldMesh = null, heldKey = null;
 function rebuildHand() {
   if (armMesh) handArm.remove(armMesh);
   armMesh = new THREE.Mesh(new THREE.BoxGeometry(.2, .2, .62), lam(new THREE.Color(LOOK_OPT.suit[LOOK.suit]).multiplyScalar(.75)));
@@ -2104,10 +2461,16 @@ function pickMesh(t) {
   box(.05, .05, .5, wood, 0, 0, 0, g); box(.34, .07, .07, head, 0, 0, -.25, g); box(.07, .07, .07, head, .17, -.03, -.22, g); box(.07, .07, .07, head, -.17, -.03, -.22, g);
   g.position.set(-.02, .1, -.3); g.rotation.set(.9, .2, -.3); return g;
 }
+function swordMesh(col) {
+  const g = new THREE.Group(), wood = lam("#8a5a2e"), bl = lam(col), dk = lam("#555a66");
+  box(.05, .05, .18, wood, 0, 0, .12, g); box(.22, .05, .05, dk, 0, 0, .02, g); box(.07, .025, .52, bl, 0, 0, -.26, g);
+  g.position.set(-.02, .1, -.3); g.rotation.set(.9, .2, -.3); return g;
+}
+const toolMesh = (id) => TOOLS[id].tier ? pickMesh(TOOLS[id].tier) : swordMesh(TOOLS[id].col);
 function updateHeld() {
-  const id = S.tool ? "p" + S.tool : hotIds()[sel] || null; if (id === heldId) return; heldId = id;
+  const id = S.hot[sel] || null; if (id === heldKey) return; heldKey = id;
   if (heldMesh) { handArm.remove(heldMesh); heldMesh = null; }
-  if (S.tool) { heldMesh = pickMesh(S.tool); handArm.add(heldMesh); }
+  if (TOOLS[id]) { heldMesh = toolMesh(id); handArm.add(heldMesh); }
   else if (id) { heldMesh = new THREE.Mesh(itemGeo(id), itemMat); heldMesh.scale.setScalar(.22); heldMesh.position.set(-.04, .14, -.34); heldMesh.rotation.set(.1, .7, 0); handArm.add(heldMesh); }
 }
 rebuildHand();
@@ -2177,7 +2540,7 @@ function openLook() {
   (function spin() { if (!lookOpen || !lookR) return; const t = (performance.now() - t0) / 1000; lookAv.rotation.y = Math.sin(t * .8) * .9; animAvatar(lookAv, 2, t, 0); lookR.setSize($("lookCv").clientWidth, $("lookCv").clientHeight, false); cam.aspect = $("lookCv").clientWidth / Math.max(1, $("lookCv").clientHeight); cam.updateProjectionMatrix(); lookR.render(lookScene, cam); requestAnimationFrame(spin); })();
 }
 function refreshLookAv() { if (!lookScene) return; if (lookAv) lookScene.remove(lookAv); lookAv = buildAvatar(LOOK); lookScene.add(lookAv); }
-function saveLook() { try { localStorage.setItem("spacecraft2-look", JSON.stringify(LOOK)); } catch (e) {} rebuildHand(); heldId = -1; updateHeld(); net.me.color = LOOK_OPT.pack[LOOK.pack]; }
+function saveLook() { try { localStorage.setItem("spacecraft2-look", JSON.stringify(LOOK)); } catch (e) {} rebuildHand(); heldKey = -1; updateHeld(); net.me.color = LOOK_OPT.pack[LOOK.pack]; }
 $("lookBtn").onclick = openLook;
 $("bLook").onclick = openLook;
 $("lookClose").onclick = () => { $("lookOv").hidden = true; lookOpen = false; if ($("startOv").hidden && $("teachOv").hidden) resume(); };
@@ -2204,6 +2567,7 @@ const net = (() => {
     if (got.length) { toast(got.length === 1 ? `파티원 ${nm}${ig} '${got[0]}' 임무를 완료했어요` : `파티원 ${nm}${ig} 끝낸 임무 ${got.length}개를 함께 완료했어요`, 2800); sfx.quest(); renderMission(); save(); }
   }
   let peer = null, host = false, code = "", conns = [], hostConn = null, sendT = 0, live = false, teacher = false, roomT0 = 0, clockOff = null, clockT = 0;
+  let pvp = false; // 방장이 켜고 끄는 플레이어끼리 대결
   const others = {}; // id → { name, color, pk, x, y, z, yaw, done, mesh, seen }
   const PREFIX = "spacecraft-class-";
   const qs = new URLSearchParams(location.search), local = qs.get("peer");
@@ -2334,7 +2698,13 @@ const net = (() => {
     }
     if (d.t === "bye" && d.from) removeOther(d.from);
     if ((d.t === "pdone" || d.t === "psync") && Number.isInteger(d.party)) takeParty(d);
-    if (d.t === "clock" && !host && Number.isFinite(d.c)) clockOff = d.c - performance.now() / 1000;
+    if (d.t === "clock" && !host && Number.isFinite(d.c)) {
+      clockOff = d.c - performance.now() / 1000;
+      if (typeof d.pvp === "boolean" && d.pvp !== pvp) { pvp = d.pvp; toast(pvp ? "방장이 플레이어끼리 대결을 켰어요! 기지 코어 6칸 안은 안전 구역이에요" : "방장이 대결을 껐어요", 3200); }
+    }
+    if (d.t === "hit" && d.to === me.id && pvp && !teacher) { const a = others[d.from]; if (a && a.pk === S.planet && Math.hypot(a.x - P.pos.x, a.y - P.pos.y, a.z - P.pos.z) < 7) takeHit(+d.dmg, a.name, a.x, a.z); }
+    if (d.t === "pile" && d.p && typeof d.p === "object") { const p = cleanPile(d.p); if (p) addPile(p); }
+    if (d.t === "pick" && typeof d.id === "string") removePile(d.id, false);
     if (d.t === "notice" && !teacher) { const n = $("notice"); n.innerHTML = "<small>선생님</small>"; n.appendChild(document.createTextNode(String(d.text || "").slice(0, 60))); n.hidden = false; clearTimeout(n._t); n._t = setTimeout(() => { n.hidden = true; }, 8000); sfx.quest(); }
   }
   function dropBy(c) { if (c._pid) { removeOther(c._pid); relay({ t: "bye", from: c._pid }, null); } }
@@ -2343,7 +2713,7 @@ const net = (() => {
   function tick(dt) {
     if (!live) return;
     sendT += dt;
-    if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000 }); }
+    if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp }); }
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
     if (teacher) { tickOthers(dt); return; }
     if (me.party && (psyncT += dt) > 3) { psyncT = 0; send({ t: "psync", party: me.party, name: me.name, done: Object.keys(S.done) }); }
@@ -2422,7 +2792,7 @@ const net = (() => {
     const el = $("room"); if (!code || !$("startOv").hidden) { el.hidden = true; return; }
     if (performance.now() - roomT < 500) return; roomT = performance.now();
     const n = Object.keys(others).length + 1, same = Object.values(others).filter(o => o.pk === S.planet).length;
-    el.hidden = false; el.innerHTML = live ? `방 <b>${code}</b> · ${n}명 · 이 행성에 ${same}명 더 ▸` : `방 <b>${code}</b> · 연결 끊김`;
+    el.hidden = false; el.innerHTML = live ? `방 <b>${code}</b> · ${n}명 · 이 행성에 ${same}명 더${pvp ? " · ⚔ 대결 켜짐" : ""} ▸` : `방 <b>${code}</b> · 연결 끊김`;
   }
   function openRoster() {
     pause(true);
@@ -2431,11 +2801,20 @@ const net = (() => {
     const pp = $("partyPick"); pp.innerHTML = "";
     for (let k = 0; k <= 6; k++) { const b = document.createElement("button"); b.textContent = k ? `파티 ${k}` : "혼자"; b.className = me.party === k ? "on" : ""; if (k) b.style.borderColor = PARTY_COL[k];
       b.onclick = () => { me.party = k; try { localStorage.setItem("spacecraft2-party", String(k)); } catch (e) {} psyncT = 3; openRoster(); }; pp.appendChild(b); }
+    const vb = $("pvpPick"); vb.innerHTML = "";
+    [[false, "끄기"], [true, "켜기"]].forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = pvp === v ? "on" : ""; b.disabled = !host; b.onclick = () => { setPvp(v); openRoster(); }; vb.appendChild(b); });
+    $("pvpNote").textContent = host ? "방장만 바꿀 수 있어요. 기지 코어 6칸 안은 안전 구역이에요." : `방장이 정해요 · 지금 ${pvp ? "켜짐" : "꺼짐"} · 기지 코어 6칸 안은 안전 구역`;
     $("rosterNote").textContent = `방 코드 ${code}${host ? " · 내가 방장이에요. 내 게임을 끄면 방이 닫혀요." : ""}`;
     const box = $("rosterList"); box.innerHTML = "";
     L.forEach(o => { const d = document.createElement("div"); d.innerHTML = `<i style="background:${o.color}"></i><b></b><small>${(PLANETS[o.pk] || {}).name || "?"}${o.party ? ` · <span style="color:${PARTY_COL[o.party]}">파티 ${o.party}</span>` : ""}</small><small>임무 ${o.done}개</small>`; d.querySelector("b").textContent = o.name; box.appendChild(d); });
     $("rosterOv").hidden = false;
   }
+  function setPvp(v) {
+    pvp = !!v; if (host) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp }); }
+    toast(pvp ? "플레이어끼리 대결을 켰어요. 기지 코어 6칸 안은 안전 구역이에요" : "대결을 껐어요", 2600);
+    $("tPvp").textContent = `플레이어 대결: ${pvp ? "켜짐" : "꺼짐"}`; $("tPvp").classList.toggle("on", pvp);
+  }
+  $("tPvp").onclick = () => setPvp(!pvp);
   $("room").onclick = openRoster; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; resume(); };
   $("hostBtn").onclick = () => makeRoom(false); $("joinBtn").onclick = joinRoom; $("teachBtn").onclick = () => makeRoom(true);
   addEventListener("beforeunload", (e) => {
@@ -2445,7 +2824,7 @@ const net = (() => {
   });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { send, tick, partyDone, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
+  return { send, tick, partyDone, setPvp, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
@@ -2471,7 +2850,7 @@ function frame(now) {
   if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
-  updateCamera(dt); if (!paused) dropTick(dt);
+  updateCamera(dt); if (!paused) dropTick(dt); pileTick(dt);
   skyDome.position.copy(camera.position); skyGroup.position.copy(camera.position);
   // 하늘·빛
   const e = env.e, day = smooth(-.12, .25, e), sk = PL.sky;
@@ -2527,9 +2906,10 @@ const saved = load();
 if (saved) $("contBtn").hidden = false;
 function start(fresh) {
   if (fresh) { S = DEF(); S.inv = {}; try { localStorage.removeItem("spacecraft2"); } catch (e) {} }
-  else { S = Object.assign(DEF(), saved); if (saved.tool == null) { S.tool = S.visited.moon ? 2 : 0; if (S.visited.moon) S.done.e1b = S.done.e1c = true; } }
+  else { S = Object.assign(DEF(), saved); if (saved.tool == null) { S.tool = S.visited.moon ? 2 : 0; if (S.visited.moon) S.done.e1b = S.done.e1c = true; }
+    if (!Array.isArray(saved.hot) && S.tool && !Object.keys(TOOLS).some(t => S.inv[t] > 0)) S.inv[TOOL_OF[S.tool]] = 1; }
   loadPlanet(S.planet);
-  if (matchMedia("(pointer: coarse)").matches) { isTouch = true; $("touch").hidden = false; }
+  useTouch(SET.input === "touch" || (SET.input === "auto" && matchMedia("(pointer: coarse)").matches));
   $("startOv").hidden = true; showHud(true); if (fresh) pause(false); else resume();
   if (fresh) showLog({ no: "탐사 대원 훈련", t: "지구 훈련 기지", ev: "왼쪽 아래 계기판: 체력 · 산소 · 전력 · 우주복 온도", x: "다른 천체에서는 숨 쉴 공기가 없거나, 너무 뜨겁거나 차가워요. 우주복은 전력으로 안쪽을 20 °C로 유지하고, 전력과 산소는 기지 코어 근처에서 채워져요. 먼저 지구에서 나무를 캐서 제작대와 곡괭이를 만들고, 밤이 오기 전에 횃불을 준비하세요. 굴 속은 어두우니 조심하세요." });
 }
@@ -2537,6 +2917,6 @@ $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
