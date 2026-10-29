@@ -1086,9 +1086,9 @@ const DEF = () => ({
 // 곡괭이: 단계가 높을수록 빨리 캐고, 더 단단한 광석을 캘 수 있어요
 const PICKS = [
   { n: "맨손", sp: 1, dmg: 2 },
-  { n: "돌 곡괭이", sp: 1.8, dmg: 3, col: "#8f9198" },
-  { n: "철 곡괭이", sp: 2.6, dmg: 4, col: "#e2e5ec" },
-  { n: "다이아몬드 곡괭이", sp: 4, dmg: 5, col: "#7ff0ff" },
+  { n: "돌 곡괭이", sp: 1.3, dmg: 3, col: "#8f9198" },
+  { n: "철 곡괭이", sp: 1.7, dmg: 4, col: "#e2e5ec" },
+  { n: "다이아몬드 곡괭이", sp: 2.3, dmg: 5, col: "#7ff0ff" },
 ];
 let S = DEF();
 const P = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: 0, pitch: 0, ground: false, jumpY: null, peak: 0 };
@@ -1418,9 +1418,9 @@ const RECIPES = [
   { id: 35, n: "제작대", need: { 7: 4 }, out: 35, cat: "block", hand: true, use: "놓아 두면 4칸 안에서 곡괭이와 장비를 만들 수 있어요. 기지 코어 근처도 제작대처럼 쓸 수 있어요." },
   { id: 36, n: "횃불 ×4", need: { 7: 1, 108: 1 }, out: 36, count: 4, cat: "block", hand: true, use: "주변을 밝혀요. 밝은 곳에는 고장 난 로봇이 생기지 않아요. 산소가 있어야 타서 지구에서만 쓸 수 있어요." },
   { id: 37, n: "전등 ×2", need: { 109: 1, 32: 1, 101: 1 }, out: 37, count: 2, cat: "block", use: "전기로 빛을 내서 산소가 없는 달·화성·수성에서도 켜져요. 횃불보다 조금 더 밝아요." },
-  { id: "pick1", n: "돌 곡괭이", need: { 7: 2, 4: 3 }, pick: 1, cat: "tool", use: "석탄·철·구리·황 광석을 캘 수 있어요. 캐는 속도 1.8배." },
-  { id: "pick2", n: "철 곡괭이", need: { 7: 2, 100: 3 }, pick: 2, cat: "tool", use: "금·다이아몬드·티타늄·토륨 광석까지 캘 수 있어요. 캐는 속도 2.6배." },
-  { id: "pick3", n: "다이아몬드 곡괭이", need: { 7: 2, 111: 3 }, pick: 3, cat: "tool", use: "가장 단단한 날. 캐는 속도 4배, 로봇도 세게 때려요." },
+  { id: "pick1", n: "돌 곡괭이", need: { 7: 2, 4: 3 }, pick: 1, cat: "tool", use: "석탄·철·구리·황 광석을 캘 수 있어요. 캐는 속도 1.3배." },
+  { id: "pick2", n: "철 곡괭이", need: { 7: 2, 100: 3 }, pick: 2, cat: "tool", use: "금·다이아몬드·티타늄·토륨 광석까지 캘 수 있어요. 캐는 속도 1.7배." },
+  { id: "pick3", n: "다이아몬드 곡괭이", need: { 7: 2, 111: 3 }, pick: 3, cat: "tool", use: "가장 단단한 날. 캐는 속도 2.3배. 싸울 때는 칼이 훨씬 세요." },
   { id: "sword1", n: "돌 칼", need: { 7: 1, 4: 2 }, tool: 123, cat: "tool", use: "로봇에게 주는 피해 8 (맨손 2, 곡괭이 3~5). 정찰 로봇을 두 번에 멈춰요. 캐는 데는 쓸 수 없어요." },
   { id: "sword2", n: "철 칼", need: { 7: 1, 100: 2 }, tool: 124, cat: "tool", use: "피해 12. 정찰 로봇을 한 번에 멈춰요." },
   { id: "sword3", n: "다이아몬드 칼", need: { 7: 1, 111: 2 }, tool: 125, cat: "tool", use: "피해 18. 대형 굴착 로봇도 세 번이면 멈춰요." },
