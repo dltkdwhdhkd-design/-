@@ -501,7 +501,7 @@ const WHERE = { 100: "철광석 · 수성에 많음", 101: "모래·레골리스
   4: "지구 땅속 회색 돌", 7: "지구 나무 줄기", 11: "달의 바다", 14: "그늘진 구덩이·극관", 32: "제작" };
 // 도구(120~): 손에 들어야 효과가 있어요
 const TOOLS = { 120: { n: "돌 곡괭이", tier: 1 }, 121: { n: "철 곡괭이", tier: 2 }, 122: { n: "다이아몬드 곡괭이", tier: 3 },
-  123: { n: "돌 칼", dmg: 6, col: "#8f9198" }, 124: { n: "철 칼", dmg: 8, col: "#e2e5ec" }, 125: { n: "다이아몬드 칼", dmg: 11, col: "#7ff0ff" } };
+  123: { n: "돌 칼", dmg: 8, col: "#8f9198" }, 124: { n: "철 칼", dmg: 12, col: "#e2e5ec" }, 125: { n: "다이아몬드 칼", dmg: 18, col: "#7ff0ff" } };
 // 가방에 있는 가장 좋은 곡괭이 단계(죽어서 떨어뜨리면 내려가요)
 const bestTier = () => Math.max(0, ...Object.keys(TOOLS).filter(t => S.inv[t] > 0 && TOOLS[t].tier).map(t => TOOLS[t].tier));
 const SAFE_R = 6; // 기지 코어 근처 안전 구역(대결 피해 없음)
@@ -1085,9 +1085,9 @@ const DEF = () => ({
 // 곡괭이: 단계가 높을수록 빨리 캐고, 더 단단한 광석을 캘 수 있어요
 const PICKS = [
   { n: "맨손", sp: 1, dmg: 2 },
-  { n: "돌 곡괭이", sp: 1.8, dmg: 4, col: "#8f9198" },
-  { n: "철 곡괭이", sp: 2.6, dmg: 6, col: "#e2e5ec" },
-  { n: "다이아몬드 곡괭이", sp: 4, dmg: 8, col: "#7ff0ff" },
+  { n: "돌 곡괭이", sp: 1.8, dmg: 3, col: "#8f9198" },
+  { n: "철 곡괭이", sp: 2.6, dmg: 4, col: "#e2e5ec" },
+  { n: "다이아몬드 곡괭이", sp: 4, dmg: 5, col: "#7ff0ff" },
 ];
 let S = DEF();
 const P = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: 0, pitch: 0, ground: false, jumpY: null, peak: 0 };
@@ -1246,11 +1246,11 @@ const DEATH = {
   abyss: ["끝없이 가라앉았어요", (pk) => `${PLANETS[pk].name}${josa(PLANETS[pk].name, "은", "는")} 대부분 수소와 헬륨 같은 기체로 된 목성형 행성이에요. 아래로 내려가면 기체가 점점 짙어질 뿐 단단한 땅이 나오지 않아요.`],
 };
 let pvpBy = "";
-// 대결에서 맞았을 때(네트워크로 받은 값이라 피해를 12로 제한)
+// 대결에서 맞았을 때(네트워크로 받은 값이라 피해를 18로 제한)
 function takeHit(dmg, who, ax, az) {
   if (!$("startOv").hidden || S.hp <= 0) return;
   if (Math.hypot(P.pos.x - base.x - .5, P.pos.z - base.z - .5) < SAFE_R) return;
-  S.hp -= Math.max(0, Math.min(12, dmg || 0)); cause = "pvp"; pvpBy = who; hurtT = 1; lastHurt = gameT; sfx.hurt();
+  S.hp -= Math.max(0, Math.min(18, dmg || 0)); cause = "pvp"; pvpBy = who; hurtT = 1; lastHurt = gameT; sfx.hurt();
   const dx = P.pos.x - ax, dz = P.pos.z - az, L = Math.hypot(dx, dz) || 1; P.vel.x += dx / L * 5; P.vel.z += dz / L * 5; P.vel.y = Math.max(P.vel.y, 3);
   toast(`${who}에게 맞았어요! 체력 ${Math.max(0, Math.round(S.hp))}`, 1200);
   if (S.hp <= 0) die();
@@ -1420,9 +1420,9 @@ const RECIPES = [
   { id: "pick1", n: "돌 곡괭이", need: { 7: 2, 4: 3 }, pick: 1, cat: "tool", use: "석탄·철·구리·황 광석을 캘 수 있어요. 캐는 속도 1.8배." },
   { id: "pick2", n: "철 곡괭이", need: { 7: 2, 100: 3 }, pick: 2, cat: "tool", use: "금·다이아몬드·티타늄·토륨 광석까지 캘 수 있어요. 캐는 속도 2.6배." },
   { id: "pick3", n: "다이아몬드 곡괭이", need: { 7: 2, 111: 3 }, pick: 3, cat: "tool", use: "가장 단단한 날. 캐는 속도 4배, 로봇도 세게 때려요." },
-  { id: "sword1", n: "돌 칼", need: { 7: 1, 4: 2 }, tool: 123, cat: "tool", use: "로봇에게 주는 피해 6 (맨손 2, 곡괭이 4~8). 캐는 데는 쓸 수 없어요." },
-  { id: "sword2", n: "철 칼", need: { 7: 1, 100: 2 }, tool: 124, cat: "tool", use: "피해 8. 로봇을 두 번이면 멈춰요." },
-  { id: "sword3", n: "다이아몬드 칼", need: { 7: 1, 111: 2 }, tool: 125, cat: "tool", use: "피해 11. 가장 강한 무기예요." },
+  { id: "sword1", n: "돌 칼", need: { 7: 1, 4: 2 }, tool: 123, cat: "tool", use: "로봇에게 주는 피해 8 (맨손 2, 곡괭이 3~5). 정찰 로봇을 두 번에 멈춰요. 캐는 데는 쓸 수 없어요." },
+  { id: "sword2", n: "철 칼", need: { 7: 1, 100: 2 }, tool: 124, cat: "tool", use: "피해 12. 정찰 로봇을 한 번에 멈춰요." },
+  { id: "sword3", n: "다이아몬드 칼", need: { 7: 1, 111: 2 }, tool: 125, cat: "tool", use: "피해 18. 대형 굴착 로봇도 세 번이면 멈춰요." },
   { id: 30, n: "태양광 패널", need: { 101: 2, 100: 1 }, out: 30, use: "기지 코어 6칸 안에 놓으면 해가 있을 때 전력을 만들어요. 태양에서 가까운 행성일수록 많이 만들어요." },
   { id: 31, n: "관측 장치", need: { 100: 1, 101: 2 }, out: 31, use: "땅에 놓으면 그 행성의 중력·기압·햇빛 세기를 재서 도감에 기록해요." },
   { id: 32, n: "유리 패널 ×2", need: { 101: 2 }, out: 32, count: 2, use: "투명한 벽. 황산에도 녹지 않아요." },
