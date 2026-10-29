@@ -201,6 +201,12 @@ td.unk { color: #4e5786; }
 .tTable tr.pick { cursor: pointer; }
 .tTable tr.pick:hover td { background: #ffffff0d; }
 .tTable .watch { font-size: .82em; padding: .3em .8em; }
+.set { display: grid; gap: 14px; }
+.set label { display: grid; grid-template-columns: 7em 1fr 3.5em; gap: 12px; align-items: center; font-weight: 700; }
+.set input[type=range] { width: 100%; accent-color: var(--ore); }
+.set output { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-dim); }
+.set .chk { grid-template-columns: auto 1fr; }
+.set .chk input { width: 20px; height: 20px; accent-color: var(--ore); }
 #flight { position: fixed; inset: 0; z-index: 12; background: #000; display: grid; place-items: center; text-align: center; }
 #flight canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 #flight .txt { position: relative; text-shadow: 0 2px 10px #000; }
@@ -248,6 +254,7 @@ td.unk { color: #4e5786; }
   <button class="btn ghost click" id="bDex">도감·일지 <kbd>J</kbd></button>
   <button class="btn ghost click" id="bMap">우주 지도 <kbd>M</kbd></button>
   <button class="btn ghost click" id="bLook">꾸미기 <kbd>C</kbd> · 시점 <kbd>V</kbd></button>
+  <button class="btn ghost click" id="bSet">설정 <kbd>O</kbd></button>
   <button class="btn ghost click" id="bRecall" style="position:relative;overflow:hidden">기지로 귀환 <kbd>R</kbd><span id="recallBar"></span></button>
 </div>
 <div id="touch" hidden>
@@ -273,7 +280,7 @@ td.unk { color: #4e5786; }
       <div class="row"><button class="btn ghost" id="teachBtn">선생님 화면 (플레이 없이 방만 열기)</button></div>
       <p id="mpMsg">혼자 하려면 아래 시작 버튼만 누르면 돼요. 같은 방에 들어오면 같은 행성에서 서로 보이고, 캐고 쌓은 블록도 함께 바뀌어요.</p>
     </div>
-    <div class="row"><button class="btn big" id="goBtn">지구 훈련 기지에서 시작</button><button class="btn ghost big" id="contBtn" hidden>이어서 하기</button><button class="btn ghost big" id="lookBtn">내 캐릭터 꾸미기</button></div>
+    <div class="row"><button class="btn big" id="goBtn">지구 훈련 기지에서 시작</button><button class="btn ghost big" id="contBtn" hidden>이어서 하기</button><button class="btn ghost big" id="lookBtn">내 캐릭터 꾸미기</button><button class="btn ghost big" id="setBtn">설정</button></div>
   </div>
 </div>
 
@@ -304,6 +311,19 @@ td.unk { color: #4e5786; }
     <h2 style="font-size:1.4em">탐사 일지</h2>
     <ul class="jlist" id="jList"></ul>
     <div class="row"><button class="btn ghost" id="dexClose">닫기 <kbd>J</kbd></button></div>
+  </div>
+</div>
+
+<div class="overlay" id="setOv" hidden>
+  <div class="card">
+    <h2>설정</h2>
+    <div class="set">
+      <label>시선 감도 <input type="range" id="sSens" min="0.2" max="3" step="0.1"><output id="oSens"></output></label>
+      <label>소리 크기 <input type="range" id="sVol" min="0" max="1" step="0.05"><output id="oVol"></output></label>
+      <label class="chk"><input type="checkbox" id="sInv"> 위아래 시선 반전</label>
+    </div>
+    <p>이 기기에만 저장돼요. 마우스와 손가락으로 화면을 끌 때 모두 적용돼요.</p>
+    <div class="row"><button class="btn" id="setClose">완료</button></div>
   </div>
 </div>
 
@@ -1190,7 +1210,7 @@ function openCraft() {
   });
   $("craftOv").hidden = false;
 }
-$("bCraft").onclick = openCraft; $("craftClose").onclick = () => { $("craftOv").hidden = true; pause(false); };
+$("bCraft").onclick = openCraft; $("craftClose").onclick = () => { $("craftOv").hidden = true; resume(); };
 
 /* ═════════════ 우주 지도·비행 ═════════════ */
 const ORBC = { mercury: ["#d9d4cc", "#6f6a63"], venus: ["#fff0c2", "#c89a50"], earth: ["#9fd8ff", "#2f7fe0"], moon: ["#f2f2f2", "#8d8d92"], mars: ["#ffb08a", "#b4552f"], jupiter: ["#fbe3c0", "#b07a4f"], europa: ["#f4ead8", "#b08a6a"], saturn: ["#fff2c8", "#c8a860"], titan: ["#f0b060", "#a8601e"], uranus: ["#d8fbfb", "#5fc4cc"], neptune: ["#a8c8ff", "#2850c8"] };
@@ -1215,7 +1235,7 @@ function openMap() {
   });
   $("mapOv").hidden = false;
 }
-$("bMap").onclick = openMap; $("mapClose").onclick = () => { $("mapOv").hidden = true; pause(false); };
+$("bMap").onclick = openMap; $("mapClose").onclick = () => { $("mapOv").hidden = true; resume(); };
 function fly(pk) {
   let f = FUEL[pk];
   for (const id of FUELS) { const u = Math.min(f, S.inv[id] || 0); if (u) { S.inv[id] -= u; f -= u; } }
@@ -1451,7 +1471,7 @@ function showLog(L) {
   $("logNo").textContent = L.no; $("logTitle").textContent = L.t; $("logEvidence").textContent = L.ev; $("logText").textContent = L.x;
   $("logOv").hidden = false; $("logClose").focus();
 }
-$("logClose").onclick = () => { $("logOv").hidden = true; pause(false); };
+$("logClose").onclick = () => { $("logOv").hidden = true; resume(); };
 function openDex() {
   pause(true);
   const rows = ORDER.map(pk => {
@@ -1470,7 +1490,7 @@ function openDex() {
   });
   $("dexOv").hidden = false;
 }
-$("bDex").onclick = openDex; $("dexClose").onclick = () => { $("dexOv").hidden = true; pause(false); };
+$("bDex").onclick = openDex; $("dexClose").onclick = () => { $("dexOv").hidden = true; resume(); };
 
 /* ═════════════ 소리 ═════════════ */
 // 모든 소리는 master → airF(공기 필터)를 거쳐요. 대기가 없는 천체에서는 높은 소리가 걸러져 둔하게 들려요.
@@ -1489,7 +1509,7 @@ function ac() {
 function setAir(pk) {
   if (!actx) return; const PL = PLANETS[pk];
   airF.frequency.value = PL.airless ? 380 : PL.P > 2 || PL.thick ? 6000 : 20000;
-  master.gain.value = PL.airless ? .75 : 1;
+  master.gain.value = (PL.airless ? .75 : 1) * (typeof SET === "object" ? SET.vol : .8);
 }
 function tone(f, d = .1, type = "square", v = .05, w = 0, f2) {
   try {
@@ -1544,10 +1564,11 @@ let locked = false, isTouch = false;
 function pause(p) { paused = p; wantMine = false; if (p) { try { document.exitPointerLock(); } catch (e) {} for (const k in keys) keys[k] = false; stickV = { x: 0, y: 0 }; touchJump = false; recall = 0; } }
 addEventListener("keydown", (e) => {
   if (e.target && e.target.tagName === "INPUT") return;
-  const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden;
+  const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden || !$("setOv").hidden;
   if (e.code === "KeyE" && $("startOv").hidden && $("logOv").hidden) { if (!$("craftOv").hidden) $("craftClose").click(); else if (!anyOv) openCraft(); return; }
   if (e.code === "KeyJ" && $("startOv").hidden && $("logOv").hidden) { if (!$("dexOv").hidden) $("dexClose").click(); else if (!anyOv) openDex(); return; }
   if (e.code === "KeyM" && $("startOv").hidden && $("logOv").hidden) { if (!$("mapOv").hidden) $("mapClose").click(); else if (!anyOv) openMap(); return; }
+  if (e.code === "KeyO" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("setOv").hidden) $("setClose").click(); else if (!anyOv) openSet(); return; }
   if (e.code === "KeyC" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("lookOv").hidden) $("lookClose").click(); else if (!anyOv) openLook(); return; }
   if (paused) return;
   if (e.code === "KeyV") { toggleView(); return; }
@@ -1555,20 +1576,38 @@ addEventListener("keydown", (e) => {
   if (/^Digit[1-9]$/.test(e.code)) { sel = +e.code.slice(5) - 1; renderHotbar(); }
 });
 addEventListener("keyup", (e) => { keys[e.code] = false; });
-document.addEventListener("pointerlockchange", () => { locked = document.pointerLockElement === canvas; if (!locked) wantMine = false; });
+document.addEventListener("pointerlockchange", () => { locked = document.pointerLockElement === canvas; if (locked) lockFails = 0; wantMine = false; for (const k in drags) delete drags[k]; });
 document.addEventListener("mousemove", (e) => { if (locked && !paused) look(e.movementX, e.movementY, .0024); });
 addEventListener("wheel", (e) => { const n = hotIds().length; if (n && !paused) { sel = (sel + (e.deltaY > 0 ? 1 : n - 1)) % n; renderHotbar(); } }, { passive: true });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-function look(dx, dy, s) { P.yaw -= dx * s; P.pitch = Math.max(-1.55, Math.min(1.55, P.pitch - dy * s)); }
+const SET = (() => { const d = { sens: 1, vol: .8, inv: false }; try { return Object.assign(d, JSON.parse(localStorage.getItem("spacecraft2-set") || "{}")); } catch (e) { return d; } })();
+function look(dx, dy, s) { s *= SET.sens; P.yaw -= dx * s; P.pitch = Math.max(-1.55, Math.min(1.55, P.pitch - dy * s * (SET.inv ? -1 : 1))); }
+function openSet() {
+  if ($("startOv").hidden) pause(true);
+  $("sSens").value = SET.sens; $("sVol").value = SET.vol; $("sInv").checked = SET.inv; showSet(); $("setOv").hidden = false;
+}
+function showSet() { $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
+function saveSet() { SET.sens = +$("sSens").value; SET.vol = +$("sVol").value; SET.inv = $("sInv").checked; showSet(); setAir(S.planet); try { localStorage.setItem("spacecraft2-set", JSON.stringify(SET)); } catch (e) {} }
+["sSens", "sVol", "sInv"].forEach(id => $(id).addEventListener("input", saveSet));
+$("sVol").addEventListener("change", () => sfx.pop());
+$("setBtn").onclick = openSet; $("bSet").onclick = openSet;
+$("setClose").onclick = () => { $("setOv").hidden = true; if ($("startOv").hidden && $("teachOv").hidden) resume(); };
 const drags = {};
+// 창을 닫으면(클릭이나 키 입력 직후라서 브라우저가 허락해 줘요) 바로 마우스 시점으로 돌아가요
+// 마우스 잠금이 세 번 연속 거절되면(잠금을 막아 둔 화면) 끌어서 둘러보기로 바꿈
+let noLock = !canvas.requestPointerLock, lockFails = 0;
+function lockFail() { if (++lockFails >= 3) noLock = true; }
+function lockMouse() { if (isTouch || noLock || locked) return; try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { lockFail(); } }
+document.addEventListener("pointerlockerror", lockFail);
+function resume() { pause(false); for (const k in drags) delete drags[k]; wantMine = false; lockMouse(); }
 canvas.addEventListener("pointerdown", (e) => {
   if (paused) return;
   if (e.pointerType === "mouse") {
     if (locked) { if (e.button === 2) place(); else wantMine = true; return; }
-    try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {}
+    if (!noLock) { lockMouse(); return; }
   } else { isTouch = true; $("touch").hidden = false; }
   drags[e.pointerId] = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0, btn: e.button, type: e.pointerType, hold: false };
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
 });
 canvas.addEventListener("pointermove", (e) => {
   const d = drags[e.pointerId]; if (!d || locked) return;
@@ -1768,7 +1807,7 @@ function refreshLookAv() { if (!lookScene) return; if (lookAv) lookScene.remove(
 function saveLook() { try { localStorage.setItem("spacecraft2-look", JSON.stringify(LOOK)); } catch (e) {} rebuildHand(); heldId = -1; updateHeld(); net.me.color = LOOK_OPT.pack[LOOK.pack]; }
 $("lookBtn").onclick = openLook;
 $("bLook").onclick = openLook;
-$("lookClose").onclick = () => { $("lookOv").hidden = true; lookOpen = false; if ($("startOv").hidden && $("teachOv").hidden) pause(false); };
+$("lookClose").onclick = () => { $("lookOv").hidden = true; lookOpen = false; if ($("startOv").hidden && $("teachOv").hidden) resume(); };
 function toggleView() { third = !third; toast(third ? "3인칭 시점" : "1인칭 시점"); }
 $("tView").addEventListener("click", toggleView);
 // 선생님이 학생 시점으로 보기
@@ -1914,9 +1953,11 @@ const net = (() => {
       const on = now - b.seen < 10000, tr = document.createElement("tr"); if (!on) tr.className = "gone";
       tr.innerHTML = `<td><i style="background:${b.color}"></i><span></span></td><td>${(PLANETS[b.pk] || {}).name || "?"}</td><td>${b.done}개</td><td>${b.dex} / 11</td><td>${on ? b.hp : "—"}</td><td>${on ? "접속 중" : "나감"}</td><td>${on ? `<button class="btn watch">화면 보기</button>` : ""}</td>`;
       tr.querySelector("span").textContent = b.name; t.appendChild(tr);
-      if (on && others[b.id]) { tr.className = "pick"; tr.onclick = () => startSpec(b.id); }
+      if (on && others[b.id]) { tr.className = "pick"; tr.dataset.id = b.id; }
     });
   }
+  // 표는 1초마다 다시 그려지므로, 누르는 순간(pointerdown)에 바로 반응해야 클릭이 씹히지 않음
+  $("tTable").addEventListener("pointerdown", (e) => { const tr = e.target.closest("tr.pick"); if (tr && others[tr.dataset.id]) startSpec(tr.dataset.id); });
   $("tSend").onclick = () => { const v = $("tMsg").value.trim(); if (!v) return; send({ t: "notice", text: v.slice(0, 60) }); $("tMsg").value = ""; $("tSend").textContent = "보냈어요"; setTimeout(() => { $("tSend").textContent = "학생 화면에 띄우기"; }, 1500); };
   $("tMsg").addEventListener("keydown", (e) => { if (e.key === "Enter") $("tSend").click(); });
   function renderRoom() {
@@ -1934,7 +1975,7 @@ const net = (() => {
     L.forEach(o => { const d = document.createElement("div"); d.innerHTML = `<i style="background:${o.color}"></i><b></b><small>${(PLANETS[o.pk] || {}).name || "?"}</small><small>임무 ${o.done}개</small>`; d.querySelector("b").textContent = o.name; box.appendChild(d); });
     $("rosterOv").hidden = false;
   }
-  $("room").onclick = openRoster; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; pause(false); };
+  $("room").onclick = openRoster; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; resume(); };
   $("hostBtn").onclick = () => makeRoom(false); $("joinBtn").onclick = joinRoom; $("teachBtn").onclick = () => makeRoom(true);
   addEventListener("beforeunload", (e) => { if (teacher && conns.length) { e.preventDefault(); e.returnValue = ""; return; } try { send({ t: "bye" }); peer && peer.destroy(); } catch (e) {} });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
@@ -2018,14 +2059,14 @@ function start(fresh) {
   if (fresh) { S = DEF(); S.inv = {}; try { localStorage.removeItem("spacecraft2"); } catch (e) {} }
   else { S = Object.assign(DEF(), saved); }
   loadPlanet(S.planet);
-  $("startOv").hidden = true; showHud(true); pause(false);
   if (matchMedia("(pointer: coarse)").matches) { isTouch = true; $("touch").hidden = false; }
+  $("startOv").hidden = true; showHud(true); if (fresh) pause(false); else resume();
   if (fresh) showLog({ no: "탐사 대원 훈련", t: "지구 훈련 기지", ev: "왼쪽 아래 계기판: 체력 · 산소 · 전력 · 우주복 온도", x: "다른 천체에서는 숨 쉴 공기가 없거나, 너무 뜨겁거나 차가워요. 우주복은 전력으로 안쪽을 20 °C로 유지하고, 전력과 산소는 기지 코어 근처에서 채워져요. 먼저 지구에서 자원을 모으고 장비를 만들어 보세요." });
 }
 $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, panelsNearCore, MISSIONS };
+window.__dbg = { spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
