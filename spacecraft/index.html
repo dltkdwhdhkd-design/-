@@ -180,7 +180,12 @@ td.unk { color: #4e5786; }
 #room { top: calc(env(safe-area-inset-top, 0px) + 44px); left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: .25em .9em; font-weight: 700; font-size: .85em; white-space: nowrap; }
 #room b { font-family: var(--font-display); font-weight: 400; color: var(--ore); letter-spacing: .1em; }
 .roster { display: grid; gap: 6px; }
-.roster div { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 10px; align-items: center; background: #ffffff08; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+#pinvite { top: 96px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; gap: 10px; align-items: center; background: #101827ee; border: 1px solid #ffd65a; border-radius: 12px; padding: 10px 14px; font-weight: 700; max-width: calc(100vw - 32px); flex-wrap: wrap; justify-content: center; }
+#pinvite[hidden] { display: none; }
+#partyInfo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 10px; }
+#partyInfo .mem { display: inline-flex; gap: 6px; align-items: center; background: #ffffff10; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+#partyInfo button, .roster button { font: inherit; font-size: .85em; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--line); background: #ffffff14; color: inherit; cursor: pointer; }
+.roster div { display: grid; grid-template-columns: 14px 1fr auto auto auto; gap: 10px; align-items: center; background: #ffffff08; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 .roster i { width: 14px; height: 14px; border-radius: 3px; }
 .roster small { color: var(--ink-dim); }
 @media (max-width: 760px) { #room { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 185px); } }
@@ -273,6 +278,7 @@ td.unk { color: #4e5786; }
 <div class="hud" id="gauges" hidden>
   <div class="g" id="gHp"><span>체력</span><div class="bar"><i style="background:var(--hp)"></i></div><span class="v"></span></div>
   <div class="g" id="gO2"><span>산소</span><div class="bar"><i style="background:var(--o2)"></i></div><span class="v"></span></div>
+  <div class="g" id="gFd"><span>배부름</span><div class="bar"><i style="background:#e0a040"></i></div><span class="v"></span></div>
   <div class="g" id="gPw"><span>전력</span><div class="bar"><i style="background:var(--pow)"></i></div><span class="v"></span></div>
   <div class="g" id="gSt"><span>복 온도</span><div class="bar"><i style="background:var(--good)"></i></div><span class="v"></span></div>
   <div class="suit" id="suitName"></div>
@@ -283,6 +289,7 @@ td.unk { color: #4e5786; }
 <div class="hud" id="fact" hidden></div>
 <div class="hud" id="cross" hidden></div>
 <div class="hud" id="toast" hidden></div>
+<div class="hud click" id="pinvite" hidden><span id="pinvTxt"></span><button class="btn" id="pinvYes">수락 (Y)</button><button class="btn ghost" id="pinvNo">거절 (N)</button></div>
 <div class="hud" id="jumpMeter" hidden></div>
 <div class="hud" id="hotName" hidden></div>
 <div class="hud click" id="hotbar" hidden></div>
@@ -420,7 +427,7 @@ td.unk { color: #4e5786; }
   <div class="card">
     <h2>우리 반 탐사대</h2>
     <p id="rosterNote"></p>
-    <div id="partyBox"><b>내 파티</b> <small>같은 파티끼리는 누가 임무를 끝내면 모두 완료돼요</small><div class="ctabs" id="partyPick"></div></div>
+    <div id="partyBox"><b>내 파티</b> <small>초대를 받아 수락해야 파티가 돼요. 같은 파티끼리는 임무를 함께 완료하고, 대결에서 서로 공격할 수 없어요.</small><div id="partyInfo"></div></div>
     <div id="pvpBox"><b>플레이어끼리 대결</b> <small id="pvpNote"></small><div class="ctabs" id="pvpPick"></div></div>
     <div class="roster" id="rosterList"></div>
     <div class="row"><button class="btn ghost" id="rosterClose">닫기</button></div>
@@ -494,19 +501,51 @@ const BLOCKS = {
         fact: "다이아몬드는 탄소가 땅속 아주 깊은 곳의 높은 압력과 온도에서 단단하게 뭉친 광물이에요. 가장 단단한 천연 광물이라 곡괭이 날로 쓰기 좋아요." },
   42: { n: "티타늄 광석", c: ["#3e3f45", "#c9b8ff", "#2c2d32"], h: 1.1, drop: 112, ore: true, tier: 2,
         fact: "달의 바다를 이루는 현무암에는 일메나이트라는 광물이 많아요. 여기서 가볍고 튼튼하며 열에 강한 티타늄을 얻어요." },
+  // 6차: 건축 블록
+  43: { n: "나무 판자", c: ["#a8763e", "#c49052", "#7a4e26"], h: .6 },
+  44: { n: "화로", c: ["#6a6c72", "#8f9198", "#4a4c52"], top: ["#5a5c62", "#7d7f86", "#3a3c42"], h: 1.0, furnace: true, light: 9 },
+  45: { n: "농지", c: ["#6b4a2f", "#7d5a3a", "#5a3d26"], top: ["#4a3020", "#5e3e28", "#33200f"], h: .4, drop: 3 },
+  47: { n: "돌벽돌", c: ["#7d7f86", "#9a9ca3", "#55575d"], h: 1.0 },
+  48: { n: "붉은 벽돌", c: ["#a0482e", "#c45e3c", "#d8cdbd"], h: 1.0 },
+  49: { n: "철 블록", c: ["#c7c9d1", "#eceef3", "#8c8e98"], h: 1.2 },
+  62: { n: "구리 블록", c: ["#d07a46", "#eda274", "#3fc0a0"], h: 1.2 },
+  63: { n: "금 블록", c: ["#e8b82a", "#ffe680", "#a87c08"], h: 1.2 },
+  64: { n: "다이아몬드 블록", c: ["#6fe0f0", "#d0fcff", "#2f98a8"], h: 1.4 },
+  65: { n: "티타늄 블록", c: ["#a9a2c4", "#dcd6ef", "#6e6888"], h: 1.3 },
+  66: { n: "석탄 블록", c: ["#2a2a2f", "#45454c", "#141416"], h: 1.0 },
+  67: { n: "황 블록", c: ["#e8d030", "#fff38a", "#a89010"], h: .8 },
+  68: { n: "양털", c: ["#eeeeea", "#ffffff", "#c8c8c0"], h: .3 },
+  69: { n: "문", c: ["#9a6a36", "#b88448", "#5a3a1a"], h: .6, door: 1 },
+  70: { n: "문", c: ["#9a6a36", "#b88448", "#5a3a1a"], h: .6, door: 2, drop: 69 },
+  71: { n: "문", c: ["#9a6a36", "#b88448", "#5a3a1a"], h: .6, door: 3, drop: 69, thin: true },
+  72: { n: "문", c: ["#9a6a36", "#b88448", "#5a3a1a"], h: .6, door: 4, drop: 69, thin: true },
+  73: { n: "침대", c: ["#c83a3a", "#e45a50", "#8a2020"], top: ["#c83a3a", "#e45a50", "#8a2020"], h: .3, bed: true, shape: [0, 0, 0, 1, .56, 1] },
+  74: { n: "소금 블록", c: ["#ececf0", "#ffffff", "#c4c4cc"], h: .5 },
+  75: { n: "발사대", c: ["#2e3346", "#ffb347", "#232737"], h: 1.0, panel: true },
 };
+// 농작물: 밀 50~53, 보리 54~57, 옥수수 58~61 (0~3단계, 3이 다 자란 것)
+["밀", "보리", "옥수수"].forEach((nm, k) => { for (let st = 0; st < 4; st++) BLOCKS[50 + k * 4 + st] = { n: st === 3 ? `다 자란 ${nm}` : `어린 ${nm}`, c: ["#5aa040", "#7cc858", "#3a7a2a"], h: .05, thin: true, plant: true, crop: k, drop: 0 }; });
+const isPad = (b) => b === 34 || b === 75;
+const isDoor = (b) => b >= 69 && b <= 72;
 const MATS = {
   100: { n: "철", c: "#c7c9d1" }, 101: { n: "규소", c: "#e6d6a8" }, 102: { n: "황", c: "#f2dc3a" }, 103: { n: "물", c: "#3c80e0" },
   104: { n: "토륨", c: "#7fe0a0" }, 105: { n: "수소", c: "#d8f0ff" }, 106: { n: "소금", c: "#f4f4f4" }, 107: { n: "메테인", c: "#c08a40" },
   108: { n: "석탄", c: "#2a2a2e" }, 109: { n: "구리", c: "#e0905a" }, 110: { n: "금", c: "#ffd23f" }, 111: { n: "다이아몬드", c: "#8ff4ff" }, 112: { n: "티타늄", c: "#c9c2e0" },
+  113: { n: "생고기", c: "#e07a7a" }, 114: { n: "구운 고기", c: "#9a5228" }, 115: { n: "밀", c: "#e0b850" }, 116: { n: "보리", c: "#d8c890" }, 117: { n: "옥수수", c: "#f2cc3a" },
+  118: { n: "빵", c: "#c8873a" }, 119: { n: "보리밥", c: "#efe6cf" }, 130: { n: "구운 옥수수", c: "#e0a030" }, 131: { n: "육포", c: "#8a3a22" }, 132: { n: "사과", c: "#e03a30" },
 };
+// 먹으면 차는 배부름(최대 20)
+const FOOD = { 113: 3, 114: 8, 115: 1, 116: 1, 117: 2, 118: 6, 119: 6, 130: 5, 131: 6, 132: 4 };
+// 심을 수 있는 알갱이 → 작물 종류
+const SEED = { 115: 0, 116: 1, 117: 2 };
 // 재료를 어디서 구하는지 (제작 창에 보여 줘요)
 const WHERE = { 100: "철광석 · 수성에 많음", 101: "모래·레골리스", 102: "수성·금성 황 광석", 103: "지구 바다", 104: "금성 표면·화성 땅속", 105: "목성형 행성 구름", 106: "유로파 얼음", 107: "타이탄 호수",
   108: "지구 땅속 (검은 점)", 109: "지구 땅속 (청록 점)", 110: "지구 깊은 땅속 (노란 점)", 111: "지구 가장 깊은 곳 (하늘색 점)", 112: "달의 바다 현무암 (보라 점)",
-  4: "지구 땅속 회색 돌", 7: "지구 나무 줄기", 11: "달의 바다", 14: "그늘진 구덩이·극관", 32: "제작" };
+  4: "지구 땅속 회색 돌", 7: "지구 나무 줄기", 11: "달의 바다", 14: "그늘진 구덩이·극관", 32: "제작",
+  113: "지구 동물(소·돼지·닭·양)", 115: "지구 들판의 야생 밀·밭", 116: "지구 들판의 야생 보리·밭", 117: "지구 들판의 야생 옥수수·밭", 68: "지구의 양", 3: "지구 흙", 43: "나무로 제작" };
 // 도구(120~): 손에 들어야 효과가 있어요
 const TOOLS = { 120: { n: "돌 곡괭이", tier: 1 }, 121: { n: "철 곡괭이", tier: 2 }, 122: { n: "다이아몬드 곡괭이", tier: 3 },
-  123: { n: "돌 칼", dmg: 8, col: "#8f9198" }, 124: { n: "철 칼", dmg: 12, col: "#e2e5ec" }, 126: { n: "로켓", rocket: true }, 125: { n: "다이아몬드 칼", dmg: 18, col: "#7ff0ff" } };
+  123: { n: "돌 칼", dmg: 8, col: "#8f9198" }, 124: { n: "철 칼", dmg: 12, col: "#e2e5ec" }, 126: { n: "로켓", rocket: true }, 127: { n: "괭이", hoe: true, col: "#8f9198" }, 125: { n: "다이아몬드 칼", dmg: 18, col: "#7ff0ff" } };
 // 가방에 있는 가장 좋은 곡괭이 단계(죽어서 떨어뜨리면 내려가요)
 const bestTier = () => Math.max(0, ...Object.keys(TOOLS).filter(t => S.inv[t] > 0 && TOOLS[t].tier).map(t => TOOLS[t].tier));
 const SAFE_R = 6; // 기지 코어 근처 안전 구역(대결 피해 없음)
@@ -516,8 +555,10 @@ const SOLID = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].th
 const LIQ = (b) => !!(BLOCKS[b] && BLOCKS[b].liquid);
 
 /* 텍스처 묶음: 칸마다 16px, 옆면·윗면·아랫면 세 줄 */
-const STYLE = {1:"bedrock", 2:"grass", 3:"dirt", 4:"stone", 5:"sand", 6:"water", 7:"log", 8:"leaves", 9:"ore", 10:"regolith", 11:"basalt", 12:"stone", 14:"ice", 15:"dirt", 16:"stone", 17:"snow", 18:"pebble", 19:"stone", 20:"ore", 21:"basalt", 22:"sand", 24:"ore", 25:"cloud", 26:"cloud", 27:"striped", 28:"water", 29:"icerock", 23:"metal", 34:"pad", 38:"ore", 39:"ore", 40:"ore", 41:"gem", 42:"ore"};
-const NT = 64, MT = 50; // 블록 칸 0~49, 재료 칸 50~
+const STYLE = {1:"bedrock", 2:"grass", 3:"dirt", 4:"stone", 5:"sand", 6:"water", 7:"log", 8:"leaves", 9:"ore", 10:"regolith", 11:"basalt", 12:"stone", 14:"ice", 15:"dirt", 16:"stone", 17:"snow", 18:"pebble", 19:"stone", 20:"ore", 21:"basalt", 22:"sand", 24:"ore", 25:"cloud", 26:"cloud", 27:"striped", 28:"water", 29:"icerock", 23:"metal", 34:"pad", 38:"ore", 39:"ore", 40:"ore", 41:"gem", 42:"ore",
+  43:"planks", 44:"furnace", 45:"farmland", 47:"stonebrick", 48:"brick", 49:"metalblock", 62:"copperblock", 63:"metalblock", 64:"gemblock", 65:"metalblock", 66:"coalblock", 67:"crystal", 68:"wool", 69:"door", 70:"door", 71:"door", 72:"door", 73:"bed", 74:"crystal", 75:"pad"};
+for (let i = 50; i < 62; i++) STYLE[i] = "crop";
+const NT = 140, MT = 100; // 블록 칸 0~99, 재료 칸 100~
 const atlas = document.createElement("canvas"); atlas.width = 16 * NT; atlas.height = 48;
 const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height = 32;
 (function paint() {
@@ -577,11 +618,38 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
     striped(ox, oy, c) { const P = pal(c), I = [rgb("#dfe6ec"), rgb("#c8d2da")]; for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const band = Math.sin((y + Math.sin(x * .4) * 2) * .8); put(ox, oy, x, y, band > .55 ? pick(P, .4 + R() * .4) : I[R() < .7 ? 0 : 1]); } },
     metal(ox, oy, c) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const seam = x % 8 === 0 || y % 8 === 0; put(ox, oy, x, y, seam ? P[1] : pick(P, .6 + R() * .25)); }
       [[2, 2], [5, 2], [2, 5], [5, 5]].forEach(([x, y]) => [0, 8].forEach(ax => [0, 8].forEach(ay => put(ox, oy, x + ax, y + ay, P[3])))); },
+    planks(ox, oy, c) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = Math.floor(y / 4), seam = y % 4 === 3 || (x + (r % 2) * 8 + r * 3) % 16 === 0; put(ox, oy, x, y, seam ? P[0] : pick(P, .45 + Math.sin(x * .8 + r * 5) * .12 + R() * .22)); } },
+    stonebrick(ox, oy, c) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = Math.floor(y / 8), mort = y % 8 === 7 || (x + r * 4) % 8 === 7, hi = y % 8 === 0 || (x + r * 4) % 8 === 0; put(ox, oy, x, y, mort ? P[0] : hi ? P[3] : pick(P, .35 + R() * .45)); } },
+    brick(ox, oy, c) { const r1 = rgb(c[0]), l = rgb(c[1]), m = rgb(c[2]); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = Math.floor(y / 4), mort = y % 4 === 3 || (x + (r % 2) * 4) % 8 === 7; put(ox, oy, x, y, mort ? mix(m, [140, 130, 120], R() * .35) : mix(r1, l, R() * .45 + (y % 4 === 0 ? .25 : 0))); } },
+    metalblock(ox, oy, c) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x === 0 || y === 0 || x === 15 || y === 15, e2 = x === 1 || y === 1, e3 = x === 14 || y === 14, sh = (x + y) % 13 < 2 ? .3 : 0; put(ox, oy, x, y, e ? P[0] : e2 ? P[3] : e3 ? P[1] : pick(P, .5 + sh + R() * .15)); } },
+    copperblock(ox, oy, c) { S.metalblock(ox, oy, [c[0], c[1], "#8a4a26"]); const g2 = rgb(c[2]); for (let i = 0; i < 16; i++) { const x = 1 + Math.floor(R() * 13), y = 1 + Math.floor(R() * 13); put(ox, oy, x, y, g2); if (R() < .6) put(ox, oy, x + 1, y, mix(g2, [255, 255, 255], .25)); } },
+    gemblock(ox, oy, c) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x === 0 || y === 0 || x === 15 || y === 15, d = (x + y) % 8, d2 = (x - y + 16) % 8; put(ox, oy, x, y, e ? P[0] : d === 0 || d2 === 0 ? P[3] : pick(P, .35 + ((x + y) % 16 < 8 ? .25 : 0) + R() * .15)); } },
+    coalblock(ox, oy, c) { const P = pal(c); fillN(ox, oy, P, 4, .5, .4); for (let i = 0; i < 10; i++) put(ox, oy, Math.floor(R() * 16), Math.floor(R() * 16), [120, 120, 130]); },
+    crystal(ox, oy, c) { const P = pal(c); fillN(ox, oy, P, 4, .4, .3); for (let i = 0; i < 6; i++) { const x = Math.floor(R() * 12), y = Math.floor(R() * 12), s = 2 + Math.floor(R() * 2); for (let a = 0; a <= s; a++) for (let q = 0; q <= s; q++) put(ox, oy, x + a, y + q, a === 0 || q === 0 ? P[3] : a === s || q === s ? P[0] : P[2]); } },
+    wool(ox, oy, c) { const P = pal(c); const N = vnoise(8); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, pick(P, .3 + (N(x, y) * .6 + R() * .3 - ((x * 3 + y * 5) % 7 === 0 ? .25 : 0)) * .8)); },
+    furnace(ox, oy, c, b, row) { const P = pal(row === 1 ? b.top : c); fillN(ox, oy, P, 4, .6, .35); for (let i = 0; i < 16; i++) { put(ox, oy, i, 0, P[0]); put(ox, oy, i, 15, P[0]); put(ox, oy, 0, i, P[0]); put(ox, oy, 15, i, P[0]); }
+      if (row === 0) { for (let y = 8; y < 14; y++) for (let x = 4; x < 12; x++) put(ox, oy, x, y, [24, 18, 14]); for (let x = 5; x < 11; x++) { const f = 10 + Math.floor(R() * 3); for (let y = f; y < 14; y++) put(ox, oy, x, y, y === 13 ? [255, 90, 30] : R() < .5 ? [255, 210, 70] : [255, 140, 40]); } for (let x = 3; x < 13; x++) put(ox, oy, x, 7, P[3]); }
+      else for (let y = 5; y < 11; y++) for (let x = 5; x < 11; x++) put(ox, oy, x, y, (x + y) % 2 ? P[0] : [40, 34, 30]); },
+    farmland(ox, oy, c, b, row) { if (row !== 1) { S.dirt(ox, oy, c); return; } const P = pal(b.top); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, y % 4 === 0 ? P[0] : y % 4 === 1 ? P[3] : pick(P, .35 + R() * .5)); },
+    door(ox, oy, c, b) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const e = x < 2 || x > 13 || y === 0 || y === 15; put(ox, oy, x, y, e ? P[0] : pick(P, .45 + (x % 4 === 0 ? -.25 : 0) + R() * .2)); }
+      if (b.door % 2 === 0) { for (let y = 3; y < 12; y++) for (let x = 3; x < 13; x++) if (x !== 7 && x !== 8 && y !== 7) put(ox, oy, x, y, y < 5 ? [215, 240, 250] : [160, 210, 235]); }
+      else { put(ox, oy, 11, 3, [235, 205, 90]); put(ox, oy, 11, 4, [180, 150, 60]); put(ox, oy, 12, 3, [180, 150, 60]); } },
+    bed(ox, oy, c, b, row) { const r1 = rgb(c[0]), r2 = rgb(c[1]), wt = [240, 240, 234], wd = rgb("#8a5a2e");
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, row === 1 ? (y < 5 && x > 1 && x < 14 ? mix(wt, [205, 205, 200], R() * .4) : y === 5 ? mix(wt, r1, .5) : mix(r1, r2, R() * .35 + ((x + y) % 6 === 0 ? .4 : 0)))
+        : y < 7 ? mix(r1, r2, R() * .35) : y < 12 ? mix(r1, r2, R() * .35 + (y === 7 ? .5 : 0)) : y < 13 ? wt : x < 3 || x > 12 ? wd : [46, 34, 24]); },
+    crop(ox, oy, c, b, row, id) { g.clearRect(ox, oy, 16, 16); const k = Math.floor((id - 50) / 4), s = (id - 50) % 4, h = 4 + s * 3.7, G = [[70, 150, 50], [96, 180, 64], [52, 116, 38]];
+      const ripe = s === 3, RC = k === 0 ? [[214, 172, 64], [244, 210, 104], [168, 126, 38]] : [[206, 192, 120], [236, 226, 160], [150, 138, 74]];
+      for (let i = 0; i < 5; i++) { const x = 1 + i * 3 + (i % 2); for (let y = 0; y < h; y++) put(ox, oy, x, 15 - y, ripe && k < 2 ? (y > h - 5 ? RC[y % 3] : RC[2]) : G[(i + y) % 3]);
+        if (s > 0 && k < 2) put(ox, oy, x + (i % 2 ? -1 : 1), 15 - Math.floor(h * .45), ripe ? RC[2] : G[1]);
+        if (ripe && k < 2) for (let y = h - 4; y < h; y++) put(ox, oy, x + 1, 15 - y, RC[1]);
+        if (ripe && k === 1) for (let y = h; y < Math.min(16, h + 3); y++) put(ox, oy, x + (y % 2), 15 - y, RC[2]); }
+      if (k === 2 && s >= 1) { for (let i = 0; i < 4; i++) { const x = 2 + i * 4, yy = 15 - Math.floor(h * .55); put(ox, oy, x + 1, yy, G[0]); put(ox, oy, x + 2, yy - 1, G[1]); put(ox, oy, x - 1, yy + 1, G[2]); } }
+      if (k === 2 && ripe) for (const x of [4, 10]) for (let y = 5; y < 10; y++) { put(ox, oy, x, y, y % 2 ? [250, 214, 70] : [228, 182, 40]); put(ox, oy, x + 1, y, y % 2 ? [228, 182, 40] : [255, 230, 110]); put(ox, oy, x - 1, y + 1, [120, 170, 70]); } },
     pad(ox, oy, c) { S.metal(ox, oy, ["#3a4054", "#4c5470", "#262a38"]); for (let x = 0; x < 16; x++) for (let y of [0, 1, 14, 15]) put(ox, oy, x, y, (x + y) % 4 < 2 ? rgb("#ffb347") : [30, 30, 34]); },
   };
   const tile = (ox, oy, c, b, top, row, id) => {
     const st = STYLE[id];
-    if (st && S[st]) S[st](ox, oy, c, b, row);
+    if (st && S[st]) S[st](ox, oy, c, b, row, +id);
     else { g.fillStyle = c[0]; g.fillRect(ox, oy, 16, 16); for (let i = 0; i < 80; i++) { g.fillStyle = R() < .5 ? c[1] : c[2]; g.fillRect(ox + Math.floor(R() * 16), oy + Math.floor(R() * 16), 1, 1); } }
     if (b.panel || b.core || b.device) { g.fillStyle = c[2]; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); }
     if (b.core) { g.fillStyle = top ? "#ffb347" : "#5fe0c8"; g.fillRect(ox + 4, oy + 4, 8, 8); g.fillStyle = "#fff"; g.fillRect(ox + 6, oy + 6, 4, 4); }
@@ -593,7 +661,7 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
       const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, (top ? x % 5 === 0 || y % 5 === 0 : y % 4 === 0) ? P[0] : pick(P, .4 + R() * .4));
       if (!top && row === 0) { g.fillStyle = "#c7c9d1"; g.fillRect(ox + 3, oy + 3, 4, 2); g.fillStyle = "#6e4622"; g.fillRect(ox + 4, oy + 5, 2, 7); g.fillStyle = "#8f9198"; g.fillRect(ox + 9, oy + 4, 3, 3); g.fillStyle = "#6e4622"; g.fillRect(ox + 10, oy + 7, 1, 6); }
       g.fillStyle = "#4a2c14"; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); }
-    if (b.thin) { g.clearRect(ox, oy, 16, 16); g.fillStyle = c[0]; g.fillRect(ox, oy + 5, 16, 11); g.fillStyle = c[2]; g.fillRect(ox, oy + 2, 16, 4); g.fillStyle = c[1]; g.fillRect(ox, oy, 16, 3); g.fillRect(ox + 5, oy + 2, 6, 3); }
+    if (b.thin && !b.plant && !b.door) { g.clearRect(ox, oy, 16, 16); g.fillStyle = c[0]; g.fillRect(ox, oy + 5, 16, 11); g.fillStyle = c[2]; g.fillRect(ox, oy + 2, 16, 4); g.fillStyle = c[1]; g.fillRect(ox, oy, 16, 3); g.fillRect(ox + 5, oy + 2, 6, 3); }
     if (b.lamp) { const P = [rgb("#c89a3a"), rgb("#f2c860"), rgb("#ffe6a0"), rgb("#fffbe8")]; const N = vnoise(5); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, pick(P, N(x, y) * .7 + R() * .4));
       g.fillStyle = "#8a8f99"; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); }
     if (b.liquid && !STYLE[id]) { g.fillStyle = "rgba(255,255,255,.25)"; for (let i = 0; i < 4; i++) g.fillRect(ox + Math.floor(R() * 10), oy + Math.floor(R() * 14), 5, 1); }
@@ -606,6 +674,16 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
     if (st === "grass" || st === "log") tile(id * 16, 32, b.c, b, false, st === "log" ? 1 : 2, id); else g.drawImage(atlas, id * 16, b.top && !b.table && !b.solar ? 16 : 0, 16, 16, id * 16, 32, 16, 16);
   }
   // 아이템 아이콘(재료): 광물 덩어리·주괴·가루를 구별해요
+  const blobAt = (ox, cx, cy, rx, ry, col) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1) put(ox, 0, x, y, typeof col === "function" ? col(x, y) : col); };
+  const meat = (ox, c, hi, lo) => { blobAt(ox, 7, 8.5, 5.2, 4, (x, y) => y < 7 && x < 8 ? hi : y > 10 ? lo : c); blobAt(ox, 13, 6, 1.6, 1.6, [240, 236, 226]); for (let i = 0; i < 3; i++) put(ox, 0, 11 + i, 7 - i, [240, 236, 226]); };
+  const grain = (ox, c, hi, lo) => { for (let i = 0; i < 12; i++) put(ox, 0, 3 + Math.floor(i * .5), 14 - i, [110, 150, 60]); for (let i = 0; i < 5; i++) { put(ox, 0, 6 + Math.floor(i * .6), 7 - i, hi); put(ox, 0, 8 + Math.floor(i * .6), 8 - i, c); put(ox, 0, 5 + Math.floor(i * .6), 6 - i, lo); } };
+  const FOODI = { 113: meat, 114: meat, 131: meat,
+    115: grain, 116: grain,
+    117: (ox, c, hi, lo) => { blobAt(ox, 8, 8, 3, 6, (x, y) => (x + y) % 2 ? hi : c); for (let y = 6; y < 15; y++) { put(ox, 0, 4, y, [110, 170, 70]); put(ox, 0, 12, y, [90, 150, 60]); } },
+    130: (ox, c, hi, lo) => { blobAt(ox, 8, 8, 3, 6, (x, y) => (x + y) % 3 ? c : lo); },
+    118: (ox, c, hi, lo) => { blobAt(ox, 8, 9, 6.5, 3.8, (x, y) => y < 8 ? hi : y > 11 ? lo : c); for (const x of [5, 8, 11]) { put(ox, 0, x, 7, [240, 214, 160]); put(ox, 0, x + 1, 8, [240, 214, 160]); } },
+    119: (ox, c, hi, lo) => { blobAt(ox, 8, 8, 5.5, 3, (x, y) => R() < .3 ? [220, 210, 180] : c); for (let y = 9; y < 14; y++) for (let x = 2 + (y - 9); x < 14 - (y - 9); x++) put(ox, 0, x, y, y === 9 ? [90, 60, 40] : [130, 84, 52]); },
+    132: (ox, c, hi, lo) => { blobAt(ox, 8, 9.5, 5, 4.6, (x, y) => x < 7 && y < 8 ? hi : x > 10 ? lo : c); put(ox, 0, 8, 3, [100, 70, 40]); put(ox, 0, 8, 4, [100, 70, 40]); put(ox, 0, 9, 3, [90, 170, 60]); put(ox, 0, 10, 2, [90, 170, 60]); } };
   const ING = { 100: 1, 109: 1, 110: 1, 112: 1 }, GEM = { 111: 1, 104: 1 }, DUST = { 101: 1, 102: 1, 106: 1 }, DROP = { 103: 1, 105: 1, 107: 1 };
   for (const id in MATS) {
     const m = MATS[id], ox = (id - 100 + MT) * 16, c = rgb(m.c), hi = mix(c, [255, 255, 255], .5), lo = mul(c, .55); g.clearRect(ox, 0, 16, 48);
@@ -613,6 +691,7 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
     else if (GEM[id]) { const pts = [[7, 3], [8, 3], [6, 4], [9, 4], [5, 5], [10, 5], [4, 6], [11, 6], [5, 9], [10, 9], [6, 11], [9, 11], [7, 12], [8, 12]];
       for (let y = 3; y < 13; y++) for (let x = 4; x < 12; x++) { const w = y < 7 ? (y - 3) + 1 : 12 - y; if (Math.abs(x - 7.5) < w) put(ox, 0, x, y, x < 7 && y < 8 ? hi : y > 9 ? lo : c); } }
     else if (DUST[id]) { for (let y = 8; y < 13; y++) for (let x = 2; x < 14; x++) { if (Math.abs(x - 7.5) < (y - 7) * 1.4) put(ox, 0, x, y, R() < .3 ? hi : R() < .3 ? lo : c); } }
+    else if (FOODI[id]) FOODI[id](ox, c, hi, lo);
     else if (DROP[id]) { for (let y = 3; y < 14; y++) for (let x = 3; x < 13; x++) { const w = y < 8 ? (y - 3) * .8 : Math.sqrt(Math.max(0, 25 - (y - 9) ** 2)); if (Math.abs(x - 7.5) < w) put(ox, 0, x, y, x < 7 && y > 7 && y < 11 ? hi : c, .9); } }
     else { for (let y = 4; y < 13; y++) for (let x = 3; x < 13; x++) { if (Math.hypot(x - 7.5, y - 8.5) < 4.6 + R() * .6) put(ox, 0, x, y, R() < .25 ? lo : x + y < 13 ? hi : c); } }
   }
@@ -620,7 +699,7 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
   [[16, 16, 2, 4], [16, 16, 30, 10], [16, 16, 8, 30], [16, 16, 28, 28], [16, 16, 20, 1]].forEach(([a, b, c, d]) => { k.beginPath(); k.moveTo(a, b); k.lineTo((a + c) / 2 + 3, (b + d) / 2 - 2); k.lineTo(c, d); k.stroke(); });
 })();
 function iconCanvas(id) {
-  if (TOOLS[id]) return TOOLS[id].rocket ? rocketIcon() : TOOLS[id].tier ? pickIcon(TOOLS[id].tier) : swordIcon(TOOLS[id].col);
+  if (TOOLS[id]) return TOOLS[id].rocket ? rocketIcon() : TOOLS[id].hoe ? hoeIcon() : TOOLS[id].tier ? pickIcon(TOOLS[id].tier) : swordIcon(TOOLS[id].col);
   const c = document.createElement("canvas"); c.width = c.height = 16;
   const ox = id >= 100 ? (id - 100 + MT) * 16 : id * 16, oy = id >= 100 ? 0 : (BLOCKS[id].top ? 16 : 0);
   c.getContext("2d").drawImage(atlas, ox, oy, 16, 16, 0, 0, 16, 16); return c;
@@ -766,6 +845,7 @@ const GEN = {
       ores(x, z, h - 2, 40, .016, 8, 1, 9); ores(x, z, h - 2, 41, .011, 9, 1, 5);
       const forest = .02 + .06 * smooth(.5, .72, noise(x / 14, z / 14, 88));
       if (h >= 19 && hash(x, z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) tree(x, h + 1, z);
+      else if (h >= 18 && get(x, h, z) === 2 && !get(x, h + 1, z) && hash(x, z, 91) < .014 && Math.hypot(x - base.x, z - base.z) > 5) set(x, h + 1, z, 53 + Math.floor(noise(x / 9, z / 9, 93) * 2.99) * 4);
     }
     // 바위 절벽에 드러난 철광석·석탄
     for (let i = 0; i < 60; i++) { const x = Math.floor(hash(i, 5, 9) * SX), z = Math.floor(hash(i, 6, 9) * SZ), h = topY(x, z); if (h > 18 && get(x, h, z) === 2) set(x, h, z, i % 3 ? 9 : 38); }
@@ -916,7 +996,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, 1, .05, 900);
 camera.rotation.order = "YXZ";
 const tex = new THREE.CanvasTexture(atlas); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
-const matSolid = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true });
+const matSolid = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true, alphaTest: .5 });
 const matWater = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true, transparent: true, opacity: .72, depthWrite: false });
 [matSolid, matWater].forEach(m => { m.onBeforeCompile = (sh) => {
   sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 lt;\nvarying vec2 vLt;").replace("#include <color_vertex>", "#include <color_vertex>\nvLt = lt;");
@@ -936,7 +1016,7 @@ const FACES = [
   { d: [0, 0, 1], c: [[0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], uv: [[0, 0], [1, 0], [0, 1], [1, 1]] },
 ];
 const AO = [.42, .6, .8, 1];
-const opaque = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin));
+const opaque = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin || BLOCKS[b].shape || BLOCKS[b].glass));
 let chunks = {};
 function buildChunk(cx, cz) {
   const key = cx + "," + cz;
@@ -947,6 +1027,9 @@ function buildChunk(cx, cz) {
     for (let y = 0; y < SY; y++) {
       const b = W[I(x, y, z)]; if (!b) continue;
       const liq = BLOCKS[b].liquid, T = S[liq ? 1 : 0];
+      if (BLOCKS[b].plant) { cross(T, x, y, z, b); continue; }
+      if (BLOCKS[b].door > 2) { const ax = SOLID(get(x - 1, y, z)) || SOLID(get(x + 1, y, z)); shapeBox(T, x, y, z, b, ax ? [0, 0, 0, .19, 1, 1] : [0, 0, 0, 1, 1, .19]); continue; }
+      if (BLOCKS[b].shape) { shapeBox(T, x, y, z, b, BLOCKS[b].shape); continue; }
       if (BLOCKS[b].thin) { thinBox(T, x, y, z, b); continue; }
       const glow = BLOCKS[b].lamp;
       for (const f of FACES) {
@@ -993,6 +1076,32 @@ function buildChunk(cx, cz) {
     scene.add(m); meshes.push(m);
   });
   chunks[key] = meshes;
+}
+// 침대·열린 문처럼 칸을 다 채우지 않는 상자
+function shapeBox(T, x, y, z, b, s) {
+  const lv = lightAt(x, y, z), B = BLOCKS[b];
+  for (const f of FACES) {
+    const v0 = T.p.length / 3, row = f.top ? (B.top ? 1 : 0) : f.d[1] < 0 ? 2 : 0;
+    for (let k = 0; k < 4; k++) {
+      const c = f.c[k], px = c[0] ? s[3] : s[0], py = c[1] ? s[4] : s[1], pz = c[2] ? s[5] : s[2];
+      T.p.push(x + px, y + py, z + pz); T.n.push(f.d[0], f.d[1], f.d[2]);
+      // 옆면은 칸 높이만큼만 무늬를 잘라 붙여요
+      const vv = f.d[1] ? f.uv[k][1] : (c[1] ? s[4] : s[1]);
+      T.u.push((b * 16 + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - vv * 15.4) / 48);
+      const sh = f.d[1] > 0 ? 1 : f.d[1] < 0 ? .6 : .82; T.c.push(sh, sh, sh); T.l.push(skyF(lv[0]), blF(lv[1]));
+    }
+    T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
+  }
+}
+// 농작물: 칸 안에 X자로 엇갈린 두 장(앞뒤 모두 보여요)
+function cross(T, x, y, z, b) {
+  const lv = lightAt(x, y, z), ls = skyF(lv[0]), lb = blF(lv[1]), u0 = (b * 16 + .3) / (16 * NT), u1 = (b * 16 + 15.7) / (16 * NT), v0 = 1 - 15.7 / 48, v1 = 1 - .3 / 48;
+  const Q = [[[.15, .15], [.85, .85]], [[.85, .15], [.15, .85]]];
+  for (const [[ax, az], [bx, bz]] of Q) for (const flip of [0, 1]) {
+    const n = T.p.length / 3, A = flip ? [bx, bz] : [ax, az], Bq = flip ? [ax, az] : [bx, bz];
+    [[A, 0, u0, v0], [Bq, 0, u1, v0], [A, .95, u0, v1], [Bq, .95, u1, v1]].forEach(([p, h, u, v]) => { T.p.push(x + p[0], y + h, z + p[1]); T.n.push(0, 1, 0); T.u.push(flip ? u0 + u1 - u : u, v); T.c.push(.9, .9, .9); T.l.push(ls, lb); });
+    T.i.push(n, n + 1, n + 2, n + 2, n + 1, n + 3);
+  }
 }
 // 횃불처럼 가는 블록: 칸 가운데 작은 기둥
 function thinBox(T, x, y, z, b) {
@@ -1158,7 +1267,7 @@ const SUITS = {
 const DEF = () => ({
   planet: "earth", inv: { 33: 0 }, mined: {}, gear: { rocket: false, insul: false, pressure: false, batt: 0, rtg: false },
   done: {}, logs: [], dex: {}, seen: {}, edits: {}, visited: { earth: true }, best: {}, time: {},
-  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {}, hot: [0, 0, 0, 0, 0, 0, 0, 0, 0], piles: [],
+  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {}, hot: [0, 0, 0, 0, 0, 0, 0, 0, 0], piles: [], food: 20, crops: {}, spawn: {}, rocketAt: null,
 });
 // 곡괭이: 단계가 높을수록 빨리 캐고, 더 단단한 광석을 캘 수 있어요
 const PICKS = [
@@ -1286,15 +1395,19 @@ function survival(dt) {
   if (PL.breath) S.o2 = Math.min(100, S.o2 + 10 * dt);
   else { S.o2 -= .38 * dt; if (nearCore) S.o2 = Math.min(100, S.o2 + 12 * dt); }
   S.o2 = Math.max(0, S.o2);
+  // 배고픔: 가만히 있어도 조금씩, 움직이고 캐면 더 빨리 줄어요
+  const moving = Math.hypot(P.vel.x, P.vel.z) > .5;
+  S.food = Math.max(0, Math.min(20, (S.food == null ? 20 : S.food) - (.016 + (moving ? .02 : 0) + (wantMine ? .02 : 0)) * dt));
   // 체력
   let dmg = 0; cause = ""; warnMsg = "";
+  if (S.food <= 0) { dmg += .7; cause = "hunger"; }
   if (S.o2 <= 0) { dmg += 9; cause = "o2"; }
   if (S.st > 45) { dmg += Math.min(25, (S.st - 45) / 4); cause = "hot"; }
   if (S.st < 0) { dmg += Math.min(25, -S.st / 4); cause = "cold"; }
   if (env.Pa > su.pr) { dmg += 30; cause = "pressure"; }
   if (dmg) { S.hp -= dmg * dt; hurtT = Math.min(1, hurtT + dt * 2); if (gameT - lastHurt > .7) { lastHurt = gameT; sfx.hurt(); hurtT = 1; } }
   else if (radNow) {} // 방사선을 쬐는 동안은 회복되지 않아요
-  else if (nearCore) S.hp = Math.min(100, S.hp + 6 * dt); else S.hp = Math.min(100, S.hp + .4 * dt);
+  else if (nearCore) S.hp = Math.min(100, S.hp + 6 * dt); else if (S.food >= 6) S.hp = Math.min(100, S.hp + (S.food >= 16 ? .6 : .4) * dt);
   // 경고
   if (env.Pa > su.pr) warnMsg = `기압 ${Math.round(env.Pa)}기압! 지금 우주복은 ${su.pr}기압까지만 버텨요`;
   else if (S.pw <= 0 && Math.abs(env.T - 20) > 25) warnMsg = `전력 없음: 바깥 기온 ${Math.round(env.T)} °C가 우주복 안으로 스며들어요`;
@@ -1302,6 +1415,7 @@ function survival(dt) {
   else if (S.planet === "neptune" && wind > 1.5) warnMsg = `바람 초속 ${Math.round(wind * 190)} m — 날려가지 않게 조심!`;
   else if (PL.gas && P.pos.y < GAS_TOP - 6) warnMsg = `구름 아래로 내려가는 중: ${Math.round(env.Pa)}기압 · ${Math.round(env.T)} °C. 바닥은 없어요`;
   else if (S.o2 < 25 && !PL.breath) warnMsg = "산소가 얼마 안 남았어요. 기지 코어 근처로 돌아가세요";
+  else if (S.food < 4) warnMsg = S.food <= 0 ? "너무 배고파서 체력이 줄어요! 음식을 손에 들고 놓기(오른쪽 클릭)로 먹으세요" : "배가 고파요. 음식을 손에 들고 놓기(오른쪽 클릭)로 먹으세요";
   if (S.hp <= 0) die();
   // 기록
   const sn = S.seen[pk] = S.seen[pk] || { min: env.T, max: env.T };
@@ -1320,6 +1434,7 @@ const DEATH = {
   robot: ["고장 난 로봇에게 당했어요", () => "어두운 곳에서는 고장 난 탐사 로봇이 나타나요. 밝은 곳에는 생기지 않으니 횃불이나 전등으로 기지 주변과 굴을 밝혀 두세요. 로봇마다 피하는 법이 달라요. 돌격 로봇이 번쩍이면 옆으로 비키고, 레이저 조준선이 보이면 블록 뒤에 숨고, 자폭 로봇이 깜박이면 달아나고, 대형 로봇이 팔을 들면 점프하세요. 칼을 만들면 더 세게 때려요."],
   meteor: ["운석에 맞았어요", (pk) => `${PLANETS[pk].name}에는 대기가 없어서 운석이 타 없어지지 않고 그대로 떨어져요. 붉은 원이 보이면 바로 원 밖으로 피하세요.`],
   rad: ["방사선을 너무 많이 쬐었어요", (pk) => pk === "europa" ? "유로파는 목성의 강한 자기장에 붙잡힌 고에너지 입자 속을 돌아요. 경보가 울리면 얼음 속을 파고 들어가거나 지붕 아래로 피하세요." : `${PLANETS[pk].name}에는 지구처럼 태양 방사선을 막아 줄 두꺼운 대기와 자기장이 없어요. 태양 폭풍 경보가 울리면 땅속이나 지붕 아래로 피하세요.`],
+  hunger: ["배가 고파 쓰러졌어요", () => "몸은 음식 속 영양소(탄수화물·단백질·지방)를 에너지로 바꿔 움직여요. 동물을 잡아 고기를 굽거나, 밀·보리·옥수수를 키워 먹으세요. 다른 천체로 떠날 때는 음식을 챙기세요."],
   pvp: ["다른 탐사 대원에게 쓰러졌어요", () => `${pvpBy || "다른 대원"}에게 맞았어요. 방장이 '플레이어끼리 대결'을 켜 두었어요. 기지 코어 6칸 안은 안전 구역이라 맞지 않아요.`],
   abyss: ["끝없이 가라앉았어요", (pk) => `${PLANETS[pk].name}${josa(PLANETS[pk].name, "은", "는")} 대부분 수소와 헬륨 같은 기체로 된 목성형 행성이에요. 아래로 내려가면 기체가 점점 짙어질 뿐 단단한 땅이 나오지 않아요.`],
 };
@@ -1340,8 +1455,11 @@ function die() {
   const items = {}; let n = 0;
   for (const id in S.inv) if (S.inv[id] > 0) { items[id] = S.inv[id]; n += S.inv[id]; S.inv[id] = 0; }
   if (n) { const gas = PLANETS[pk].gas; makePile(items, gas ? base.x + 4.5 : P.pos.x, gas ? base.y + 1 : P.pos.y + .2, gas ? base.z + .5 : P.pos.z, "death"); }
-  S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; toBase(); clearMobs();
-  showLog({ no: "구조 요청 · 기지로 이송됨", t: c[0], ev: `쓰러진 곳: ${PLANETS[pk].name} · 바깥 기온 ${Math.round(env.T)} °C · 기압 ${fmtP(env.Pa)} · ${n ? `가진 물건 ${n}개를 쓰러진 자리에 떨어뜨렸어요. 빛 기둥을 찾아가 30분 안에 주우세요` : "떨어뜨린 물건 없음"}`, x: c[1](pk), dead: true });
+  S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; S.food = 20; toBase(); clearMobs();
+  // 침대가 있으면 침대 위에서 다시 시작해요
+  const bed = (S.spawn || {})[pk]; let atBed = false;
+  if (bed && get(bed[0], bed[1], bed[2]) === 73 && !SOLID(get(bed[0], bed[1] + 1, bed[2])) && !SOLID(get(bed[0], bed[1] + 2, bed[2]))) { P.pos.set(bed[0] + .5, bed[1] + 1.01, bed[2] + .5); P.vel.set(0, 0, 0); atBed = true; }
+  showLog({ no: atBed ? "구조 요청 · 침대로 이송됨" : "구조 요청 · 기지로 이송됨", t: c[0], ev: `쓰러진 곳: ${PLANETS[pk].name} · 바깥 기온 ${Math.round(env.T)} °C · 기압 ${fmtP(env.Pa)} · ${n ? `가진 물건 ${n}개를 쓰러진 자리에 떨어뜨렸어요. 빛 기둥을 찾아가 30분 안에 주우세요` : "떨어뜨린 물건 없음"}`, x: c[1](pk), dead: true });
   sfx.die(); renderHotbar(); save();
 }
 
@@ -1429,22 +1547,29 @@ function mineTick(dt, h) {
   if (Math.floor(mining.t * 4.5) !== Math.floor((mining.t - dt) * 4.5)) { sfx.tick(b); swing = Math.max(swing, .001); }
   if (mining.t >= need) {
     edit(h.x, h.y, h.z, 0); burst(h.x, h.y, h.z, b);
-    const drop = B.drop != null ? B.drop : b;
-    if (drop) { S.inv[drop] = (S.inv[drop] || 0) + 1; spawnDrop(drop, h.x, h.y, h.z); }
+    let drop = B.drop != null ? B.drop : b, cnt = 1;
+    // 다 자란 작물은 알갱이 2~3개, 덜 자란 것은 심은 알갱이 1개만 돌려줘요
+    if (B.crop != null) { drop = 115 + B.crop; cnt = (b - 50) % 4 === 3 ? 2 + (Math.random() < .5 ? 1 : 0) : 1; }
+    if (b === 8 && Math.random() < .12) drop = 132;
+    if (B.door) { const oy = B.door % 2 ? h.y + 1 : h.y - 1; if (isDoor(get(h.x, oy, h.z))) edit(h.x, oy, h.z, 0); }
+    // 농지를 부수면 위에 심은 작물도 떨어져요
+    if (b === 45 && BLOCKS[get(h.x, h.y + 1, h.z)] && BLOCKS[get(h.x, h.y + 1, h.z)].plant) { const cb = get(h.x, h.y + 1, h.z); edit(h.x, h.y + 1, h.z, 0); S.inv[115 + BLOCKS[cb].crop] = (S.inv[115 + BLOCKS[cb].crop] || 0) + 1; }
+    if (isPad(b) && S.rocketPk === S.planet && rocketG && Math.hypot(rocketG.position.x - h.x - .5, rocketG.position.z - h.z - .5) < .7 && Math.abs(rocketG.position.y - h.y - 1) < .5) { S.rocketPk = null; S.rocketAt = null; S.inv[126] = 1; syncRocket(); toast("발사대를 부숴서 로켓을 가방에 넣었어요", 2200); }
+    if (drop) { S.inv[drop] = (S.inv[drop] || 0) + cnt; spawnDrop(drop, h.x, h.y, h.z); }
     const m = S.mined[S.planet] = S.mined[S.planet] || {}; m[b] = (m[b] || 0) + 1;
-    sfx.dig(b); toast(drop ? `+1 ${itemName(drop)}` : `${itemName(b)} 부서짐`);
+    sfx.dig(b); toast(drop ? `+${cnt} ${itemName(drop)}` : `${itemName(b)} 부서짐`);
     if (B.fact && !S.facts[b]) { S.facts[b] = true; showFact(`새 광물: ${B.n}`, B.fact); S.logs.push({ id: "ore" + b, pk: S.planet, t: `광물 발견: ${B.n}`, ev: `${PLANETS[S.planet].name}에서 ${B.n}${josa(B.n, "을", "를")} 처음 캤어요.`, x: B.fact }); }
     mining = null; crack.material.opacity = 0; renderHotbar();
   }
 }
-const HOT_FIRST = [120, 121, 122, 123, 124, 125, 36, 37, 35, 31, 30, 32];
+const HOT_FIRST = [120, 121, 122, 123, 124, 125, 127, 36, 37, 35, 31, 30, 32];
 const heldId = () => S.hot[sel] || 0, heldTier = () => (TOOLS[heldId()] || {}).tier || 0;
 // 칸 정리: 다 쓴 칸은 비우고, 새로 생긴 블록·도구는 빈 칸에 넣어요
 function syncHot() {
   if (!Array.isArray(S.hot) || S.hot.length !== 9) S.hot = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   S.hot = S.hot.map(id => id && (S.inv[id] || 0) > 0 ? +id : 0);
   S.known = S.known || {};
-  const want = Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0 && (TOOLS[i] || (i < 100 && BLOCKS[i])) && !S.hot.includes(i) && !S.known[i]);
+  const want = Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0 && (TOOLS[i] || FOOD[i] || (i < 100 && BLOCKS[i])) && !S.hot.includes(i) && !S.known[i]);
   Object.keys(S.inv).forEach(i => { if (S.inv[i] > 0) S.known[i] = true; else delete S.known[i]; });
   const rk = (i) => { const k = HOT_FIRST.indexOf(i); return k < 0 ? 100 + i : k; };
   want.sort((a, b) => rk(a) - rk(b)).forEach(i => { const e = S.hot.indexOf(0); if (e >= 0) S.hot[e] = i; });
@@ -1453,19 +1578,89 @@ function hotIds() { const rk = (i) => { const k = HOT_FIRST.indexOf(i); return k
 let sel = 0, mode = "dig";
 function place() {
   if (paused) return;
-  const h = raycast(6); if (!h) { window.__why = 'nohit'; return; }
-  const id = heldId(); if (!id || !(S.inv[id] > 0)) { toast("고른 칸이 비었어요. 가방(I)에서 넣을 수 있어요"); return; }
+  const h = raycast(6);
+  if (h && useBlock(h)) return;
+  const id = heldId();
+  if (FOOD[id] && S.inv[id] > 0 && !(SEED[id] != null && h && h.b === 45)) { eat(id); return; }
+  if (!h) { window.__why = 'nohit'; return; }
+  if (!id || !(S.inv[id] > 0)) { toast("고른 칸이 비었어요. 가방(I)에서 넣을 수 있어요"); return; }
   if (id === 126) { setRocket(h); return; }
+  if (id === 127) { till(h); return; }
+  if (SEED[id] != null) { plant(h, id); return; }
   if (!BLOCKS[id]) { toast(`${itemName(id)}${josa(itemName(id), "은", "는")} 놓을 수 없어요`); return; }
   if (id === 36 && !PLANETS[S.planet].breath) { toast(`횃불에 불이 붙지 않아요. 불이 타려면 산소가 필요한데 ${PLANETS[S.planet].name}에는 숨 쉴 산소가 거의 없어요. 전기로 켜는 전등을 쓰세요.`, 4200); sfx.fizz(); return; }
   const x = h.x + h.n[0], y = h.y + h.n[1], z = h.z + h.n[2];
   if (y >= SY || SOLID(get(x, y, z))) return;
+  if (id === 69) { placeDoor(x, y, z); return; }
   set(x, y, z, id);
   if (hits(P.pos.x, P.pos.y, P.pos.z)) { set(x, y, z, 0); toast("내가 서 있는 자리에는 놓을 수 없어요"); return; }
   edit(x, y, z, id); S.inv[id]--; sfx.place(id); swing = .001;
   if (S.planet === "venus") placedTimes[(((x % SX) + SX) % SX) + "," + y + "," + z] = gameT;
   if (id === 31) deviceRun(x, y, z);
   renderHotbar();
+}
+
+// 문 열고 닫기, 침대에 눕기, 제작대·화로 열기
+function useBlock(h) {
+  const b = h.b;
+  if (isDoor(b)) {
+    const lo = BLOCKS[b].door % 2 ? h.y : h.y - 1, open = get(h.x, lo, h.z) === 71;
+    if (open && (hits(P.pos.x, P.pos.y, P.pos.z) || (() => { set(h.x, lo, h.z, 69); set(h.x, lo + 1, h.z, 70); const bad = hits(P.pos.x, P.pos.y, P.pos.z); set(h.x, lo, h.z, 71); set(h.x, lo + 1, h.z, 72); return bad; })())) { toast("문 사이에 서 있어서 닫을 수 없어요"); return true; }
+    edit(h.x, lo, h.z, open ? 69 : 71); if (isDoor(get(h.x, lo + 1, h.z))) edit(h.x, lo + 1, h.z, open ? 70 : 72);
+    tone(open ? 160 : 220, .08, "triangle", .06); swing = .001; return true;
+  }
+  if (b === 73) { S.spawn = S.spawn || {}; S.spawn[S.planet] = [h.x, h.y, h.z]; toast("침대에 누웠어요. 쓰러지면 이 침대에서 다시 시작해요", 2600); sfx.pop(); save(); return true; }
+  if (b === 35 || b === 44) { if (b === 44) craftTab = "food"; openCraft(); return true; }
+  return false;
+}
+function placeDoor(x, y, z) {
+  if (y + 1 >= SY || SOLID(get(x, y + 1, z)) || get(x, y + 1, z)) { toast("문은 두 칸 높이라 위가 비어 있어야 해요"); return; }
+  set(x, y, z, 69); set(x, y + 1, z, 70);
+  const bad = hits(P.pos.x, P.pos.y, P.pos.z); set(x, y, z, 0); set(x, y + 1, z, 0);
+  if (bad) { toast("내가 서 있는 자리에는 놓을 수 없어요"); return; }
+  edit(x, y, z, 69); edit(x, y + 1, z, 70); S.inv[69]--; sfx.place(43); swing = .001; renderHotbar();
+}
+function eat(id) {
+  if (S.food >= 19.5) { toast("배가 불러서 더 못 먹어요"); return; }
+  S.inv[id]--; S.food = Math.min(20, S.food + FOOD[id]); swing = .001;
+  [0, .12, .24].forEach(w => hiss("bandpass", 900 + Math.random() * 500, 2, .07, .12, w));
+  let msg = `${itemName(id)}${josa(itemName(id), "을", "를")} 먹었어요 (배부름 +${FOOD[id]})`;
+  if (id === 113 && Math.random() < .3) { S.hp = Math.max(1, S.hp - 6); hurtT = .6; msg = "날고기를 먹고 배탈이 났어요! 화로에서 구워 먹으면 안전해요"; showFact("익혀 먹어야 하는 까닭", "날고기에는 세균이 있을 수 있어요. 높은 열로 익히면 세균이 죽고 단백질이 소화하기 쉬워져요."); }
+  toast(msg, 1800);
+  if (!S.ate) { S.ate = true; showFact("음식과 에너지", "음식 속 영양소(탄수화물·단백질·지방)가 몸속에서 분해되면서 움직이는 데 필요한 에너지가 나와요. 그래서 움직이고 일할수록 배가 빨리 고파져요."); }
+  renderHotbar(); renderGauges(); save();
+}
+// 괭이로 풀이나 흙을 갈아 농지를 만들어요
+function till(h) {
+  if (h.b !== 2 && h.b !== 3) { toast(h.b === 45 ? "이미 간 농지예요. 밀·보리·옥수수 알갱이를 들고 놓기로 심으세요" : "괭이로는 풀이나 흙만 갈 수 있어요", 2200); return; }
+  if (get(h.x, h.y + 1, h.z)) { toast("위가 비어 있어야 땅을 갈 수 있어요"); return; }
+  edit(h.x, h.y, h.z, 45); sfx.dig(3); swing = .001;
+  if (!S.tilled) { S.tilled = true; toast("농지를 만들었어요! 밀·보리·옥수수 알갱이를 들고 놓기로 심으세요. 물이 4칸 안에 있으면 빨리 자라요", 3600); }
+}
+function nearWater(x, y, z) { for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) for (let dy = -1; dy <= 0; dy++) if (get(x + dx, y + dy, z + dz) === 6) return true; return false; }
+function plant(h, id) {
+  if (h.b !== 45) { toast("알갱이는 괭이로 간 농지 위에만 심을 수 있어요 (오른쪽 클릭으로 먹을 수도 있어요)", 2600); return; }
+  if (!PLANETS[S.planet].breath) { toast("공기와 알맞은 온도가 없어서 식물이 자랄 수 없어요"); return; }
+  if (get(h.x, h.y + 1, h.z)) return;
+  const k = SEED[id], x = h.x, y = h.y + 1, z = h.z;
+  edit(x, y, z, 50 + k * 4); S.inv[id]--; sfx.place(8); swing = .001;
+  const L = (S.crops = S.crops || {})[S.planet] = (S.crops[S.planet] || {}); L[x + "," + y + "," + z] = { k, g: 0 };
+  if (!S.planted) { S.planted = true; showFact("씨앗이 자라려면", "씨앗 속에는 어린 싹과 양분이 들어 있어요. 싹이 튼 식물은 잎으로 햇빛을 받아 물과 이산화탄소로 양분을 만들어요(광합성). 그래서 밭은 햇빛이 들고 물이 가까운 곳이 좋아요. 밤에는 자라지 않지만 전등을 켜 두면 자라요."); }
+  else if (!nearWater(x, y - 1, z)) toast("심었어요. 4칸 안에 물이 없어서 천천히 자라요", 2200);
+  renderHotbar();
+}
+// 내가 심은 작물이 시간이 지나면 자라요(자라는 모습은 같은 방 친구에게도 보여요)
+const GROW = 40; let cropT = 0;
+function cropTick(dt) {
+  if ((cropT += dt) < 1) return; const t = cropT; cropT = 0;
+  const L = (S.crops || {})[S.planet]; if (!L) return;
+  for (const key in L) {
+    const c = L[key], [x, y, z] = key.split(",").map(Number), b = get(x, y, z), st = b - 50 - c.k * 4;
+    if (st < 0 || st > 2 || get(x, y - 1, z) !== 45) { delete L[key]; continue; }
+    const [sk, bl] = lightAt(x, y, z); if (Math.max(env.day ? sk : 0, bl) < 9) continue;
+    c.g += t * (nearWater(x, y - 1, z) ? 1 : .35);
+    if (c.g >= GROW) { c.g = 0; edit(x, y, z, b + 1); if (st === 2) delete L[key]; }
+  }
 }
 
 /* ═════════════ 관측 장치 ═════════════ */
@@ -1504,7 +1699,28 @@ const RECIPES = [
   { id: "sword3", n: "다이아몬드 칼", need: { 7: 1, 111: 2 }, tool: 125, cat: "tool", use: "피해 18. 대형 굴착 로봇도 세 번이면 멈춰요." },
   { id: 30, n: "태양광 패널", need: { 101: 2, 100: 1 }, out: 30, use: "기지 코어 6칸 안에 놓으면 해가 있을 때 전력을 만들어요. 태양에서 가까운 행성일수록 많이 만들어요." },
   { id: 31, n: "관측 장치", need: { 100: 1, 101: 2 }, out: 31, use: "땅에 놓으면 그 행성의 중력·기압·햇빛 세기를 재서 도감에 기록해요." },
-  { id: 32, n: "유리 패널 ×2", need: { 101: 2 }, out: 32, count: 2, use: "투명한 벽. 황산에도 녹지 않아요." },
+  { id: 32, n: "유리 패널 ×2", need: { 101: 2 }, out: 32, count: 2, cat: "build", use: "투명한 벽·창문. 규소(모래)를 녹여 만들어요. 황산에도 녹지 않아요." },
+  { id: 43, n: "나무 판자 ×4", need: { 7: 1 }, out: 43, count: 4, cat: "build", hand: true, use: "통나무를 켜서 만든 판자. 집 벽과 바닥, 문·침대 재료예요." },
+  { id: 44, n: "화로", need: { 4: 8 }, out: 44, cat: "build", hand: true, use: "4칸 안에서 석탄으로 고기·빵·벽돌을 구워요. 화로를 누르면 바로 음식 만들기가 열려요. 불은 산소가 있어야 타서 지구에서만 써요." },
+  { id: 69, n: "문", need: { 43: 6 }, out: 69, cat: "build", use: "두 칸 높이 나무 문. 놓기(오른쪽 클릭)로 열고 닫아요. 열면 지나갈 수 있어요." },
+  { id: 73, n: "침대", need: { 43: 3, 68: 3 }, out: 73, cat: "build", use: "놓은 뒤 누르면(오른쪽 클릭) 그 천체에서 쓰러졌을 때 기지 대신 침대에서 다시 시작해요. 양털은 양에게서 얻어요." },
+  { id: 47, n: "돌벽돌 ×4", need: { 4: 4 }, out: 47, count: 4, cat: "build", use: "돌을 반듯하게 깎아 쌓은 벽돌. 튼튼한 성벽과 집 벽에." },
+  { id: 48, n: "붉은 벽돌 ×4", need: { 3: 4, 108: 1 }, out: 48, count: 4, cat: "build", fire: true, use: "흙 속 점토를 높은 열로 구우면 단단한 벽돌이 돼요. 화로 근처에서 만들어요." },
+  { id: 49, n: "철 블록", need: { 100: 4 }, out: 49, cat: "build", use: "철 4개를 녹여 붙인 단단한 블록. 금속 기지 벽에 좋아요." },
+  { id: 62, n: "구리 블록", need: { 109: 4 }, out: 62, cat: "build", use: "구리는 공기 속 산소·물과 만나 겉이 청록색 녹(녹청)으로 덮여요. 자유의 여신상이 초록색인 까닭이에요." },
+  { id: 63, n: "금 블록", need: { 110: 4 }, out: 63, cat: "build", use: "녹슬지 않아 오래 반짝이는 금 블록. 멋진 장식용이에요." },
+  { id: 64, n: "다이아몬드 블록", need: { 111: 4 }, out: 64, cat: "build", use: "가장 단단한 천연 광물로 만든 블록. 캐는 데도 오래 걸려요." },
+  { id: 65, n: "티타늄 블록 ×2", need: { 112: 3 }, out: 65, count: 2, cat: "build", use: "가볍고 튼튼하며 열에 강해서 우주선과 우주 기지 벽에 써요." },
+  { id: 66, n: "석탄 블록", need: { 108: 4 }, out: 66, cat: "build", use: "석탄 4개를 꾹 눌러 뭉친 검은 블록." },
+  { id: 67, n: "황 블록", need: { 102: 4 }, out: 67, cat: "build", use: "노란 황 결정 블록. 황은 화산 근처에서 많이 나와요." },
+  { id: 74, n: "소금 블록", need: { 106: 4 }, out: 74, cat: "build", use: "소금(염화 나트륨) 알갱이는 정육면체 모양 결정이에요. 확대경으로 보면 작은 주사위처럼 보여요." },
+  { id: 75, n: "발사대", need: { 100: 4, 108: 2 }, out: 75, cat: "build", use: "어디에나 놓을 수 있는 내 발사대. 집 옆에 두고 로켓을 세워 그 자리에서 출발해요." },
+  { id: "hoe", n: "괭이", need: { 7: 2, 4: 2 }, tool: 127, cat: "tool", use: "풀이나 흙을 갈아 농지를 만들어요(놓기·오른쪽 클릭). 농지에 밀·보리·옥수수 알갱이를 심어요." },
+  { id: 114, n: "구운 고기 ×2", need: { 113: 2, 108: 1 }, out: 114, count: 2, cat: "food", fire: true, use: "배부름 +8. 높은 열로 익히면 세균이 죽고 소화가 잘 돼요." },
+  { id: 118, n: "빵 ×2", need: { 115: 3, 108: 1 }, out: 118, count: 2, cat: "food", fire: true, use: "배부름 +6. 밀가루 속 녹말(탄수화물)은 몸을 움직이는 에너지가 돼요." },
+  { id: 119, n: "보리밥 ×2", need: { 116: 2, 103: 1, 108: 1 }, out: 119, count: 2, cat: "food", fire: true, use: "배부름 +6. 보리에는 소화를 돕는 식이 섬유가 많아요." },
+  { id: 130, n: "구운 옥수수 ×2", need: { 117: 2, 108: 1 }, out: 130, count: 2, cat: "food", fire: true, use: "배부름 +5. 옥수수는 세계에서 가장 많이 기르는 곡물 가운데 하나예요." },
+  { id: 131, n: "육포 ×2", need: { 113: 2, 106: 1 }, out: 131, count: 2, cat: "food", hand: true, use: "배부름 +6. 소금이 고기 속 물을 빼내 세균이 살기 어려워서 오래 두고 먹을 수 있어요. 먼 천체로 떠날 때 챙기세요." },
   { id: "batt", n: "배터리 팩", need: { 100: 2, 101: 2 }, gear: "batt", use: "우주복 전력 한도 +50 (최대 3개)." },
   { id: "rocket", n: "로켓", need: { 100: 6, 101: 4 }, tool: 126, cat: "gear", use: "손에 들고 발사대(착륙선 옆 주황 줄무늬 블록)에 놓으면 세워져요. 로켓을 누르거나 M으로 올라타 다른 천체로 날아가요. 연료로 물이나 얼음이 필요해요." },
   { id: "insul", n: "단열 우주복", need: { 11: 4, 100: 3 }, gear: "insul", use: "달 현무암 속 티타늄으로 만든 단열층. 바깥 열이 덜 스며들어 냉난방 전력이 약 절반으로 줄어요." },
@@ -1520,8 +1736,11 @@ function nearTable() {
 }
 const owned = (r) => (r.gear && r.gear !== "batt" && S.gear[r.gear]) || (r.gear === "batt" && S.gear.batt >= 3) || (r.pick && S.inv[TOOL_OF[r.pick]] > 0) || (r.tool && (S.inv[r.tool] > 0 || (r.tool === 126 && S.rocketPk)));
 const hasAll = (r, k = 1) => Object.entries(r.need).every(([id, n]) => (S.inv[id] || 0) >= n * k);
-function canMake(r) { return hasAll(r) && !owned(r) && (r.hand || nearTable()); }
-function maxMake(r) { if (!r.out) return canMake(r) ? 1 : 0; let k = 0; while (k < 64 && hasAll(r, k + 1)) k++; return r.hand || nearTable() ? k : 0; }
+// 화로가 필요한 것(굽기)은 화로 4칸 안에서만 만들어요
+function nearFire() { const px = Math.floor(P.pos.x), py = Math.floor(P.pos.y), pz = Math.floor(P.pos.z); for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) for (let dy = -3; dy <= 3; dy++) if (get(px + dx, py + dy, pz + dz) === 44) return true; return false; }
+const canHere = (r) => r.fire ? nearFire() : r.hand || nearTable();
+function canMake(r) { return hasAll(r) && !owned(r) && canHere(r); }
+function maxMake(r) { if (!r.out) return canMake(r) ? 1 : 0; let k = 0; while (k < 64 && hasAll(r, k + 1)) k++; return canHere(r) ? k : 0; }
 function makeIt(r, k) {
   for (let i = 0; i < k; i++) {
     Object.entries(r.need).forEach(([id, n]) => S.inv[id] -= n);
@@ -1532,8 +1751,9 @@ function makeIt(r, k) {
   sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save();
 }
 let craftTab = "all";
-const CTABS = [["all", "전체"], ["block", "블록"], ["tool", "도구"], ["gear", "장비"]];
+const CTABS = [["all", "전체"], ["block", "블록"], ["build", "건축"], ["food", "음식"], ["tool", "도구"], ["gear", "장비"]];
 function pickIcon(t) { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d"); g.fillStyle = "#8a5a2e"; for (let i = 0; i < 10; i++) g.fillRect(3 + i, 13 - i, 2, 2); g.fillStyle = PICKS[t].col; g.fillRect(6, 2, 8, 2); g.fillRect(12, 2, 2, 7); g.fillRect(4, 3, 3, 2); return c; }
+function hoeIcon() { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d"); g.fillStyle = "#8a5a2e"; for (let i = 0; i < 10; i++) g.fillRect(3 + i, 13 - i, 2, 2); g.fillStyle = "#8f9198"; g.fillRect(8, 2, 6, 2); g.fillRect(12, 2, 2, 4); return c; }
 function rocketIcon() {
   const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d");
   g.fillStyle = "#e9edf3"; g.fillRect(6, 3, 4, 10); g.fillStyle = "#e0503a"; g.fillRect(7, 1, 2, 2); g.fillRect(6, 2, 4, 1); g.fillRect(4, 10, 2, 4); g.fillRect(10, 10, 2, 4);
@@ -1571,7 +1791,7 @@ function openCraft() {
     const need = Object.entries(r.need).map(([id, n]) => { const ok = (S.inv[id] || 0) >= n; return `<span class="${ok ? "ok" : "no"}">${itemName(+id)} ${S.inv[id] || 0}/${n}</span>${ok || !WHERE[id] ? "" : ` <i>(${WHERE[id]})</i>`}`; }).join(" · ");
     const d = document.createElement("div"); d.className = "recipe" + (canMake(r) ? "" : " cant");
     d.appendChild(recipeIcon(r));
-    const why = have ? "" : !r.hand && !near && hasAll(r) ? `<div class="use" style="color:var(--ore)">제작대 근처에서 만들 수 있어요</div>` : "";
+    const why = have ? "" : r.fire && !nearFire() ? `<div class="use" style="color:var(--ore)">화로 4칸 안에서 만들 수 있어요</div>` : !r.fire && !r.hand && !near && hasAll(r) ? `<div class="use" style="color:var(--ore)">제작대 근처에서 만들 수 있어요</div>` : "";
     d.insertAdjacentHTML("beforeend", `<div><b>${r.n}${r.gear === "batt" ? ` (${S.gear.batt}/3)` : ""}</b><div class="need">${have ? "<span class=ok>가지고 있어요</span>" : need}</div>${why}<div class="use">${r.use}</div></div>`);
     const bs = document.createElement("div"); bs.className = "btns";
     const b = document.createElement("button"); b.className = "btn"; b.textContent = "만들기"; b.disabled = !canMake(r); b.onclick = () => makeIt(r, 1); bs.appendChild(b);
@@ -1587,13 +1807,13 @@ $("bCraft").onclick = openCraft; $("craftClose").onclick = () => { $("craftOv").
 const ORBC = { mercury: ["#d9d4cc", "#6f6a63"], venus: ["#fff0c2", "#c89a50"], earth: ["#9fd8ff", "#2f7fe0"], moon: ["#f2f2f2", "#8d8d92"], mars: ["#ffb08a", "#b4552f"], jupiter: ["#fbe3c0", "#b07a4f"], europa: ["#f4ead8", "#b08a6a"], saturn: ["#fff2c8", "#c8a860"], titan: ["#f0b060", "#a8601e"], uranus: ["#d8fbfb", "#5fc4cc"], neptune: ["#a8c8ff", "#2850c8"] };
 const ORB = { jupiter: "repeating-linear-gradient(0deg,#e8d2b0 0 6px,#b07a4f 6px 10px)", saturn: "radial-gradient(circle at 35% 35%, #fff2c8, #c8a860 70%)", europa: "radial-gradient(circle at 35% 35%, #fbf4e8, #b08a6a 75%)", titan: "radial-gradient(circle at 35% 35%, #f0b060, #a8601e 70%)", uranus: "radial-gradient(circle at 35% 35%, #d8fbfb, #5fc4cc 70%)", neptune: "radial-gradient(circle at 35% 35%, #a8c8ff, #2850c8 70%)",
   mercury: "radial-gradient(circle at 35% 35%, #d9d4cc, #6f6a63 70%)", venus: "radial-gradient(circle at 35% 35%, #fff0c2, #c89a50 70%)", earth: "radial-gradient(circle at 35% 35%, #9fd8ff, #2f7fe0 55%, #123c7a)", moon: "radial-gradient(circle at 35% 35%, #f2f2f2, #8d8d92 70%)", mars: "radial-gradient(circle at 35% 35%, #ffb08a, #b4552f 70%)" };
-function nearPad() { for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let dy = -5; dy <= 1; dy++) if (get(Math.floor(P.pos.x) + dx, Math.floor(P.pos.y) + dy, Math.floor(P.pos.z) + dz) === 34) return true; return false; }
+function nearPad() { if (rocketG && S.rocketPk === S.planet) return Math.hypot(P.pos.x - rocketG.position.x, P.pos.z - rocketG.position.z) < 5 && Math.abs(P.pos.y - rocketG.position.y) < 5; for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let dy = -5; dy <= 1; dy++) if (isPad(get(Math.floor(P.pos.x) + dx, Math.floor(P.pos.y) + dy, Math.floor(P.pos.z) + dz))) return true; return false; }
 const FUELS = [103, 14, 105, 107];
 function fuelHave() { return FUELS.reduce((a, id) => a + (S.inv[id] || 0), 0); }
 function openMap() {
   pause(true);
   const pad = nearPad();
-  $("mapNote").innerHTML = !S.gear.rocket && !S.inv[126] ? "<b>로켓이 없어요.</b> 제작대에서 로켓(철 6, 규소 4)을 먼저 만드세요." : S.rocketPk !== S.planet ? "<b>로켓을 발사대에 세우세요.</b> 로켓을 손에 들고 착륙선 옆 주황 줄무늬 발사대를 바라보며 놓기(오른쪽 클릭, 터치는 놓기 모드)를 하세요." : !pad ? "<b>발사대 근처에서만 출발할 수 있어요.</b> 착륙선 옆 주황색 발사대로 가세요." : `연료(물·얼음·수소·메테인) ${fuelHave()}개 보유. 태양에서 가까운 순서로 나열했어요.`;
+  $("mapNote").innerHTML = !S.gear.rocket && !S.inv[126] ? "<b>로켓이 없어요.</b> 제작대에서 로켓(철 6, 규소 4)을 먼저 만드세요." : S.rocketPk !== S.planet ? "<b>로켓을 발사대에 세우세요.</b> 로켓을 손에 들고 착륙선 옆 주황 줄무늬 발사대를 바라보며 놓기(오른쪽 클릭, 터치는 놓기 모드)를 하세요." : !pad ? "<b>내 로켓 근처에서만 출발할 수 있어요.</b> 로켓을 세워 둔 발사대로 가세요." : `연료(물·얼음·수소·메테인) ${fuelHave()}개 보유. 태양에서 가까운 순서로 나열했어요.`;
   const L = $("destList"); L.innerHTML = "";
   ORDER.forEach(pk => {
     const b = document.createElement("button");
@@ -1625,7 +1845,7 @@ function flyAnim(pk) {
     st.forEach(s => { s.z -= .02; if (s.z <= .02) s.z = 1; const k = .5 / s.z; g.fillStyle = "#fff"; g.fillRect(cv.width / 2 + s.x * k * cv.width / 2, cv.height / 2 + s.y * k * cv.height / 2, 2 / s.z, 2 / s.z); });
     if (t > 1.6) { const r = (t - 1.6) * 200; g.fillStyle = ORB[pk] ? "#888" : "#888"; const gr = g.createRadialGradient(cv.width / 2 - r * .3, cv.height / 2 - r * .3, 0, cv.width / 2, cv.height / 2, r); const cc = ORBC[pk]; gr.addColorStop(0, cc[0]); gr.addColorStop(1, cc[1]); g.fillStyle = gr; g.beginPath(); g.arc(cv.width / 2, cv.height / 2, r, 0, 7); g.fill(); }
     if (t < 3.2) requestAnimationFrame(anim);
-    else { box.hidden = true; S.rocketPk = pk; loadPlanet(pk); S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; if (!landCine()) { pause(false); showHud(true); arriveLog(pk); } }
+    else { box.hidden = true; S.rocketPk = pk; S.rocketAt = null; loadPlanet(pk); S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; if (!landCine()) { pause(false); showHud(true); arriveLog(pk); } }
   })();
 }
 const ARRIVE = {
@@ -1900,6 +2120,7 @@ function renderGauges() {
   set1("gHp", S.hp, 100, Math.round(S.hp), S.hp < 30);
   set1("gO2", S.o2, 100, PLANETS[S.planet].breath ? "공기" : Math.round(S.o2), S.o2 < 25);
   set1("gPw", S.pw, maxPw(), Math.round(S.pw), S.pw < 20);
+  set1("gFd", S.food, 20, Math.ceil(S.food), S.food < 5);
   const st = $("gSt"); st.querySelector("i").style.width = Math.max(4, Math.min(100, (S.st + 40) / 120 * 100)) + "%"; st.querySelector("i").style.background = S.st > 45 ? "var(--bad)" : S.st < 0 ? "var(--ice)" : "var(--good)"; st.querySelector(".v").textContent = Math.round(S.st) + "°"; st.classList.toggle("danger", S.st > 45 || S.st < 0);
   $("suitName").textContent = `${suit().n}${S.gear.batt ? ` · 배터리 +${S.gear.batt * 50}` : ""} · 손: ${heldId() ? itemName(heldId()) : "맨손"}`;
 }
@@ -2056,6 +2277,7 @@ addEventListener("keydown", (e) => {
   if (e.code === "KeyJ" && $("startOv").hidden && $("logOv").hidden) { if (!$("dexOv").hidden) $("dexClose").click(); else if (!anyOv) openDex(); return; }
   if (e.code === "KeyM" && $("startOv").hidden && $("logOv").hidden) { if (!$("mapOv").hidden) $("mapClose").click(); else if (!anyOv) openMap(); return; }
   if (e.code === "KeyO" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("setOv").hidden) $("setClose").click(); else if (!anyOv) openSet(); return; }
+  if (e.code === "KeyP" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("rosterOv").hidden) $("rosterClose").click(); else if (!anyOv) { if ($("room").hidden) toast("친구와 같은 방에 들어가면 P로 친구 목록과 파티를 볼 수 있어요", 2400); else $("room").click(); } return; }
   if (e.code === "KeyC" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("lookOv").hidden) $("lookClose").click(); else if (!anyOv) openLook(); return; }
   if (paused) return;
   if (e.code === "KeyV") { toggleView(); return; }
@@ -2196,12 +2418,14 @@ function nameTag(name, color) {
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true })); tag.scale.set(1.6, .4, 1); tag.position.y = 2.45; tag.renderOrder = 5; return tag;
 }
 // 블록 모양 작은 상자: 손에 든 블록과 떨어진 아이템에 써요
-const itemMat = new THREE.MeshLambertMaterial({ map: tex });
+const itemMat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: .5, side: THREE.DoubleSide });
 const itemGeos = {};
 function itemGeo(id) {
   if (itemGeos[id]) return itemGeos[id];
-  const g = new THREE.BoxGeometry(1, 1, 1), uv = g.attributes.uv, mat = id >= 100;
-  const ox = mat ? (id - 100 + MT) * 16 : id * 16;
+  const mat = id >= 100, ox = mat ? (id - 100 + MT) * 16 : id * 16;
+  // 재료·음식은 마인크래프트처럼 납작한 그림 한 장으로 보여요
+  if (mat) { const g = new THREE.PlaneGeometry(1, 1), uv = g.attributes.uv; for (let i = 0; i < 4; i++) { const u = uv.getX(i), v = uv.getY(i); uv.setXY(i, (ox + .3 + u * 15.4) / (16 * NT), 1 - (15.7 - v * 15.4) / 48); } return (itemGeos[id] = g); }
+  const g = new THREE.BoxGeometry(1, 1, 1), uv = g.attributes.uv;
   for (let f = 0; f < 6; f++) {
     const row = mat ? 0 : f === 2 ? (BLOCKS[id].top ? 1 : 0) : f === 3 ? 2 : 0;
     for (let k = 0; k < 4; k++) { const i = f * 4 + k, u = uv.getX(i), v = uv.getY(i); uv.setXY(i, (ox + .3 + u * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - v * 15.4) / 48); }
@@ -2336,18 +2560,35 @@ function findPad() {
   for (let dx = -9; dx <= 9; dx++) for (let dz = -9; dz <= 9; dz++) for (let dy = -3; dy <= 1; dy++) { const x = base.x + dx, y = base.y + dy, z = base.z + dz; if (get(x, y, z) === 34) { sx += x + .5; sz += z + .5; n++; top = y + 1; } }
   return n ? { x: sx / n, y: top, z: sz / n } : null;
 }
+// 내 로켓이 서 있는 자리(예전 저장은 착륙선 옆 발사대 가운데)
+function rocketSpot() {
+  if (S.rocketPk !== S.planet) return null;
+  const a = S.rocketAt; if (Array.isArray(a) && isPad(get(Math.floor(a[0]), a[1] - 1, Math.floor(a[2])))) return { x: a[0], y: a[1], z: a[2] };
+  return findPad();
+}
+// 다른 친구 로켓이 이미 서 있는 자리인지
+const rocketTaken = (x, z) => Object.values(net.others).some(o => o.pk === S.planet && o.rk && Math.hypot(o.rk[0] - x, o.rk[2] - z) < .9);
+// 도착하면 비어 있는 발사대 칸에 내려요
+function landSpot() {
+  const c = findPad(); if (!c) return null; const L = [];
+  for (let dx = -9; dx <= 9; dx++) for (let dz = -9; dz <= 9; dz++) for (let dy = -3; dy <= 1; dy++) { const x = base.x + dx, y = base.y + dy, z = base.z + dz; if (get(x, y, z) === 34 && !SOLID(get(x, y + 1, z))) L.push({ x: x + .5, y: y + 1, z: z + .5 }); }
+  return L.find(p => !rocketTaken(p.x, p.z)) || L[0] || c;
+}
 function syncRocket() {
-  padC = findPad();
+  padC = rocketSpot() || findPad();
   const want = S.rocketPk === S.planet && padC;
+  if (want && !cine) S.rocketAt = [padC.x, padC.y, padC.z];
   if (!want) { if (rocketG && !cine) { scene.remove(rocketG); rocketG = null; } return; }
   if (!rocketG) { rocketG = buildRocket(); scene.add(rocketG); }
   if (!cine) { rocketG.position.set(padC.x, padC.y, padC.z); rocketG.rotation.set(0, 0, 0); }
 }
 function setRocket(h) {
-  const b = get(h.x, h.y, h.z), pad = findPad();
-  if (b !== 34 || !pad) { toast("로켓은 발사대(착륙선 옆 주황 줄무늬 블록)에만 세울 수 있어요", 2600); return; }
+  const b = get(h.x, h.y, h.z);
+  if (!isPad(b)) { toast("로켓은 발사대(주황 줄무늬 블록) 위에만 세울 수 있어요. 발사대는 제작대에서 만들 수도 있어요", 2800); return; }
+  if (SOLID(get(h.x, h.y + 1, h.z))) { toast("발사대 위가 막혀 있어요"); return; }
   if (S.rocketPk === S.planet) { toast("이미 로켓이 서 있어요"); return; }
-  S.inv[126]--; S.rocketPk = S.planet; S.gear.rocket = true; sfx.place(23); swing = .001;
+  if (rocketTaken(h.x + .5, h.z + .5)) { toast("친구 로켓이 서 있는 칸이에요. 옆 발사대 칸에 세우세요", 2400); return; }
+  S.inv[126]--; S.rocketPk = S.planet; S.rocketAt = [h.x + .5, h.y + 1, h.z + .5]; S.gear.rocket = true; sfx.place(23); swing = .001;
   syncRocket(); renderHotbar(); save();
   toast("로켓을 세웠어요! 로켓을 누르거나 M을 눌러 올라타세요", 3000);
 }
@@ -2380,6 +2621,7 @@ function launchCine(pk) {
   return true;
 }
 function landCine() {
+  const sp = landSpot(); if (sp) S.rocketAt = [sp.x, sp.y, sp.z];
   syncRocket(); if (!padC) { cine = null; return false; }
   if (!rocketG) { rocketG = buildRocket(); scene.add(rocketG); }
   cine = { pk: S.planet, ph: "land", t: 0, y: padC.y + 45, v: -14 }; rocketG.position.set(padC.x, cine.y, padC.z); pause(true); showHud(false);
@@ -2464,7 +2706,7 @@ function mobHits(px, py, pz, w = .3, h = 1.3) {
 }
 const mobFree = () => PLANETS[S.planet].gas || S.planet === "venus" || net.teacher;
 function brightAt(x, y, z) { const [sk, bl] = lightAt(x, y, z); return Math.max(env.e > .05 ? sk : Math.round(sk * .15), bl); }
-function clearMobs() { mobs.forEach(m => { scene.remove(m.g); if (m.beam) scene.remove(m.beam); }); mobs = []; }
+function clearMobs() { mobs.forEach(m => { scene.remove(m.g); if (m.beam) scene.remove(m.beam); }); mobs = []; if (typeof clearAnimals === "function") clearAnimals(); }
 // 두 점 사이에 블록이 있으면 레이저(빛)가 막혀요
 function clearLine(ax, ay, az, bx, by, bz) {
   const L = Math.hypot(bx - ax, by - ay, bz - az), n = Math.ceil(L / .25);
@@ -2598,11 +2840,105 @@ function mobTick(dt) {
   });
   if (S.hp <= 0 && cause === "robot") die();
 }
+/* ═════════════ 지구 동물 ═════════════ */
+// 풀밭에서 돌아다니고, 때리면 달아나요. 잡으면 고기(양은 양털도)를 얻어요.
+const ANIMT = {
+  cow: { n: "소", hp: 10, sp: 1.3, w: .42, h: 1.35, wt: 3, drop: [[113, 2]], col: ["#5a3a28", "#f0ece4"],
+    fact: "소는 풀을 먹는 초식 동물이에요. 위가 네 칸으로 나뉘어 있어서, 삼킨 풀을 다시 입으로 올려 씹는 되새김질을 해요." },
+  pig: { n: "돼지", hp: 10, sp: 1.4, w: .38, h: .95, wt: 3, drop: [[113, 2]], col: ["#f0a0a8", "#c8707a"],
+    fact: "돼지는 식물과 동물을 모두 먹는 잡식 동물이에요. 땀샘이 거의 없어서 진흙에 뒹굴어 몸을 식혀요." },
+  chicken: { n: "닭", hp: 4, sp: 1.6, w: .22, h: .75, wt: 3, drop: [[113, 1]], col: ["#ffffff", "#e8b030"],
+    fact: "닭은 날개와 깃털이 있는 새(조류)지만 몸이 무거워 멀리 날지 못해요. 깃털 사이 공기층이 체온을 지켜 줘요." },
+  sheep: { n: "양", hp: 8, sp: 1.2, w: .4, h: 1.15, wt: 2, drop: [[113, 1], [68, 1]], col: ["#f4f2ec", "#3a3530"],
+    fact: "양털은 꼬불꼬불해서 사이사이에 공기를 많이 품어요. 공기는 열을 잘 전달하지 않아서 양털 옷과 이불이 따뜻해요." },
+};
+let animals = [], aniT = 0;
+function buildAnimal(type) {
+  const T = ANIMT[type], g = new THREE.Group(), a = lam(T.col[0]), b = lam(T.col[1]), dk = lam("#22201e"), legs = [];
+  const leg = (x, z, h, w, m) => { const p = new THREE.Group(); p.position.set(x, h, z); box(w, h, w, m, 0, -h / 2, 0, p); g.add(p); legs.push(p); };
+  let head;
+  if (type === "chicken") {
+    box(.34, .3, .44, a, 0, .42, .02, g); head = new THREE.Group(); head.position.set(0, .62, -.2); g.add(head);
+    box(.2, .26, .2, a, 0, .06, 0, head); box(.1, .06, .1, lam("#e8a020"), 0, .04, -.14, head); box(.05, .1, .12, lam("#e03030"), 0, .24, 0, head); box(.06, .1, .06, lam("#d02828"), 0, -.06, -.11, head);
+    box(.04, .04, .02, dk, -.08, .1, -.1, head); box(.04, .04, .02, dk, .08, .1, -.1, head);
+    box(.06, .2, .3, a, -.2, .44, .04, g); box(.06, .2, .3, a, .2, .44, .04, g);
+    leg(-.08, .02, .27, .05, lam("#e8a020")); leg(.08, .02, .27, .05, lam("#e8a020"));
+  } else {
+    const L = type === "cow" ? .62 : type === "sheep" ? .5 : .34, bw = type === "cow" ? .66 : type === "sheep" ? .7 : .58, bh = type === "pig" ? .5 : .58, bl = type === "cow" ? 1.15 : .95;
+    const legM = type === "sheep" ? b : type === "pig" ? a : a;
+    box(bw, bh, bl, a, 0, L + bh / 2, 0, g);
+    head = new THREE.Group(); head.position.set(0, L + bh * .75, -bl / 2 - .12); g.add(head);
+    const hm = type === "sheep" ? b : a;
+    box(type === "pig" ? .46 : .42, .42, .38, hm, 0, 0, -.06, head);
+    box(.06, .06, .02, dk, -.12, .06, -.26, head); box(.06, .06, .02, dk, .12, .06, -.26, head);
+    if (type === "pig") box(.22, .14, .06, b, 0, -.06, -.28, head);
+    if (type === "cow") { box(.24, .14, .06, lam("#d8b8a8"), 0, -.12, -.27, head); box(.06, .12, .06, lam("#e8e0c8"), -.2, .24, -.04, head); box(.06, .12, .06, lam("#e8e0c8"), .2, .24, -.04, head);
+      box(bw + .01, .26, .3, b, 0, L + bh * .6, .15, g); box(.2, .2, bl * .5, b, bw / 2 - .05, L + bh * .45, -.2, g); }
+    if (type === "sheep") box(bw + .06, bh + .06, bl + .04, a, 0, L + bh / 2, 0, g);
+    const lw = type === "cow" ? .17 : .14, lx = bw / 2 - lw / 2 - .02, lz = bl / 2 - lw / 2 - .04;
+    leg(-lx, -lz, L, lw, legM); leg(lx, -lz, L, lw, legM); leg(-lx, lz, L, lw, legM); leg(lx, lz, L, lw, legM);
+  }
+  const mats = []; g.traverse(o => { if (o.material && !mats.includes(o.material)) mats.push(o.material); });
+  g.userData = { legs, head, mats, base: mats.map(m => m.color.clone()) };
+  return g;
+}
+function pickAnimal() { let tot = 0; for (const k in ANIMT) tot += ANIMT[k].wt; let r = Math.random() * tot; for (const k in ANIMT) { r -= ANIMT[k].wt; if (r <= 0) return k; } return "cow"; }
+function spawnHerd() {
+  if (animals.length >= 9) return;
+  const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 18, cx = Math.floor(P.pos.x + Math.cos(a) * d), cz = Math.floor(P.pos.z + Math.sin(a) * d);
+  if (cx < 2 || cz < 2 || cx >= SX - 2 || cz >= SZ - 2 || Math.hypot(cx - base.x, cz - base.z) < 9) return;
+  const type = pickAnimal(), n = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n && animals.length < 9; i++) {
+    const x = cx + Math.floor(Math.random() * 5) - 2, z = cz + Math.floor(Math.random() * 5) - 2; if (x < 1 || z < 1 || x >= SX - 1 || z >= SZ - 1) continue;
+    const y = topY(x, z); if (get(x, y, z) !== 2 || SOLID(get(x, y + 1, z)) || SOLID(get(x, y + 2, z)) || lightAt(x, y + 1, z)[0] < 12) continue;
+    const g = buildAnimal(type); scene.add(g);
+    animals.push({ type, T: ANIMT[type], g, p: new THREE.Vector3(x + .5, y + 1, z + .5), v: new THREE.Vector3(), hp: ANIMT[type].hp, yaw: Math.random() * 6.28, st: "idle", stT: Math.random() * 3, walk: 0, flash: 0, ground: false, seen: false });
+  }
+}
+function clearAnimals() { animals.forEach(m => scene.remove(m.g)); animals = []; }
+function meetAnimal(m) {
+  S.aniSeen = S.aniSeen || {}; if (S.aniSeen[m.type]) return; const first = !Object.keys(S.aniSeen).length; S.aniSeen[m.type] = true;
+  const x = (first ? "지금까지 생명체가 사는 것으로 확인된 천체는 지구뿐이에요. 액체 물, 숨 쉴 산소, 알맞은 온도가 모두 있기 때문이에요. " : "") + m.T.fact;
+  showFact(`지구 동물: ${m.T.n}`, x); S.logs.push({ id: "ani" + m.type, pk: S.planet, t: `동물 발견: ${m.T.n}`, ev: `지구에서 ${m.T.n}${josa(m.T.n, "을", "를")} 처음 만났어요.`, x });
+}
+function animalTick(dt) {
+  if (S.planet !== "earth" || net.teacher) { if (animals.length) clearAnimals(); return; }
+  if ((aniT += dt) > 2.5) { aniT = 0; spawnHerd(); }
+  const g = G_EARTH, dayK = smooth(-.12, .25, env.e);
+  animals = animals.filter(m => {
+    const T = m.T, u = m.g.userData, dx = P.pos.x - m.p.x, dz = P.pos.z - m.p.z, dist = Math.hypot(dx, dz) || .001;
+    if (dist > 48) { scene.remove(m.g); return false; }
+    if (!m.seen && dist < 10) { m.seen = true; meetAnimal(m); }
+    m.stT -= dt; let sp = 0;
+    if (m.st === "flee") { m.yaw = Math.atan2(-dx, -dz) + Math.sin(gameT * 3 + m.walk) * .4; sp = T.sp * 2.4; if (m.stT <= 0) { m.st = "idle"; m.stT = 2; } }
+    else if (m.st === "walk") { sp = T.sp; if (m.stT <= 0) { m.st = "idle"; m.stT = 1.5 + Math.random() * 3; } }
+    else if (m.stT <= 0) { m.st = "walk"; m.stT = 1.5 + Math.random() * 3; m.yaw += (Math.random() - .5) * 2.6; }
+    const wx = -Math.sin(m.yaw) * sp, wz = -Math.cos(m.yaw) * sp;
+    m.v.x += (wx - m.v.x) * Math.min(1, dt * 6); m.v.z += (wz - m.v.z) * Math.min(1, dt * 6); m.v.y -= g * dt; if (m.v.y < -30) m.v.y = -30;
+    const inW = LIQ(get(Math.floor(m.p.x), Math.floor(m.p.y + .3), Math.floor(m.p.z))); if (inW) { m.v.y = Math.max(m.v.y, 1.5); m.yaw += dt * 1.5; }
+    let blocked = false;
+    m.p.x += m.v.x * dt; if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) { m.p.x -= m.v.x * dt; blocked = true; }
+    m.p.z += m.v.z * dt; if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) { m.p.z -= m.v.z * dt; blocked = true; }
+    m.p.y += m.v.y * dt;
+    if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) { if (m.v.y < 0) { m.p.y = Math.floor(m.p.y) + 1; if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) m.p.y -= m.v.y * dt; m.ground = true; } else m.p.y -= m.v.y * dt; m.v.y = 0; } else m.ground = false;
+    if (blocked && m.ground) { if (!SOLID(get(Math.floor(m.p.x - Math.sin(m.yaw)), Math.floor(m.p.y + 1), Math.floor(m.p.z - Math.cos(m.yaw))))) m.v.y = JUMP_V * .9; else m.yaw += 1.6; }
+    m.p.x = Math.max(.5, Math.min(SX - .5, m.p.x)); m.p.z = Math.max(.5, Math.min(SZ - .5, m.p.z));
+    if (m.p.y < -5) { scene.remove(m.g); return false; }
+    const [sk, bl] = lightAt(Math.floor(m.p.x), Math.floor(m.p.y + .5), Math.floor(m.p.z)), lk = .32 + .68 * Math.max(dayK * sk / 15, bl / 15);
+    m.flash = Math.max(0, m.flash - dt * 4);
+    u.mats.forEach((mt, i) => { mt.color.copy(u.base[i]).multiplyScalar(lk); if (m.flash) mt.color.lerp(cB.set(0xff3030), m.flash * .7); });
+    m.g.position.copy(m.p); m.g.rotation.y += (((m.yaw - m.g.rotation.y + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 8);
+    const v = Math.hypot(m.v.x, m.v.z); m.walk += dt * v * 3; const sw = Math.sin(m.walk * 2.4) * Math.min(1, v) * .6;
+    u.legs.forEach((l, i) => { l.rotation.x = (i % 2 ? -sw : sw) * (i > 1 ? -1 : 1); });
+    if (u.head) u.head.rotation.x = m.st === "idle" && Math.sin(gameT * .7 + m.walk) > .5 ? .5 : 0;
+    return true;
+  });
+}
 // 조준한 곳에 로봇이 있으면 캐는 대신 때려요
 const atkDmg = () => (TOOLS[heldId()] || {}).dmg || PICKS[heldTier()].dmg;
 function attackTick(dt) {
   atkCD -= dt; const pv = net.pvp && !net.teacher;
-  if (!wantMine || (!mobs.length && !pv)) return false;
+  if (!wantMine || (!mobs.length && !animals.length && !pv)) return false;
   const o = third ? new THREE.Vector3(P.pos.x, P.pos.y + EYE, P.pos.z) : camera.position.clone(), d = new THREE.Vector3(); camera.getWorldDirection(d);
   let best = null, who = null, bt = 3.6;
   const aim = (c, r) => {
@@ -2610,9 +2946,10 @@ function attackTick(dt) {
     const t = c.clone().sub(o).dot(d); return t >= 0 && t <= bt && o.clone().addScaledVector(d, t).distanceTo(c) < r ? t : -1;
   };
   for (const m of mobs) { const c = m.p.clone(); c.y += m.T.h * .6; const t = aim(c, .6 * m.T.sc); if (t >= 0) { best = m; bt = t; } }
+  for (const m of animals) { const c = m.p.clone(); c.y += m.T.h * .55; const t = aim(c, .35 + m.T.w); if (t >= 0) { best = m; bt = t; } }
   // 대결이 켜져 있으면 같은 행성의 다른 대원도 때릴 수 있어요
   if (pv) for (const id in net.others) {
-    const q = net.others[id]; if (q.pk !== S.planet || !q.mesh || !q.mesh.visible) continue;
+    const q = net.others[id]; if (q.pk !== S.planet || !q.mesh || !q.mesh.visible || net.sameParty(id)) continue;
     for (const hy of [.5, 1.3]) { const t = aim(new THREE.Vector3(q.mesh.position.x, q.mesh.position.y + hy, q.mesh.position.z), .5); if (t >= 0) { best = null; who = id; bt = t; } }
   }
   if (!best && !who) return false;
@@ -2621,6 +2958,22 @@ function attackTick(dt) {
       atkCD = .45; swing = .001; const q = net.others[who];
       if (Math.hypot(q.x - base.x - .5, q.z - base.z - .5) < SAFE_R) toast("기지 코어 근처는 안전 구역이라 맞지 않아요");
       else { net.send({ t: "hit", to: who, dmg: atkDmg() }); sfx.hit(); }
+    }
+    return true;
+  }
+  if (best.g && best.T && ANIMT[best.type]) {
+    if (atkCD <= 0) {
+      atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; best.st = "flee"; best.stT = 4; tone(best.type === "chicken" ? 900 : 200, .14, "triangle", .06, 0, best.type === "chicken" ? 1300 : 150);
+      best.v.addScaledVector(d, 5); best.v.y = 4;
+      // 맞으면 주변 무리도 함께 달아나요
+      animals.forEach(o => { if (o !== best && o.type === best.type && o.p.distanceTo(best.p) < 7) { o.st = "flee"; o.stT = 3; } });
+      if (best.hp <= 0) {
+        const x = Math.floor(best.p.x), y = Math.floor(best.p.y + .5), z = Math.floor(best.p.z);
+        burst(x, y, z, best.type === "sheep" ? 68 : 3); sfx.pop(); scene.remove(best.g); animals = animals.filter(m => m !== best);
+        const got = []; best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); });
+        got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
+        toast(`${best.T.n}${josa(best.T.n, "을", "를")} 잡았어요! ${got.map(itemName).join(", ")}${S.ate ? "" : " · 화로에서 구워 먹으세요"}`, 2000); renderHotbar();
+      }
     }
     return true;
   }
@@ -2660,7 +3013,12 @@ function swordMesh(col) {
   box(.05, .05, .18, wood, 0, 0, .12, g); box(.22, .05, .05, dk, 0, 0, .02, g); box(.07, .025, .52, bl, 0, 0, -.26, g);
   g.position.set(-.02, .1, -.3); g.rotation.set(.9, .2, -.3); return g;
 }
-const toolMesh = (id) => { if (TOOLS[id].rocket) { const g = buildRocket(); g.scale.setScalar(.09); g.position.set(-.02, -.05, -.32); g.rotation.set(.2, 0, -.2); return g; } return TOOLS[id].tier ? pickMesh(TOOLS[id].tier) : swordMesh(TOOLS[id].col); };
+function hoeMesh() {
+  const g = new THREE.Group(), wood = lam("#8a5a2e"), head = lam("#8f9198");
+  box(.05, .05, .5, wood, 0, 0, 0, g); box(.2, .06, .06, head, -.07, 0, -.25, g); box(.06, .06, .1, head, -.15, -.04, -.22, g);
+  g.position.set(-.02, .1, -.3); g.rotation.set(.9, .2, -.3); return g;
+}
+const toolMesh = (id) => { if (TOOLS[id].hoe) return hoeMesh(); if (TOOLS[id].rocket) { const g = buildRocket(); g.scale.setScalar(.09); g.position.set(-.02, -.05, -.32); g.rotation.set(.2, 0, -.2); return g; } return TOOLS[id].tier ? pickMesh(TOOLS[id].tier) : swordMesh(TOOLS[id].col); };
 function updateHeld() {
   const id = S.hot[sel] || null; if (id === heldKey) return; heldKey = id;
   if (heldMesh) { handArm.remove(heldMesh); heldMesh = null; }
@@ -2747,12 +3105,57 @@ const spec = { id: null, view: 0 };
 // 선생님이나 한 학생이 방을 만들면(호스트) 나머지가 4자리 코드로 접속해요. 모든 메시지는 호스트를 거쳐 퍼져요.
 const net = (() => {
   const COLORS = ["#ff6b6b", "#ffb347", "#ffd65a", "#6fe39a", "#5fe0c8", "#7fd3ff", "#8f9bff", "#d68fff", "#ff8fc8", "#c7c9d1"];
-  const me = { id: Math.random().toString(36).slice(2, 10), name: "", color: LOOK_OPT.pack[LOOK.pack], party: (() => { try { return +localStorage.getItem("spacecraft2-party") || 0; } catch (e) { return 0; } })() };
-  const PARTY_COL = ["", "#ff6b6b", "#ffb347", "#6fe39a", "#7fd3ff", "#d68fff", "#ff8fc8"];
-  let psyncT = 0;
-  function partyDone(id, L) { if (!live || !me.party || teacher) return; send({ t: "pdone", party: me.party, id, pk: S.planet, name: me.name, log: L ? { t: L.t, ev: L.ev, x: L.x } : null }); }
+  // 파티: 초대받아 수락해야 들어가요. 처음 초대한 사람이 파티장이 되어 내보내기·해산을 관리해요.
+  const me = { id: Math.random().toString(36).slice(2, 10), name: "", color: LOOK_OPT.pack[LOOK.pack], pid: "", plead: "", members: [], names: {} };
+  let psyncT = 0, invite = null, joining = null; const pendingInv = {};
+  const isLeader = () => !!me.pid && me.plead === me.id;
+  const pcol = (pid) => pid ? COLORS[[...pid].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length] : "";
+  const nameOf = (id) => id === me.id ? me.name : (others[id] || {}).name || me.names[id] || "?";
+  function rosterMsg() { if (!isLeader()) return; const names = {}; me.members.forEach(id => names[id] = nameOf(id)); send({ t: "proster", pid: me.pid, lead: me.id, mem: me.members, names }); }
+  function leftParty(msg) { me.pid = ""; me.plead = ""; me.members = []; me.names = {}; if (msg) toast(msg, 3000); if (!$("rosterOv").hidden) openRoster(); }
+  function invitePl(id) {
+    const o = others[id]; if (!o || teacher) return;
+    if (me.pid && !isLeader()) { toast("파티장만 친구를 초대할 수 있어요"); return; }
+    if (o.party) { toast(`${o.name}${josa(o.name, "은", "는")} 이미 다른 파티에 있어요`); return; }
+    if (!me.pid) { me.pid = me.id + Math.random().toString(36).slice(2, 6); me.plead = me.id; me.members = [me.id]; }
+    if (me.members.length >= 6) { toast("파티는 6명까지예요"); return; }
+    pendingInv[id] = { pid: me.pid, t: performance.now() }; send({ t: "pinv", to: id, pid: me.pid, name: me.name });
+    toast(`${o.name}에게 파티 초대를 보냈어요. 수락하면 같은 파티가 돼요`, 2400); rosterMsg(); if (!$("rosterOv").hidden) openRoster();
+  }
+  function kickPl(id) { if (!isLeader() || id === me.id) return; me.members = me.members.filter(x => x !== id); toast(`${nameOf(id)}${josa(nameOf(id), "을", "를")} 파티에서 내보냈어요`); rosterMsg(); if (me.members.length <= 1) leftParty(); else openRoster(); }
+  function leaveParty() {
+    if (!me.pid) return;
+    if (isLeader()) { me.members = []; rosterMsg(); leftParty("파티를 해산했어요"); }
+    else { send({ t: "pleave", to: me.plead, pid: me.pid }); leftParty("파티에서 나왔어요"); }
+  }
+  function showInvite() { const el = $("pinvite"); if (!invite) { el.hidden = true; return; } $("pinvTxt").textContent = `${invite.name}${josa(invite.name, "이", "가")} 나를 파티에 초대했어요`; el.hidden = false; }
+  function answerInvite(yes) {
+    if (!invite) return;
+    if (yes && !me.pid) { joining = invite.pid; send({ t: "pjoin", to: invite.from, pid: invite.pid }); toast("수락했어요. 파티장에게 알리는 중…"); }
+    else send({ t: "pno", to: invite.from });
+    invite = null; showInvite();
+  }
+  $("pinvYes").onclick = () => answerInvite(true); $("pinvNo").onclick = () => answerInvite(false);
+  addEventListener("keydown", (e) => { if (invite && (e.code === "KeyY" || e.code === "KeyN") && !(e.target && e.target.tagName === "INPUT")) { e.stopImmediatePropagation(); answerInvite(e.code === "KeyY"); } }, true);
+  function partyMsg(d) {
+    if (teacher) return;
+    if (d.t === "pinv" && d.to === me.id) { if (me.pid || invite) send({ t: "pno", to: d.from, busy: true }); else { invite = { pid: String(d.pid || "").slice(0, 16), from: d.from, name: String(d.name || "친구").slice(0, 10) || "친구", until: performance.now() + 20000 }; showInvite(); sfx.beep(); } }
+    if (d.t === "pno" && d.to === me.id) { delete pendingInv[d.from]; const nm = nameOf(d.from); toast(d.busy ? `${nm}${josa(nm, "은", "는")} 이미 다른 파티에 있거나 초대를 받는 중이에요` : `${nm}${josa(nm, "이", "가")} 초대를 거절했어요`, 2400); if (isLeader() && me.members.length <= 1 && !Object.keys(pendingInv).length) leftParty(); }
+    if (d.t === "pjoin" && d.to === me.id && isLeader()) { const p = pendingInv[d.from]; delete pendingInv[d.from];
+      if (p && p.pid === d.pid && d.pid === me.pid && me.members.length < 6 && !me.members.includes(d.from)) { me.members.push(d.from); const nm = nameOf(d.from); toast(`${nm}${josa(nm, "이", "가")} 파티에 들어왔어요`, 2400); sfx.quest(); rosterMsg(); psyncT = 3; if (!$("rosterOv").hidden) openRoster(); } }
+    if (d.t === "pleave" && d.to === me.id && isLeader() && d.pid === me.pid && me.members.includes(d.from)) { me.members = me.members.filter(x => x !== d.from); const nm = nameOf(d.from); toast(`${nm}${josa(nm, "이", "가")} 파티를 나갔어요`); rosterMsg(); if (me.members.length <= 1) leftParty(); }
+    if (d.t === "proster" && typeof d.pid === "string" && Array.isArray(d.mem) && d.from === d.lead && d.from !== me.id) {
+      const mem = d.mem.map(String).slice(0, 6), mine = mem.includes(me.id), names = d.names && typeof d.names === "object" ? d.names : {};
+      const take = () => { me.members = mem; me.names = {}; mem.forEach(id => me.names[id] = String(names[id] || "?").slice(0, 10)); };
+      if (me.pid === d.pid && me.plead === d.lead) { if (!mine) leftParty(mem.length ? "파티장이 나를 파티에서 내보냈어요" : "파티장이 파티를 해산했어요"); else { take(); if (!$("rosterOv").hidden) openRoster(); } }
+      else if (!me.pid && mine && joining === d.pid) { me.pid = d.pid; me.plead = d.lead; take(); joining = null; const nm = nameOf(d.lead); toast(`${nm}의 파티에 들어왔어요! 임무를 함께 완료하고, 대결에서 서로 공격할 수 없어요`, 3000); sfx.quest(); psyncT = 3; if (!$("rosterOv").hidden) openRoster(); }
+    }
+  }
+  // 같은 파티원인지(대결에서 서로 못 때려요)
+  const sameParty = (id) => !!me.pid && me.members.includes(id) && (others[id] || {}).party === me.pid;
+  function partyDone(id, L) { if (!live || !me.pid || teacher) return; send({ t: "pdone", party: me.pid, id, pk: S.planet, name: me.name, log: L ? { t: L.t, ev: L.ev, x: L.x } : null }); }
   function takeParty(d) {
-    if (!me.party || teacher || d.party !== me.party || d.from === me.id) return;
+    if (!me.pid || teacher || d.party !== me.pid || d.from === me.id || !me.members.includes(d.from)) return;
     const ids = d.t === "pdone" ? [d.id] : Array.isArray(d.done) ? d.done.slice(0, 300) : [], got = [];
     ids.forEach(id => { id = String(id); const e = MISSION_BY_ID[id]; if (!e || S.done[id]) return; S.done[id] = true; got.push(e.m.t);
       const L = d.t === "pdone" && d.log && typeof d.log === "object" ? d.log : null;
@@ -2882,8 +3285,9 @@ const net = (() => {
     if (d.t === "state" && d.from && d.from !== me.id) {
       const o = others[d.from] = others[d.from] || { mesh: null };
       Object.assign(o, { name: String(d.name || "?").slice(0, 10), color: /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "#ffffff", pk: String(d.pk), x: +d.x || 0, y: +d.y || 0, z: +d.z || 0, yaw: +d.yaw || 0, pitch: +d.pitch || 0, done: +d.done || 0, dex: +d.dex || 0, hp: +d.hp || 0, look: cleanLook(d.look), sw: +d.sw || 0, seen: performance.now(),
-        mission: String(d.mission || "").slice(0, 40), o2: +d.o2 || 0, pw: +d.pw || 0, T: +d.T || 0, party: Number.isInteger(d.party) ? d.party : 0 });
-      if (teacher) { const k = o.name + o.color; const b = book[k] = book[k] || { first: Date.now() }; Object.assign(b, { id: d.from, name: o.name, color: o.color, pk: o.pk, done: o.done, dex: o.dex, hp: o.hp, party: o.party, seen: Date.now() }); }
+        mission: String(d.mission || "").slice(0, 40), o2: +d.o2 || 0, pw: +d.pw || 0, T: +d.T || 0, party: typeof d.party === "string" ? d.party.slice(0, 16) : "", plead: typeof d.plead === "string" ? d.plead.slice(0, 10) : "", pln: String(d.pln || "").slice(0, 10),
+        rk: Array.isArray(d.rk) && d.rk.length === 3 && d.rk.every(Number.isFinite) ? d.rk.map(Number) : null, rf: !!d.rf });
+      if (teacher) { const k = o.name + o.color; const b = book[k] = book[k] || { first: Date.now() }; Object.assign(b, { id: d.from, name: o.name, color: o.color, pk: o.pk, done: o.done, dex: o.dex, hp: o.hp, party: o.party, pln: o.pln, seen: Date.now() }); }
     }
     if (d.t === "edit" && d.pk === S.planet && Number.isInteger(d.x) && Number.isInteger(d.y) && Number.isInteger(d.z) && (BLOCKS[d.b] || d.b === 0)) {
       edit(d.x, d.y, d.z, d.b, true);
@@ -2891,27 +3295,34 @@ const net = (() => {
       (S.edits[d.pk] = S.edits[d.pk] || {})[d.x + "," + d.y + "," + d.z] = d.b;
     }
     if (d.t === "bye" && d.from) removeOther(d.from);
-    if ((d.t === "pdone" || d.t === "psync") && Number.isInteger(d.party)) takeParty(d);
+    if ((d.t === "pdone" || d.t === "psync") && typeof d.party === "string") takeParty(d);
+    if (/^p(inv|no|join|leave|roster)$/.test(d.t)) partyMsg(d);
     if (d.t === "clock" && !host && Number.isFinite(d.c)) {
       clockOff = d.c - performance.now() / 1000;
       if (typeof d.pvp === "boolean" && d.pvp !== pvp) { pvp = d.pvp; toast(pvp ? "방장이 플레이어끼리 대결을 켰어요! 기지 코어 6칸 안은 안전 구역이에요" : "방장이 대결을 껐어요", 3200); }
     }
-    if (d.t === "hit" && d.to === me.id && pvp && !teacher) { const a = others[d.from]; if (a && a.pk === S.planet && Math.hypot(a.x - P.pos.x, a.y - P.pos.y, a.z - P.pos.z) < 7) takeHit(+d.dmg, a.name, a.x, a.z); }
+    if (d.t === "hit" && d.to === me.id && pvp && !teacher && !sameParty(d.from)) { const a = others[d.from]; if (a && a.pk === S.planet && Math.hypot(a.x - P.pos.x, a.y - P.pos.y, a.z - P.pos.z) < 7) takeHit(+d.dmg, a.name, a.x, a.z); }
     if (d.t === "pile" && d.p && typeof d.p === "object") { const p = cleanPile(d.p); if (p) addPile(p); }
     if (d.t === "pick" && typeof d.id === "string") removePile(d.id, false);
     if (d.t === "notice" && !teacher) { const n = $("notice"); n.innerHTML = "<small>선생님</small>"; n.appendChild(document.createTextNode(String(d.text || "").slice(0, 60))); n.hidden = false; clearTimeout(n._t); n._t = setTimeout(() => { n.hidden = true; }, 8000); sfx.quest(); }
   }
   function dropBy(c) { if (c._pid) { removeOther(c._pid); relay({ t: "bye", from: c._pid }, null); } }
   function avatar(o) { const g = buildAvatar(o.look); g.add(nameTag(o.name, o.color)); scene.add(g); return g; }
-  function removeOther(id) { const o = others[id]; if (o && o.mesh) scene.remove(o.mesh); delete others[id]; }
+  function removeOther(id) { const o = others[id]; if (o && o.mesh) scene.remove(o.mesh); if (o && o.rkG) scene.remove(o.rkG); delete others[id]; }
   function tick(dt) {
     if (!live) return;
     sendT += dt;
     if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp }); }
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
     if (teacher) { tickOthers(dt); return; }
-    if (me.party && (psyncT += dt) > 3) { psyncT = 0; send({ t: "psync", party: me.party, name: me.name, done: Object.keys(S.done) }); }
-    if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", party: me.party, look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
+    if (me.pid && (psyncT += dt) > 3) { psyncT = 0; send({ t: "psync", party: me.pid, name: me.name, done: Object.keys(S.done) }); rosterMsg();
+      // 파티장이 방을 떠났으면 파티가 풀려요. 파티장은 떠난 파티원을 지워요
+      if (!isLeader() && !others[me.plead]) leftParty("파티장이 방을 나가서 파티가 풀렸어요");
+      else if (isLeader()) { const keep = me.members.filter(id => id === me.id || others[id]); if (keep.length !== me.members.length) { me.members = keep; rosterMsg(); if (keep.length <= 1 && !Object.keys(pendingInv).length) leftParty("파티원이 모두 나가서 파티가 풀렸어요"); } } }
+    if (invite && performance.now() > invite.until) { send({ t: "pno", to: invite.from }); invite = null; showInvite(); }
+    for (const id in pendingInv) if (performance.now() - pendingInv[id].t > 25000) { delete pendingInv[id]; if (isLeader() && me.members.length <= 1 && !Object.keys(pendingInv).length) leftParty(); }
+    if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", party: me.pid, plead: me.plead, pln: me.pid ? nameOf(me.plead) : "", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length,
+      rk: rocketG && S.rocketPk === S.planet ? [+rocketG.position.x.toFixed(2), +rocketG.position.y.toFixed(2), +rocketG.position.z.toFixed(2)] : null, rf: rocketG && rocketG.userData.flame.visible ? 1 : 0 }); }
     tickOthers(dt);
     renderRoom();
   }
@@ -2923,6 +3334,13 @@ const net = (() => {
       const here = o.pk === S.planet;
       if (o.mesh && o.mesh.userData.look !== JSON.stringify(o.look)) { scene.remove(o.mesh); o.mesh = null; }
       if (here && !o.mesh) { o.mesh = avatar(o); o.mesh.position.set(o.x, o.y, o.z); }
+      // 친구 로켓: 서 있는 자리와 발사·착륙하는 모습이 보여요
+      if (here && o.rk) {
+        if (!o.rkG) { o.rkG = buildRocket(); o.rkG.add(nameTag(o.name + "의 로켓", o.color)); o.rkG.children[o.rkG.children.length - 1].position.y = 6; scene.add(o.rkG); o.rkG.position.set(o.rk[0], o.rk[1], o.rk[2]); }
+        const g = o.rkG, far = Math.hypot(g.position.x - o.rk[0], g.position.z - o.rk[2]) > 2; g.visible = true;
+        if (far) g.position.set(o.rk[0], o.rk[1], o.rk[2]); else g.position.lerp(new THREE.Vector3(o.rk[0], o.rk[1], o.rk[2]), Math.min(1, dt * 8));
+        const u = g.userData, f = o.rf; u.flame.visible = u.core.visible = f; if (f) { const k = .8 + Math.random() * .4; u.flame.scale.set(k, 1 + Math.random() * .5, k); if (Math.random() < .4 && g.position.y - o.rk[1] < 8) puff(g.position.x, g.position.y + .2, g.position.z, 1.2); }
+      } else if (o.rkG) o.rkG.visible = false;
       if (o.mesh) {
         o.mesh.visible = here && !(spec.id === id && spec.view === 0);
         const px = o.mesh.position.x, pz = o.mesh.position.z;
@@ -2974,7 +3392,7 @@ const net = (() => {
     L.forEach(b => {
       const on = now - b.seen < 10000, tr = document.createElement("tr"); if (!on) tr.className = "gone";
       tr.innerHTML = `<td><i style="background:${b.color}"></i><span></span></td><td>${(PLANETS[b.pk] || {}).name || "?"}</td><td>${b.done}개</td><td>${b.dex} / 11</td><td>${on ? b.hp : "—"}</td><td>${on ? "접속 중" : "나감"}</td><td>${on ? `<button class="btn watch">화면 보기</button>` : ""}</td>`;
-      tr.querySelector("span").textContent = b.name + (b.party ? ` · 파티 ${b.party}` : ""); t.appendChild(tr);
+      tr.querySelector("span").textContent = b.name + (b.party ? ` · ${b.pln || "?"}의 파티` : ""); t.appendChild(tr);
       if (on && others[b.id]) { tr.className = "pick"; tr.dataset.id = b.id; }
     });
   }
@@ -2990,17 +3408,26 @@ const net = (() => {
   }
   function openRoster() {
     pause(true);
-    const L = [{ name: me.name + " (나)", color: me.color, pk: S.planet, done: Object.keys(S.done).length, party: me.party }].concat(Object.values(others));
-    L.sort((a, b) => (a.party || 9) - (b.party || 9) || b.done - a.done);
-    const pp = $("partyPick"); pp.innerHTML = "";
-    for (let k = 0; k <= 6; k++) { const b = document.createElement("button"); b.textContent = k ? `파티 ${k}` : "혼자"; b.className = me.party === k ? "on" : ""; if (k) b.style.borderColor = PARTY_COL[k];
-      b.onclick = () => { me.party = k; try { localStorage.setItem("spacecraft2-party", String(k)); } catch (e) {} psyncT = 3; openRoster(); }; pp.appendChild(b); }
+    const L = [{ id: me.id, name: me.name + " (나)", color: me.color, pk: S.planet, done: Object.keys(S.done).length, party: me.pid, pln: me.pid ? nameOf(me.plead) : "" }].concat(Object.entries(others).map(([id, o]) => Object.assign({ id }, o)));
+    L.sort((a, b) => (a.party === me.pid && me.pid ? 0 : a.party ? 1 : 2) - (b.party === me.pid && me.pid ? 0 : b.party ? 1 : 2) || String(a.party).localeCompare(String(b.party)) || b.done - a.done);
+    const pi = $("partyInfo"); pi.innerHTML = "";
+    if (!me.pid) pi.insertAdjacentHTML("beforeend", `<small>아직 파티가 없어요. 아래 목록에서 친구 옆 '초대'를 누르면 내가 파티장이 돼요.${invite ? " 받은 초대가 있어요: 위 알림에서 수락하세요." : ""}</small>`);
+    else {
+      me.members.forEach(id => { const sp = document.createElement("span"); sp.className = "mem"; sp.style.borderColor = pcol(me.pid); sp.textContent = (id === me.plead ? "👑 " : "") + nameOf(id) + (id === me.id ? " (나)" : "");
+        if (isLeader() && id !== me.id) { const k = document.createElement("button"); k.textContent = "내보내기"; k.onclick = () => kickPl(id); sp.appendChild(k); } pi.appendChild(sp); });
+      const lv = document.createElement("button"); lv.textContent = isLeader() ? "파티 해산하기" : "파티 나가기"; lv.onclick = () => { leaveParty(); openRoster(); }; pi.appendChild(lv);
+      if (isLeader()) pi.insertAdjacentHTML("beforeend", `<small>내가 파티장이에요. 친구를 초대하고 내보낼 수 있어요 (최대 6명).</small>`);
+    }
     const vb = $("pvpPick"); vb.innerHTML = "";
     [[false, "끄기"], [true, "켜기"]].forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = pvp === v ? "on" : ""; b.disabled = !host; b.onclick = () => { setPvp(v); openRoster(); }; vb.appendChild(b); });
     $("pvpNote").textContent = host ? "내가 방장이라 바꿀 수 있어요(설정 O에서도 돼요). 기지 코어 6칸 안은 안전 구역이에요." : `방장이 정해요 · 지금 ${pvp ? "켜짐" : "꺼짐"} · 기지 코어 6칸 안은 안전 구역`;
     $("rosterNote").textContent = `방 코드 ${code}${host ? " · 내가 방장이에요. 내 게임을 끄면 방이 닫혀요." : ""}`;
     const box = $("rosterList"); box.innerHTML = "";
-    L.forEach(o => { const d = document.createElement("div"); d.innerHTML = `<i style="background:${o.color}"></i><b></b><small>${(PLANETS[o.pk] || {}).name || "?"}${o.party ? ` · <span style="color:${PARTY_COL[o.party]}">파티 ${o.party}</span>` : ""}</small><small>임무 ${o.done}개</small>`; d.querySelector("b").textContent = o.name; box.appendChild(d); });
+    L.forEach(o => { const d = document.createElement("div"); d.innerHTML = `<i style="background:${o.color}"></i><b></b><small>${(PLANETS[o.pk] || {}).name || "?"}${o.party ? ` · <span style="color:${pcol(o.party)}"></span>` : ""}</small><small>임무 ${o.done}개</small><span></span>`; d.querySelector("b").textContent = o.name;
+      if (o.party) d.querySelector("small span").textContent = o.party === me.pid ? "우리 파티" : `${o.pln || "?"}의 파티`;
+      const cell = d.lastElementChild;
+      if (o.id !== me.id && !o.party && (!me.pid || isLeader()) && !teacher) { const b = document.createElement("button"); b.textContent = pendingInv[o.id] ? "초대함" : "초대"; b.disabled = !!pendingInv[o.id]; b.onclick = () => invitePl(o.id); cell.appendChild(b); }
+      box.appendChild(d); });
     $("rosterOv").hidden = false;
   }
   function setPvp(v) {
@@ -3018,7 +3445,7 @@ const net = (() => {
   });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { send, tick, partyDone, setPvp, get host() { return live && host; }, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
+  return { send, tick, partyDone, setPvp, sameParty, invitePl, kickPl, leaveParty, get party() { return { pid: me.pid, lead: me.plead, members: me.members.slice() }; }, get invite() { return invite; }, answerInvite, get host() { return live && host; }, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
@@ -3041,7 +3468,7 @@ function frame(now) {
   }
   computeEnv();
   net.tick(dt);
-  if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
+  if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); cropTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
   updateCamera(dt); cineTick(dt); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
@@ -3075,7 +3502,7 @@ function frame(now) {
   // 조준·채굴
   const h = paused ? null : raycast(6);
   hl.visible = !!h; if (h) hl.position.set(h.x + .5, h.y + .5, h.z + .5);
-  if (!paused) { mobTick(dt); if (rocketAim()) {} else if (attackTick(dt)) { mining = null; crack.material.opacity = 0; } else mineTick(dt, h); } else crack.material.opacity = 0;
+  if (!paused) { mobTick(dt); animalTick(dt); if (rocketAim()) {} else if (attackTick(dt)) { mining = null; crack.material.opacity = 0; } else mineTick(dt, h); } else crack.material.opacity = 0;
   // 파편
   parts = parts.filter(p => (p.l -= dt) > 0);
   for (let i = 0; i < PMAX; i++) {
@@ -3112,6 +3539,6 @@ $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { atlas, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
