@@ -384,6 +384,7 @@ td.unk { color: #4e5786; }
       <label class="chk"><input type="checkbox" id="sInv"> 위아래 시선 반전</label>
     </div>
     <div class="setIn"><b>조작 방식</b><div class="ctabs" id="sInput"></div><small id="sInputNote"></small></div>
+    <div class="setIn"><b>보이는 거리 (넓은 지구)</b><div class="ctabs" id="sView"></div><small>화면이 버벅이면 '가까이'를 고르세요. 퀘스트·태블릿은 '가까이'나 '보통'을 추천해요.</small></div>
     <div class="setIn" id="hostSet" hidden><b>방장 설정 · 플레이어끼리 대결</b><div class="ctabs" id="sPvp"></div><small>방에 있는 모두에게 바로 적용돼요. 기지 코어 6칸 안은 안전 구역이에요.</small></div>
     <p>이 기기에만 저장돼요. 마우스와 손가락으로 화면을 끌 때 모두 적용돼요.</p>
     <div class="row"><button class="btn" id="setClose">완료</button></div>
@@ -709,7 +710,7 @@ function iconCanvas(id) {
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 const PLANETS = {
-  earth: { name: "지구", type: "지구형 행성", g: 1, P: 1, solar: 1, au: 1, dayReal: "24시간", dayMin: 6, dir: 1, breath: true, airless: false, wrap: false,
+  earth: { size: 304, name: "지구", type: "지구형 행성", g: 1, P: 1, solar: 1, au: 1, dayReal: "24시간", dayMin: 6, dir: 1, breath: true, airless: false, wrap: false,
     sky: { dt: "#3b7fd8", dh: "#a8d0f2", nt: "#03050e", nh: "#0d1733", sun: "#ff9a4a" }, sunCol: 0xfff3dd, sunSize: 60, fog: [45, 95], amb: [.18, .62],
     T: (e) => lerp(9, 27, smooth(-.2, .6, e)), skyText: "파란 하늘", ground: "흙·암석, 액체 물, 생명", order: 3 },
   moon: { name: "달", type: "지구의 위성", g: .166, P: 0, solar: 1, au: 1, dayReal: "약 29.5일", dayMin: 20, dir: 1, breath: false, airless: true, wrap: false,
@@ -748,8 +749,9 @@ const GAS_TOP = 29;
 const VENUS_SURF = 12, VENUS_BASE = 36;
 
 /* ═════════════ 세계 ═════════════ */
-const SX = 96, SY = 52, SZ = 96, CH = 16;
-const W = new Uint8Array(SX * SY * SZ), SH = new Uint8Array(SX * SZ);
+// 천체마다 땅 넓이가 달라요(지구는 304칸: 예전 96칸의 10배 넓이). 배열은 가장 큰 크기로 한 번만 만들어요
+let SX = 96, SZ = 96; const SY = 52, CH = 16, MAXS = 304;
+const W = new Uint8Array(MAXS * SY * MAXS), SH = new Uint8Array(MAXS * MAXS);
 let wrapX = false, base = { x: 32, y: 12, z: 32 };
 const I = (x, y, z) => x + SX * (z + SZ * y);
 function get(x, y, z) {
@@ -759,7 +761,7 @@ function get(x, y, z) {
   return W[I(x, y, z)];
 }
 // 빛: 하늘빛(SKL)과 횃불·전등 빛(LT), 0~15. 한 칸 지날 때마다 1씩 약해져요
-const LT = new Uint8Array(SX * SY * SZ), SKL = new Uint8Array(SX * SY * SZ), lightQ = new Int32Array(SX * SY * SZ * 2);
+const LT = new Uint8Array(MAXS * SY * MAXS), SKL = new Uint8Array(MAXS * SY * MAXS), lightQ = new Int32Array(MAXS * SY * MAXS * 2);
 const passLight = (b) => b === 0 || b === 8 || b === 32 || (BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin));
 function spreadLight(L, n) {
   let h = 0; const A = SX * SZ;
@@ -830,25 +832,26 @@ function placeLander(lv, floor) {
 }
 const GEN = {
   earth() {
-    // 넓은 섬(바다 수면 16칸), 땅속이 깊어서 아래로 갈수록 귀한 광석
-    base = { x: 46, z: 50 };
+    // 넓은 섬(바다 수면 16칸): 가운데 기지, 곳곳에 언덕·바위산·호수·숲. 땅속이 깊어서 아래로 갈수록 귀한 광석
+    const C = SX / 2, RR = C - 3; base = { x: C - 2, z: C + 2 };
     for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
-      const d = Math.hypot(x - 48, z - 48) / 46;
-      let h = 17 + fbm(x / 20, z / 20, 1) * 11 - Math.max(0, d - .62) * 30;
+      const d = Math.hypot(x - C, z - C) / RR;
+      let h = 17 + fbm(x / 20, z / 20, 1) * 11 - Math.max(0, d - (SX > 96 ? .8 : .62)) * (SX > 96 ? 60 : 30);
+      if (SX > 96) h += Math.max(0, noise(x / 38, z / 38, 77) - .6) * 60 - Math.max(0, noise(x / 30, z / 30, 61) - .72) * 55;
       h = flatten(h, x, z, base.x, base.z, 21);
       h = Math.max(2, Math.min(SY - 10, Math.round(h)));
-      const beach = h <= 17;
-      col(x, z, h, beach ? 5 : 2, 1, beach ? 5 : 3, 2, 4);
+      const beach = h <= 17, rocky = h >= 31;
+      col(x, z, h, beach ? 5 : rocky ? 4 : 2, 1, beach ? 5 : rocky ? 4 : 3, 2, 4);
       for (let y = h + 1; y <= 16; y++) set(x, y, z, 6);
       if (h > 17) caves(x, z, h, 201);
       ores(x, z, h - 2, 38, .045, 5, 8); ores(x, z, h - 2, 9, .034, 3); ores(x, z, h - 2, 39, .022, 7);
       ores(x, z, h - 2, 40, .016, 8, 1, 9); ores(x, z, h - 2, 41, .011, 9, 1, 5);
-      const forest = .02 + .06 * smooth(.5, .72, noise(x / 14, z / 14, 88));
-      if (h >= 19 && hash(x, z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) tree(x, h + 1, z);
+      const forest = SX > 96 ? .006 + .055 * smooth(.52, .74, noise(x / 22, z / 22, 88)) : .02 + .06 * smooth(.5, .72, noise(x / 14, z / 14, 88));
+      if (h >= 19 && !rocky && hash(x, z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) tree(x, h + 1, z);
       else if (h >= 18 && get(x, h, z) === 2 && !get(x, h + 1, z) && hash(x, z, 91) < .014 && Math.hypot(x - base.x, z - base.z) > 5) set(x, h + 1, z, 53 + Math.floor(noise(x / 9, z / 9, 93) * 2.99) * 4);
     }
     // 바위 절벽에 드러난 철광석·석탄
-    for (let i = 0; i < 60; i++) { const x = Math.floor(hash(i, 5, 9) * SX), z = Math.floor(hash(i, 6, 9) * SZ), h = topY(x, z); if (h > 18 && get(x, h, z) === 2) set(x, h, z, i % 3 ? 9 : 38); }
+    for (let i = 0, n = Math.round(60 * SX * SZ / 9216); i < n; i++) { const x = Math.floor(hash(i, 5, 9) * SX), z = Math.floor(hash(i, 6, 9) * SZ), h = topY(x, z); if (h > 18 && (get(x, h, z) === 2 || get(x, h, z) === 4)) set(x, h, z, i % 3 ? 9 : 38); }
     placeLander(21, 23);
   },
   moon() {
@@ -1020,6 +1023,7 @@ const opaque = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].t
 let chunks = {};
 function buildChunk(cx, cz) {
   const key = cx + "," + cz;
+  if (chunkQ && chunkQ.has(key)) return; // 아직 안 만든 조각은 가까이 가면 그때 새 모습으로 만들어요
   if (chunks[key]) { chunks[key].forEach(m => { scene.remove(m); m.geometry.dispose(); }); }
   const S = [{ p: [], n: [], u: [], c: [], i: [], l: [] }, { p: [], n: [], u: [], c: [], i: [], l: [] }];
   for (let x = cx * CH; x < cx * CH + CH; x++) for (let z = cz * CH; z < cz * CH + CH; z++) {
@@ -1117,7 +1121,26 @@ function thinBox(T, x, y, z, b) {
     T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
   }
 }
-function buildAll() { for (const k in chunks) chunks[k].forEach(m => { scene.remove(m); m.geometry.dispose(); }); chunks = {}; for (let cx = 0; cx < SX / CH; cx++) for (let cz = 0; cz < SZ / CH; cz++) buildChunk(cx, cz); }
+// 보이는 거리(조각 수, 1조각 16칸): 설정(O)에서 고르고, 넓은 지구에서만 써요
+const VIEWD = { near: 4.2, mid: 5.2, far: 6.5 }; let chunkQ = null, visT = 0;
+const VISC_ = () => VIEWD[SET.view] || VIEWD.mid;
+function buildAll() {
+  for (const k in chunks) chunks[k].forEach(m => { scene.remove(m); m.geometry.dispose(); }); chunks = {}; chunkQ = null;
+  if (SX <= 96) { for (let cx = 0; cx < SX / CH; cx++) for (let cz = 0; cz < SZ / CH; cz++) buildChunk(cx, cz); return; }
+  chunkQ = new Set(); for (let cx = 0; cx < SX / CH; cx++) for (let cz = 0; cz < SZ / CH; cz++) chunkQ.add(cx + "," + cz);
+  const bx = Math.floor(base.x / CH), bz = Math.floor(base.z / CH);
+  for (let cx = bx - 2; cx <= bx + 2; cx++) for (let cz = bz - 2; cz <= bz + 2; cz++) if (chunkQ.delete(cx + "," + cz)) buildChunk(cx, cz);
+}
+function chunkTick() {
+  if (!chunkQ) return;
+  const pcx = camera.position.x / CH, pcz = camera.position.z / CH;
+  for (const t0 = performance.now(); chunkQ.size && performance.now() - t0 < 6;) { // 한 화면에 6ms까지만 만들어서 버벅이지 않게
+    let best = null, bd = 1e9; for (const k of chunkQ) { const i = k.indexOf(","), d = Math.hypot(+k.slice(0, i) + .5 - pcx, +k.slice(i + 1) + .5 - pcz); if (d < bd) { bd = d; best = k; } }
+    if (!best || bd > VISC_() + 1) break; chunkQ.delete(best); const i = best.indexOf(","); buildChunk(+best.slice(0, i), +best.slice(i + 1));
+  }
+  if (++visT % 10) return;
+  for (const k in chunks) { const i = k.indexOf(","), v = Math.hypot(+k.slice(0, i) + .5 - pcx, +k.slice(i + 1) + .5 - pcz) < VISC_() + .8; chunks[k].forEach(m => { m.visible = v; }); }
+}
 function rebuildAt(x, z, extra) {
   if (wrapX) x = ((x % SX) + SX) % SX;
   const cx = Math.floor(x / CH), cz = Math.floor(z / CH), n = SX / CH, done = new Set();
@@ -1267,7 +1290,7 @@ const SUITS = {
 const DEF = () => ({
   planet: "earth", inv: { 33: 0 }, mined: {}, gear: { rocket: false, insul: false, pressure: false, batt: 0, rtg: false },
   done: {}, logs: [], dex: {}, seen: {}, edits: {}, visited: { earth: true }, best: {}, time: {},
-  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {}, hot: [0, 0, 0, 0, 0, 0, 0, 0, 0], piles: [], food: 20, crops: {}, spawn: {}, rocketAt: null,
+  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {}, hot: [0, 0, 0, 0, 0, 0, 0, 0, 0], piles: [], food: 20, crops: {}, spawn: {}, rocketAt: null, worldV: 2,
 });
 // 곡괭이: 단계가 높을수록 빨리 캐고, 더 단단한 광석을 캘 수 있어요
 const PICKS = [
@@ -1291,6 +1314,7 @@ let placedTimes = {};
 const START_T = (pk) => pk === "venus" ? .15 : pk === "mercury" ? .497 : pk === "moon" ? .06 : .3;
 function loadPlanet(pk, spawnAtBase = true) {
   S.planet = pk; S.visited[pk] = true;
+  SX = SZ = PLANETS[pk].size || 96;
   W.fill(0); SH.fill(0); wrapX = PLANETS[pk].wrap; placedTimes = {};
   GEN[pk]();
   const ed = S.edits[pk] || {};
@@ -1306,7 +1330,7 @@ function toBase() {
   P.yaw = Math.PI / 2; P.pitch = -.15;
   if (S.planet === "venus") P.pos.set(base.x + 2.5, VENUS_BASE + .01, base.z + .5);
 }
-const prevSKL = new Uint8Array(SX * SY * SZ), prevLT = new Uint8Array(SX * SY * SZ);
+const prevSKL = new Uint8Array(MAXS * SY * MAXS), prevLT = new Uint8Array(MAXS * SY * MAXS);
 function forBox(xa, xb, za, zb, fn) { for (let xx = xa; xx <= xb; xx++) { const x = wrapX ? ((xx % SX) + SX) % SX : xx; if (x < 0 || x >= SX) continue; for (let z = Math.max(0, za); z <= Math.min(SZ - 1, zb); z++) fn(x, z); } }
 // 바뀐 칸에서 16칸 안만 빛을 지우고 다시 퍼뜨려요(빛은 15칸까지만 가니까 그 밖은 그대로)
 function relight(x0, x1, z0, z1) {
@@ -2291,7 +2315,7 @@ document.addEventListener("pointerlockchange", () => { locked = document.pointer
 document.addEventListener("mousemove", (e) => { if (locked && !paused) look(e.movementX, e.movementY, .0024); });
 addEventListener("wheel", (e) => { if (!paused) { sel = (sel + (e.deltaY > 0 ? 1 : 8)) % 9; renderHotbar(); } }, { passive: true });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-const SET = (() => { const d = { sens: 1, vol: .8, inv: false, input: "auto" }; try { return Object.assign(d, JSON.parse(localStorage.getItem("spacecraft2-set") || "{}")); } catch (e) { return d; } })();
+const SET = (() => { const d = { sens: 1, vol: .8, inv: false, input: "auto", view: matchMedia("(pointer: coarse)").matches ? "near" : "mid" }; try { return Object.assign(d, JSON.parse(localStorage.getItem("spacecraft2-set") || "{}")); } catch (e) { return d; } })();
 function look(dx, dy, s) { s *= SET.sens; P.yaw -= dx * s; P.pitch = Math.max(-1.55, Math.min(1.55, P.pitch - dy * s * (SET.inv ? -1 : 1))); }
 function openSet() {
   if ($("startOv").hidden) pause(true);
@@ -2311,7 +2335,8 @@ function showHostSet() {
   const box = $("sPvp"); box.innerHTML = "";
   [[false, "끄기"], [true, "켜기"]].forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = net.pvp === v ? "on" : ""; b.onclick = () => { net.setPvp(v); showHostSet(); }; box.appendChild(b); });
 }
-function showSet() { showInput(); showHostSet(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
+function showView() { const box = $("sView"); box.innerHTML = ""; [["near", "가까이 (빠름)"], ["mid", "보통"], ["far", "멀리"]].forEach(([k, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = (SET.view || "mid") === k ? "on" : ""; b.onclick = () => { SET.view = k; saveSet(); showView(); visT = 9; }; box.appendChild(b); }); }
+function showSet() { showInput(); showView(); showHostSet(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
 function saveSet() { SET.sens = +$("sSens").value; SET.vol = +$("sVol").value; SET.inv = $("sInv").checked; showSet(); setAir(S.planet); try { localStorage.setItem("spacecraft2-set", JSON.stringify(SET)); } catch (e) {} }
 ["sSens", "sVol", "sInv"].forEach(id => $(id).addEventListener("input", saveSet));
 $("sVol").addEventListener("change", () => sfx.pop());
@@ -3471,7 +3496,7 @@ function frame(now) {
   if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); cropTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
-  updateCamera(dt); cineTick(dt); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
+  updateCamera(dt); chunkTick(); cineTick(dt); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
   skyDome.position.copy(camera.position); skyGroup.position.copy(camera.position);
   // 하늘·빛
   const e = env.e, day = smooth(-.12, .25, e), sk = PL.sky;
@@ -3483,6 +3508,7 @@ function frame(now) {
   skyMat.uniforms.sunDir.value.copy(env.sunDir);
   let fogCol = skyMat.uniforms.hor.value.clone();
   let fogNear = PL.fog[0], fogFar = PL.fog[1];
+  if (chunkQ) { fogFar = Math.min(fogFar, VISC_() * 16 - 6); fogNear = Math.min(fogNear, fogFar * .45); }
   if (S.planet === "venus") { const fr = Math.max(0, Math.min(1, (P.pos.y - VENUS_SURF) / (VENUS_BASE - VENUS_SURF))); fogCol.lerp(cB.set("#6b3d18"), 1 - fr); fogFar = lerp(22, 60, fr); fogNear = lerp(1, 8, fr); }
   if (stormK) { fogNear = lerp(fogNear, 2, stormK); fogFar = lerp(fogFar, 22, stormK); fogCol.lerp(cB.set("#8a4a28"), stormK); }
   scene.fog = scene.fog || new THREE.Fog(0, 1, 2); scene.fog.color.copy(fogCol); scene.fog.near = fogNear; scene.fog.far = fogFar;
@@ -3529,6 +3555,14 @@ function start(fresh) {
   if (fresh) { S = DEF(); S.inv = {}; try { localStorage.removeItem("spacecraft2"); } catch (e) {} }
   else { S = Object.assign(DEF(), saved); if (saved.tool == null) { S.tool = S.visited.moon ? 2 : 0; if (S.visited.moon) S.done.e1b = S.done.e1c = true; }
     if (S.gear.rocket && !S.rocketPk && !(S.inv[126] > 0)) S.rocketPk = S.planet;
+    if (!saved.worldV) { // 지구가 넓어지면서 기지가 (46,50) → (150,154)로 옮겨졌어요. 지은 것도 같이 옮겨요
+      const dx = 104, dz = 104, mv = (o) => { const n = {}; for (const k in o) { const [x, y, z] = k.split(",").map(Number); n[(x + dx) + "," + y + "," + (z + dz)] = o[k]; } return n; };
+      if (S.edits.earth) S.edits.earth = mv(S.edits.earth); if (S.crops && S.crops.earth) S.crops.earth = mv(S.crops.earth);
+      if (S.spawn && S.spawn.earth) { S.spawn.earth[0] += dx; S.spawn.earth[2] += dz; }
+      if (S.rocketPk === "earth") S.rocketAt = null;
+      (S.piles || []).forEach(p => { if (p.pk === "earth") { p.x += dx; p.z += dz; } });
+      S.worldV = 2;
+    }
     if (!Array.isArray(saved.hot) && S.tool && !Object.keys(TOOLS).some(t => S.inv[t] > 0)) S.inv[TOOL_OF[S.tool]] = 1; }
   loadPlanet(S.planet);
   useTouch(SET.input === "touch" || (SET.input === "auto" && matchMedia("(pointer: coarse)").matches));
@@ -3539,6 +3573,6 @@ $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
