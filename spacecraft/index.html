@@ -186,6 +186,18 @@ td.unk { color: #4e5786; }
 .tNotice { display: flex; gap: 8px; flex-wrap: wrap; }
 .tNotice input { flex: 1 1 260px; font: inherit; color: var(--ink); background: #0a0d1c; border: 1.5px solid var(--line); border-radius: 8px; padding: .55em .8em; }
 #notice { left: 50%; top: 32%; transform: translateX(-50%); background: rgba(40, 30, 6, .92); border: 2px solid var(--ore); border-radius: 12px; padding: .7em 1.2em; font-weight: 700; font-size: 1.15em; text-align: center; max-width: min(620px, 92vw); z-index: 9; }
+#fact { left: 50%; top: 14%; transform: translateX(-50%); background: rgba(10, 30, 40, .92); border: 2px solid #5fe0c8; border-radius: 12px; padding: .6em 1.1em; max-width: min(560px, 92vw); z-index: 9; font-size: .95em; line-height: 1.5; }
+#fact b { color: #5fe0c8; display: block; }
+.ctabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.ctabs button { background: #ffffff0a; border: 1px solid var(--line); color: inherit; border-radius: 999px; padding: 4px 12px; font: inherit; font-weight: 700; cursor: pointer; }
+.ctabs button.on { background: var(--ore); color: #1a1205; border-color: var(--ore); }
+#craftWhere { font-size: .88em; color: var(--ink-dim); }
+#craftWhere.ok { color: var(--good); }
+.recipe.cant { opacity: .62; }
+.recipe .need i { font-style: normal; color: var(--ink-dim); font-weight: 400; }
+.recipe .btns { display: flex; flex-direction: column; gap: 4px; }
+.recipe .btns .btn { padding: 6px 10px; }
+.inv span canvas { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; image-rendering: pixelated; }
 #notice small { display: block; color: var(--ore); font-size: .7em; letter-spacing: .08em; }
 #hurt { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255,0,0,0) 45%, rgba(220,20,30,.55)); opacity: 0; }
 .look { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 18px; align-items: start; }
@@ -244,6 +256,7 @@ td.unk { color: #4e5786; }
 <div class="hud" id="warn" hidden></div>
 <div class="hud click" id="room" hidden></div>
 <div class="hud" id="notice" hidden></div>
+<div class="hud" id="fact" hidden></div>
 <div class="hud" id="cross" hidden></div>
 <div class="hud" id="toast" hidden></div>
 <div class="hud" id="jumpMeter" hidden></div>
@@ -296,8 +309,10 @@ td.unk { color: #4e5786; }
 
 <div class="overlay" id="craftOv" hidden>
   <div class="card wide">
-    <h2>제작대</h2>
+    <h2>제작</h2>
+    <div id="craftWhere"></div>
     <div class="inv" id="invList"></div>
+    <div class="ctabs" id="ctabs"></div>
     <div class="recipes" id="recipes"></div>
     <div class="row"><button class="btn ghost" id="craftClose">닫기 <kbd>E</kbd></button></div>
   </div>
@@ -397,7 +412,7 @@ const BLOCKS = {
   6:  { n: "물", c: ["#2f6fd0", "#3c80e0", "#2a62b8"], h: .25, drop: 103, liquid: true },
   7:  { n: "나무", c: ["#6e5233", "#836240", "#5a4329"], top: ["#a8875a", "#c09a68", "#8c6f48"], h: .7 },
   8:  { n: "나뭇잎", c: ["#3d8a34", "#4fa544", "#2f6f28"], h: .15, drop: 0 },
-  9:  { n: "철광석", c: ["#6c6c72", "#e08a4a", "#56565b"], h: 1.0, drop: 100, ore: true },
+  9:  { n: "철광석", c: ["#6c6c72", "#e08a4a", "#56565b"], h: 1.0, drop: 100, ore: true, tier: 1 },
   10: { n: "레골리스", c: ["#8d8d92", "#a9a9ae", "#6f6f75"], h: .4, drop: 101 },
   11: { n: "현무암", c: ["#3e3f45", "#55565d", "#2c2d32"], h: .9 },
   12: { n: "달 암석", c: ["#77787e", "#5f6066", "#8c8d93"], h: .9 },
@@ -407,10 +422,10 @@ const BLOCKS = {
   17: { n: "극관 얼음", c: ["#f1f4f7", "#ffffff", "#d6dde4"], h: .5, drop: 14 },
   18: { n: "둥근 자갈", c: ["#a9906c", "#d2bb95", "#7e6a4e"], h: .5, pebble: true },
   19: { n: "수성 암석", c: ["#6f6a63", "#857f77", "#57534d"], h: .9 },
-  20: { n: "황 광석", c: ["#6f6a63", "#f2dc3a", "#57534d"], h: .8, drop: 102, ore: true },
+  20: { n: "황 광석", c: ["#6f6a63", "#f2dc3a", "#57534d"], h: .8, drop: 102, ore: true, tier: 1 },
   21: { n: "금성 현무암", c: ["#4a3a30", "#5e4a3b", "#382b23"], h: 1.0 },
   22: { n: "타이탄 모래", c: ["#8a5a2a", "#a8703a", "#6e4520"], h: .4 },
-  24: { n: "토륨 광석", c: ["#4a3a30", "#7fe0a0", "#382b23"], h: 1.0, drop: 104, ore: true },
+  24: { n: "토륨 광석", c: ["#4a3a30", "#7fe0a0", "#382b23"], h: 1.0, drop: 104, ore: true, tier: 2 },
   25: { n: "메테인 구름", c: ["#9fe3ea", "#c8f4f6", "#7cc8d4"], h: .2, drop: 105 },
   26: { n: "암모니아 구름", c: ["#efe2c6", "#fff6e4", "#d6c4a0"], h: .2, drop: 105 },
   27: { n: "갈색 줄무늬 얼음", c: ["#9a6a4a", "#c8a080", "#7a4e34"], h: .5, drop: 106 },
@@ -422,17 +437,35 @@ const BLOCKS = {
   32: { n: "유리 패널", c: ["#bfe8f2", "#e8fbff", "#8fc6d4"], h: .3, glass: true },
   33: { n: "기지 코어", c: ["#e9edf3", "#5fe0c8", "#c3c9d4"], top: ["#e9edf3", "#ffb347", "#c3c9d4"], h: 1e9, core: true },
   34: { n: "발사대", c: ["#2e3346", "#ffb347", "#232737"], h: 1e9, panel: true },
+  35: { n: "제작대", c: ["#8a5a2e", "#a8763e", "#6e4622"], top: ["#b88a52", "#d0a468", "#8a5a2e"], h: .6, table: true },
+  36: { n: "횃불", c: ["#6e4a26", "#ffd25a", "#ff8a2a"], h: .05, thin: true, light: 14 },
+  37: { n: "전등", c: ["#fff3c4", "#ffffff", "#ffd97a"], h: .3, light: 15, lamp: true },
+  38: { n: "석탄 광석", c: ["#7d7f86", "#1e1e22", "#6a6c72"], h: .9, drop: 108, ore: true, tier: 1,
+        fact: "석탄은 아주 옛날 식물이 땅속에 묻혀 오랫동안 열과 압력을 받아 만들어졌어요. 그래서 생물이 살았던 지구에서만 나와요." },
+  39: { n: "구리 광석", c: ["#7d7f86", "#3fc0a0", "#6a6c72"], h: 1.0, drop: 109, ore: true, tier: 1,
+        fact: "구리는 전기가 아주 잘 통해서 전선과 전자 부품에 쓰여요. 산소가 없는 곳에서 쓸 전등을 만들 때 필요해요." },
+  40: { n: "금 광석", c: ["#7d7f86", "#ffd23f", "#6a6c72"], h: 1.1, drop: 110, ore: true, tier: 2,
+        fact: "금은 공기나 물에 닿아도 녹슬지 않고 전기가 잘 통해서 오래 써야 하는 전자 부품에 쓰여요. 땅속 깊은 곳에서 드물게 나와요." },
+  41: { n: "다이아몬드 광석", c: ["#7d7f86", "#7ff0ff", "#6a6c72"], h: 1.4, drop: 111, ore: true, tier: 2,
+        fact: "다이아몬드는 탄소가 땅속 아주 깊은 곳의 높은 압력과 온도에서 단단하게 뭉친 광물이에요. 가장 단단한 천연 광물이라 곡괭이 날로 쓰기 좋아요." },
+  42: { n: "티타늄 광석", c: ["#3e3f45", "#c9b8ff", "#2c2d32"], h: 1.1, drop: 112, ore: true, tier: 2,
+        fact: "달의 바다를 이루는 현무암에는 일메나이트라는 광물이 많아요. 여기서 가볍고 튼튼하며 열에 강한 티타늄을 얻어요." },
 };
 const MATS = {
   100: { n: "철", c: "#c7c9d1" }, 101: { n: "규소", c: "#e6d6a8" }, 102: { n: "황", c: "#f2dc3a" }, 103: { n: "물", c: "#3c80e0" },
   104: { n: "토륨", c: "#7fe0a0" }, 105: { n: "수소", c: "#d8f0ff" }, 106: { n: "소금", c: "#f4f4f4" }, 107: { n: "메테인", c: "#c08a40" },
+  108: { n: "석탄", c: "#2a2a2e" }, 109: { n: "구리", c: "#e0905a" }, 110: { n: "금", c: "#ffd23f" }, 111: { n: "다이아몬드", c: "#8ff4ff" }, 112: { n: "티타늄", c: "#c9c2e0" },
 };
+// 재료를 어디서 구하는지 (제작 창에 보여 줘요)
+const WHERE = { 100: "철광석 · 수성에 많음", 101: "모래·레골리스", 102: "수성·금성 황 광석", 103: "지구 바다", 104: "금성 표면·화성 땅속", 105: "목성형 행성 구름", 106: "유로파 얼음", 107: "타이탄 호수",
+  108: "지구 땅속 (검은 점)", 109: "지구 땅속 (청록 점)", 110: "지구 깊은 땅속 (노란 점)", 111: "지구 가장 깊은 곳 (하늘색 점)", 112: "달의 바다 현무암 (보라 점)",
+  4: "지구 땅속 회색 돌", 7: "지구 나무 줄기", 11: "달의 바다", 14: "그늘진 구덩이·극관", 32: "제작" };
 const itemName = (id) => (BLOCKS[id] || MATS[id] || {}).n || "?";
-const SOLID = (b) => b !== 0 && !(BLOCKS[b] && BLOCKS[b].liquid);
+const SOLID = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin));
 const LIQ = (b) => !!(BLOCKS[b] && BLOCKS[b].liquid);
 
 /* 텍스처 묶음: 칸마다 16px, 옆면·윗면 두 줄 */
-const NT = 44;
+const NT = 64, MT = 50; // 블록 칸 0~49, 재료 칸 50~
 const atlas = document.createElement("canvas"); atlas.width = 16 * NT; atlas.height = 32;
 const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height = 32;
 (function paint() {
@@ -448,12 +481,15 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
     if (b.device) { g.fillStyle = top ? "#5fe0c8" : "#ffb347"; g.fillRect(ox + 5, oy + 3, 6, 6); g.fillStyle = "#333"; g.fillRect(ox + 7, oy + 10, 2, 5); }
     if (b.solar && top) { g.fillStyle = "#1d3d8a"; g.fillRect(ox, oy, 16, 16); g.fillStyle = "#3d6fe0"; for (let y = 1; y < 16; y += 5) for (let x = 1; x < 16; x += 5) g.fillRect(ox + x, oy + y, 4, 4); }
     if (b.glass) { g.fillStyle = "rgba(255,255,255,.7)"; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); g.fillRect(ox + 4, oy + 4, 1, 4); g.fillRect(ox + 5, oy + 3, 3, 1); }
+    if (b.table) { g.fillStyle = c[2]; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); if (top) { g.fillRect(ox + 5, oy, 1, 16); g.fillRect(ox + 10, oy, 1, 16); g.fillRect(ox, oy + 5, 16, 1); g.fillRect(ox, oy + 10, 16, 1); } else { g.fillStyle = "#c7c9d1"; g.fillRect(ox + 3, oy + 3, 3, 5); g.fillStyle = "#6e4622"; g.fillRect(ox + 4, oy + 8, 1, 5); g.fillStyle = "#9aa0aa"; g.fillRect(ox + 9, oy + 4, 5, 2); g.fillRect(ox + 11, oy + 6, 1, 7); } }
+    if (b.thin) { g.clearRect(ox, oy, 16, 16); g.fillStyle = c[0]; g.fillRect(ox, oy + 5, 16, 11); g.fillStyle = c[2]; g.fillRect(ox, oy + 2, 16, 4); g.fillStyle = c[1]; g.fillRect(ox, oy, 16, 3); g.fillRect(ox + 5, oy + 2, 6, 3); }
+    if (b.lamp) { g.fillStyle = "#9aa0aa"; g.fillRect(ox, oy, 16, 2); g.fillRect(ox, oy + 14, 16, 2); g.fillRect(ox, oy, 2, 16); g.fillRect(ox + 14, oy, 2, 16); g.fillStyle = "#fffbe8"; g.fillRect(ox + 5, oy + 5, 6, 6); }
     if (b.liquid) { g.fillStyle = "rgba(255,255,255,.25)"; for (let i = 0; i < 4; i++) g.fillRect(ox + Math.floor(R() * 10), oy + Math.floor(R() * 14), 5, 1); }
   };
   for (const id in BLOCKS) { const b = BLOCKS[id]; tile(id * 16, 0, b.c, b, false); tile(id * 16, 16, b.top || b.c, b, !!b.top); }
   // 아이템 아이콘(재료)
   for (const id in MATS) {
-    const m = MATS[id], ox = (id - 100 + 35) * 16; g.fillStyle = "rgba(0,0,0,0)"; g.clearRect(ox, 0, 16, 32);
+    const m = MATS[id], ox = (id - 100 + MT) * 16; g.fillStyle = "rgba(0,0,0,0)"; g.clearRect(ox, 0, 16, 32);
     g.fillStyle = m.c; g.fillRect(ox + 3, 4, 10, 9); g.fillStyle = "rgba(255,255,255,.5)"; g.fillRect(ox + 4, 5, 3, 2); g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(ox + 3, 12, 10, 1);
   }
   const k = crackCv.getContext("2d"); k.strokeStyle = "rgba(0,0,0,.85)"; k.lineWidth = 1.5;
@@ -461,7 +497,7 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
 })();
 function iconCanvas(id) {
   const c = document.createElement("canvas"); c.width = c.height = 16;
-  const ox = id >= 100 ? (id - 100 + 35) * 16 : id * 16, oy = id >= 100 ? 0 : (BLOCKS[id].top ? 16 : 0);
+  const ox = id >= 100 ? (id - 100 + MT) * 16 : id * 16, oy = id >= 100 ? 0 : (BLOCKS[id].top ? 16 : 0);
   c.getContext("2d").drawImage(atlas, ox, oy, 16, 16, 0, 0, 16, 16); return c;
 }
 
@@ -518,6 +554,32 @@ function get(x, y, z) {
   if (z < 0 || z >= SZ) return 0;
   return W[I(x, y, z)];
 }
+// 빛: 하늘빛(SKL)과 횃불·전등 빛(LT), 0~15. 한 칸 지날 때마다 1씩 약해져요
+const LT = new Uint8Array(SX * SY * SZ), SKL = new Uint8Array(SX * SY * SZ), lightQ = new Int32Array(SX * SY * SZ * 2);
+const passLight = (b) => b === 0 || b === 8 || b === 32 || (BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin));
+function spreadLight(L, n) {
+  let h = 0; const A = SX * SZ;
+  while (h < n) {
+    const i = lightQ[h++], l = L[i] - 1; if (l <= 0) continue;
+    const x = i % SX, z = Math.floor(i / SX) % SZ, y = Math.floor(i / A);
+    for (let k = 0; k < 6; k++) {
+      let nx = x, ny = y, nz = z;
+      if (k === 0) nx--; else if (k === 1) nx++; else if (k === 2) ny--; else if (k === 3) ny++; else if (k === 4) nz--; else nz++;
+      if (wrapX) nx = (nx + SX) % SX; else if (nx < 0 || nx >= SX) continue;
+      if (ny < 0 || ny >= SY || nz < 0 || nz >= SZ) continue;
+      const j = nx + SX * (nz + SZ * ny);
+      if (L[j] < l && passLight(W[j]) && n < lightQ.length) { L[j] = l; lightQ[n++] = j; }
+    }
+  }
+}
+function computeLight() {
+  SKL.fill(0); LT.fill(0); let n = 0;
+  for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) for (let y = SY - 1; y >= 0; y--) { const i = I(x, y, z); if (!passLight(W[i])) break; SKL[i] = 15; lightQ[n++] = i; }
+  spreadLight(SKL, n); n = 0;
+  for (let i = 0; i < W.length; i++) { const B = W[i] && BLOCKS[W[i]]; if (B && B.light) { LT[i] = B.light; lightQ[n++] = i; } }
+  spreadLight(LT, n);
+}
+function lightAt(x, y, z) { if (y >= SY) return [15, 0]; if (y < 0) return [0, 0]; if (wrapX) x = ((x % SX) + SX) % SX; else if (x < 0 || x >= SX) return [15, 0]; if (z < 0 || z >= SZ) return [15, 0]; const i = I(x, y, z); return [SKL[i], LT[i]]; }
 function set(x, y, z, b) { if (wrapX) x = ((x % SX) + SX) % SX; if (x < 0 || z < 0 || x >= SX || z >= SZ || y < 0 || y >= SY) return; W[I(x, y, z)] = b; }
 function hash(x, z, s) { let h = (x * 374761393 + z * 668265263 + s * 1442695041) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
 function noise(x, z, s, px) {
@@ -531,7 +593,23 @@ function topY(x, z) { for (let y = SY - 1; y >= 0; y--) if (SOLID(get(x, y, z)))
 function col(x, z, h, topB, topN, mid, midN, deep) {
   for (let y = 0; y <= h; y++) set(x, y, z, y === 0 ? 1 : y > h - topN ? topB : y > h - topN - midN ? mid : deep);
 }
-function ores(x, z, h, id, p, seed, minY = 2) { for (let y = minY; y < h - 1; y++) if (W[I(x, y, z)] && hash(x * 7 + y, z * 13 - y, seed) < p) set(x, y, z, id); }
+function ores(x, z, h, id, p, seed, minY = 2, maxY = 99) { for (let y = minY; y < Math.min(h - 1, maxY + 1); y++) if (W[I(x, y, z)] && W[I(x, y, z)] !== 1 && hash(x * 7 + y, z * 13 - y, seed) < p) set(x, y, z, id); }
+// 3차원 값 잡음과 동굴: 두 잡음 면이 겹치는 가는 띠를 파내면 구불구불한 굴이 생겨요
+const hash3 = (x, y, z, s) => hash(x + y * 131, z - y * 71, s);
+function noise3(x, y, z, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+  const L = (a, b, c) => lerp(lerp(hash3(a, b, c, s), hash3(a + 1, b, c, s), u), lerp(hash3(a, b, c + 1, s), hash3(a + 1, b, c + 1, s), u), w);
+  return lerp(L(xi, yi, zi), L(xi, yi + 1, zi), v);
+}
+function caves(x, z, h, seed) {
+  if (Math.hypot(x - base.x, z - base.z) < 11) return;
+  const open = noise(x / 11, z / 11, seed + 3) > .74; // 군데군데 땅 위로 뚫린 입구
+  for (let y = 2; y <= (open ? h : h - 3); y++) {
+    const a = noise3(x / 8, y / 5, z / 8, seed), b = noise3(x / 8, y / 5, z / 8, seed + 50);
+    if (Math.abs(a - .5) < .075 && Math.abs(b - .5) < .085) set(x, y, z, 0);
+  }
+}
 function crater(x, z, cx, cz, r, dep, rim) {
   let dx = x - cx; if (wrapX) { dx = ((dx + SX / 2) % SX + SX) % SX - SX / 2; }
   const d = Math.hypot(dx, z - cz) / r;
@@ -557,7 +635,9 @@ const GEN = {
       const beach = h <= 9;
       col(x, z, h, beach ? 5 : 2, 1, beach ? 5 : 3, 2, 4);
       for (let y = h + 1; y <= 8; y++) set(x, y, z, 6);
-      ores(x, z, h - 2, 9, .03, 3);
+      if (h > 9) caves(x, z, h, 201);
+      ores(x, z, h - 2, 38, .028, 5, 4); ores(x, z, h - 2, 9, .022, 3); ores(x, z, h - 2, 39, .014, 7);
+      ores(x, z, h - 2, 40, .012, 8, 1, 6); ores(x, z, h - 2, 41, .008, 9, 1, 4);
       if (h >= 11 && h > 8 && hash(x, z, 77) < .018 && Math.hypot(x - base.x, z - base.z) > 5) tree(x, h + 1, z);
     }
     // 바위 절벽에 드러난 철광석
@@ -577,7 +657,8 @@ const GEN = {
       h = Math.max(2, Math.min(SY - 10, Math.round(h)));
       col(x, z, h, mare ? 11 : 10, mare ? 2 : 3, 12, 0, 12);
       if (pd < .9) { SH[x + SX * z] = 1; if (pd < .55) { set(x, h, z, 14); set(x, h - 1, z, 14); } }
-      ores(x, z, h, 9, .02, 11);
+      if (pd >= 1) caves(x, z, h, 211);
+      ores(x, z, h, 9, .02, 11); if (mare) ores(x, z, h, 42, .035, 13);
     }
     for (const [cx, cz] of CR) { const h = topY(cx, cz); set(cx, h, cz, 9); }
     placeLander(13, 23);
@@ -594,6 +675,7 @@ const GEN = {
       h = flatten(h, x, z, base.x, base.z, 12);
       h = Math.max(2, Math.min(SY - 4, Math.round(h)));
       col(x, z, h, cap ? 17 : river ? 18 : 15, 2, 16, 0, 16);
+      if (!cap) caves(x, z, h, 221);
       ores(x, z, h, 9, .022, 31); ores(x, z, h - 3, 24, .004, 37);
     }
     placeLander(12, 23);
@@ -609,6 +691,7 @@ const GEN = {
       col(x, z, h, 19, 3, 19, 0, 19);
       const pd = Math.hypot(((x - 50 + 32) % 64 + 64) % 64 - 32, z - 6) / 6;
       if (pd < .9) { SH[x + SX * z] = 1; if (pd < .5) { set(x, h, z, 14); set(x, h - 1, z, 14); } }
+      if (pd >= 1) caves(x, z, h, 231);
       ores(x, z, h, 9, .05, 43);
       if (hash(x, z, 51) < .05) set(x, h, z, 20);
       ores(x, z, h, 20, .012, 53);
@@ -708,6 +791,12 @@ camera.rotation.order = "YXZ";
 const tex = new THREE.CanvasTexture(atlas); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
 const matSolid = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true });
 const matWater = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true, transparent: true, opacity: .72, depthWrite: false });
+[matSolid, matWater].forEach(m => { m.onBeforeCompile = (sh) => {
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 lt;\nvarying vec2 vLt;").replace("#include <color_vertex>", "#include <color_vertex>\nvLt = lt;");
+  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec2 vLt;")
+    .replace("vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;", "vec3 outgoingLight = (reflectedLight.directDiffuse + reflectedLight.indirectDiffuse) * vLt.x + diffuseColor.rgb * vLt.y * vec3(1.0, 0.8, 0.55) + totalEmissiveRadiance;");
+}; });
+const skyF = (l) => .045 + .955 * Math.pow(l / 15, 1.6), blF = (l) => Math.pow(l / 15, 1.7) * .95;
 const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, .5); scene.add(hemi);
 const sunLight = new THREE.DirectionalLight(0xffffff, 1); scene.add(sunLight); scene.add(sunLight.target);
 // 면 정의: d 법선, c 꼭짓점, a/b 면 위 두 축
@@ -720,22 +809,24 @@ const FACES = [
   { d: [0, 0, 1], c: [[0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]], uv: [[0, 0], [1, 0], [0, 1], [1, 1]] },
 ];
 const AO = [.42, .6, .8, 1];
-const opaque = (b) => b !== 0 && !(BLOCKS[b] && BLOCKS[b].liquid);
+const opaque = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin));
 let chunks = {};
 function buildChunk(cx, cz) {
   const key = cx + "," + cz;
   if (chunks[key]) { chunks[key].forEach(m => { scene.remove(m); m.geometry.dispose(); }); }
-  const S = [{ p: [], n: [], u: [], c: [], i: [] }, { p: [], n: [], u: [], c: [], i: [] }];
+  const S = [{ p: [], n: [], u: [], c: [], i: [], l: [] }, { p: [], n: [], u: [], c: [], i: [], l: [] }];
   for (let x = cx * CH; x < cx * CH + CH; x++) for (let z = cz * CH; z < cz * CH + CH; z++) {
     const shade = SH[x + SX * z] ? .3 : 1;
     for (let y = 0; y < SY; y++) {
       const b = W[I(x, y, z)]; if (!b) continue;
       const liq = BLOCKS[b].liquid, T = S[liq ? 1 : 0];
+      if (BLOCKS[b].thin) { thinBox(T, x, y, z, b); continue; }
+      const glow = BLOCKS[b].lamp;
       for (const f of FACES) {
         const nx = x + f.d[0], ny = y + f.d[1], nz = z + f.d[2], nb = get(nx, ny, nz);
         if (liq ? nb !== 0 : opaque(nb)) continue;
         if (f.bottom && y === 0) continue;
-        const v0 = T.p.length / 3, aos = [];
+        const v0 = T.p.length / 3, aos = [], lv = lightAt(nx, ny, nz), ls = skyF(lv[0]), lb = glow ? 1 : blF(lv[1]);
         const ax = f.d[0] ? 1 : 0, ay = f.d[1] ? 1 : 0;
         for (let k = 0; k < 4; k++) {
           const c = f.c[k];
@@ -754,7 +845,7 @@ function buildChunk(cx, cz) {
           T.p.push(x + c[0], y + c[1] - (liq && f.top ? .12 : 0), z + c[2]); T.n.push(f.d[0], f.d[1], f.d[2]);
           const row = f.top && BLOCKS[b].top ? 1 : 0;
           T.u.push((b * 16 + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - f.uv[k][1] * 15.4) / 32);
-          T.c.push(l, l, l);
+          T.c.push(l, l, l); T.l.push(ls, lb);
         }
         if (aos[0] + aos[3] > aos[1] + aos[2]) T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
         else T.i.push(v0, v0 + 1, v0 + 3, v0, v0 + 3, v0 + 2);
@@ -769,16 +860,32 @@ function buildChunk(cx, cz) {
     g.setAttribute("normal", new THREE.Float32BufferAttribute(T.n, 3));
     g.setAttribute("uv", new THREE.Float32BufferAttribute(T.u, 2));
     g.setAttribute("color", new THREE.Float32BufferAttribute(T.c, 3));
+    g.setAttribute("lt", new THREE.Float32BufferAttribute(T.l, 2));
     g.setIndex(T.i);
     const m = new THREE.Mesh(g, k ? matWater : matSolid); if (k) m.renderOrder = 2;
     scene.add(m); meshes.push(m);
   });
   chunks[key] = meshes;
 }
+// 횃불처럼 가는 블록: 칸 가운데 작은 기둥
+function thinBox(T, x, y, z, b) {
+  const lo = .43, hi = .57, top = .62, lv = lightAt(x, y, z);
+  for (const f of FACES) {
+    const v0 = T.p.length / 3;
+    for (let k = 0; k < 4; k++) {
+      const c = f.c[k];
+      T.p.push(x + (c[0] ? hi : lo), y + (c[1] ? top : 0), z + (c[2] ? hi : lo)); T.n.push(f.d[0], f.d[1], f.d[2]);
+      T.u.push((b * 16 + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (15.7 - f.uv[k][1] * 15.4) / 32);
+      T.c.push(1, 1, 1); T.l.push(skyF(lv[0]), 1);
+    }
+    T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
+  }
+}
 function buildAll() { for (const k in chunks) chunks[k].forEach(m => { scene.remove(m); m.geometry.dispose(); }); chunks = {}; for (let cx = 0; cx < SX / CH; cx++) for (let cz = 0; cz < SZ / CH; cz++) buildChunk(cx, cz); }
-function rebuildAt(x, z) {
+function rebuildAt(x, z, extra) {
   if (wrapX) x = ((x % SX) + SX) % SX;
   const cx = Math.floor(x / CH), cz = Math.floor(z / CH), n = SX / CH, done = new Set();
+  if (extra) extra.forEach(k => { if (!done.has(k)) { done.add(k); const [a, c] = k.split(",").map(Number); buildChunk(a, c); } });
   const b = (a, c) => { if (wrapX) a = (a + n) % n; if (a < 0 || c < 0 || a >= n || c >= n) return; const k = a + "," + c; if (done.has(k)) return; done.add(k); buildChunk(a, c); };
   b(cx, cz);
   if (x % CH === 0) b(cx - 1, cz); if (x % CH === CH - 1) b(cx + 1, cz);
@@ -924,8 +1031,15 @@ const SUITS = {
 const DEF = () => ({
   planet: "earth", inv: { 33: 0 }, mined: {}, gear: { rocket: false, insul: false, pressure: false, batt: 0, rtg: false },
   done: {}, logs: [], dex: {}, seen: {}, edits: {}, visited: { earth: true }, best: {}, time: {},
-  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false,
+  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {},
 });
+// 곡괭이: 단계가 높을수록 빨리 캐고, 더 단단한 광석을 캘 수 있어요
+const PICKS = [
+  { n: "맨손", sp: 1, dmg: 2 },
+  { n: "돌 곡괭이", sp: 1.8, dmg: 4, col: "#8f9198" },
+  { n: "철 곡괭이", sp: 2.6, dmg: 6, col: "#e2e5ec" },
+  { n: "다이아몬드 곡괭이", sp: 4, dmg: 8, col: "#7ff0ff" },
+];
 let S = DEF();
 const P = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: 0, pitch: 0, ground: false, jumpY: null, peak: 0 };
 const PW = .3, PH = 1.7, EYE = 1.6, G_EARTH = 26, JUMP_V = 8.4, EARTH_JUMP = JUMP_V * JUMP_V / (2 * G_EARTH);
@@ -938,15 +1052,16 @@ function load() { try { const s = JSON.parse(localStorage.getItem("spacecraft2")
 
 /* ═════════════ 행성 불러오기 ═════════════ */
 let placedTimes = {};
+const START_T = (pk) => pk === "venus" ? .15 : pk === "mercury" ? .497 : pk === "moon" ? .06 : .3;
 function loadPlanet(pk, spawnAtBase = true) {
   S.planet = pk; S.visited[pk] = true;
   W.fill(0); SH.fill(0); wrapX = PLANETS[pk].wrap; placedTimes = {};
   GEN[pk]();
   const ed = S.edits[pk] || {};
   for (const k in ed) { const [x, y, z] = k.split(",").map(Number); set(x, y, z, ed[k]); if (ed[k] && pk === "venus") placedTimes[k] = gameT; }
-  buildAll(); updateWrapClones(); setupSky(pk); setAir(pk);
+  computeLight(); buildAll(); updateWrapClones(); setupSky(pk); setAir(pk);
   if (spawnAtBase) toBase();
-  if (S.time[pk] == null) S.time[pk] = pk === "venus" ? .15 : pk === "mercury" ? .497 : pk === "moon" ? .06 : .3;
+  if (S.time[pk] == null) S.time[pk] = START_T(pk);
   storm = 0; stormNext = gameT + 70;
   renderEnvStatic(); renderMission(); renderHotbar(); save();
 }
@@ -955,9 +1070,22 @@ function toBase() {
   P.yaw = Math.PI / 2; P.pitch = -.15;
   if (S.planet === "venus") P.pos.set(base.x + 2.5, VENUS_BASE + .01, base.z + .5);
 }
+const prevSKL = new Uint8Array(SX * SY * SZ), prevLT = new Uint8Array(SX * SY * SZ);
+function relight() {
+  prevSKL.set(SKL); prevLT.set(LT); computeLight();
+  const n = SX / CH, dirty = new Set();
+  for (let i = 0; i < W.length; i++) if (SKL[i] !== prevSKL[i] || LT[i] !== prevLT[i]) {
+    const x = i % SX, z = Math.floor(i / SX) % SZ, cx = Math.floor(x / CH), cz = Math.floor(z / CH);
+    dirty.add(cx + "," + cz);
+    // 덩어리 경계의 칸은 옆 덩어리 면의 밝기에도 쓰여요
+    if (x % CH === 0) dirty.add(((cx - 1 + n) % n) + "," + cz); if (x % CH === CH - 1) dirty.add(((cx + 1) % n) + "," + cz);
+    if (z % CH === 0 && cz > 0) dirty.add(cx + "," + (cz - 1)); if (z % CH === CH - 1 && cz < n - 1) dirty.add(cx + "," + (cz + 1));
+  }
+  return dirty;
+}
 function edit(x, y, z, b, remote) {
   if (wrapX) x = ((x % SX) + SX) % SX;
-  set(x, y, z, b); rebuildAt(x, z); updateWrapClones();
+  set(x, y, z, b); const dirty = relight(); rebuildAt(x, z, dirty); updateWrapClones();
   (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b;
   if (!remote) net.send({ t: "edit", pk: S.planet, x, y, z, b });
 }
@@ -1127,10 +1255,13 @@ function mineTick(dt, h) {
   if (!wantMine || !h) { mining = null; crack.material.opacity = 0; return; }
   const b = h.b, B = BLOCKS[b];
   if (!B || B.h > 1e6) { if (!mining || mining.key !== "x") toast(`${itemName(b)}${josa(itemName(b), "은", "는")} 캘 수 없어요`); mining = { key: "x" }; return; }
+  const tier = B.tier || 0, tool = S.tool || 0;
+  if (tier > tool) { if (!mining || mining.key !== "x") toast(`${B.n}${josa(B.n, "은", "는")} ${PICKS[tier].n} 이상으로 캘 수 있어요`, 2200); mining = { key: "x" }; return; }
   const key = h.x + "," + h.y + "," + h.z;
   if (!mining || mining.key !== key) mining = { key, t: 0 };
   mining.t += dt;
-  const need = B.h * (S.planet === "venus" && h.y < VENUS_BASE - 4 ? 1.4 : 1);
+  const hard = !tool && MATCAT[b] === "stone" ? 2.2 : 1; // 맨손으로 돌은 오래 걸려요
+  const need = B.h * hard * (S.planet === "venus" && h.y < VENUS_BASE - 4 ? 1.4 : 1) / PICKS[tool].sp;
   crack.position.set(h.x + .5, h.y + .5, h.z + .5); crack.material.opacity = .9; crack.material.map = crackTexs[Math.min(7, Math.floor(mining.t / need * 8))];
   if (Math.floor(mining.t * 4.5) !== Math.floor((mining.t - dt) * 4.5)) { sfx.tick(b); swing = Math.max(swing, .001); }
   if (mining.t >= need) {
@@ -1139,15 +1270,18 @@ function mineTick(dt, h) {
     if (drop) { S.inv[drop] = (S.inv[drop] || 0) + 1; spawnDrop(drop, h.x, h.y, h.z); }
     const m = S.mined[S.planet] = S.mined[S.planet] || {}; m[b] = (m[b] || 0) + 1;
     sfx.dig(b); toast(drop ? `+1 ${itemName(drop)}` : `${itemName(b)} 부서짐`);
+    if (B.fact && !S.facts[b]) { S.facts[b] = true; showFact(`새 광물: ${B.n}`, B.fact); S.logs.push({ id: "ore" + b, pk: S.planet, t: `광물 발견: ${B.n}`, ev: `${PLANETS[S.planet].name}에서 ${B.n}${josa(B.n, "을", "를")} 처음 캤어요.`, x: B.fact }); }
     mining = null; crack.material.opacity = 0; renderHotbar();
   }
 }
-function hotIds() { return Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0 && i < 100 && BLOCKS[i]).sort((a, b) => a - b).slice(0, 9); }
+const HOT_FIRST = [36, 37, 35, 31, 30, 32];
+function hotIds() { const rk = (i) => { const k = HOT_FIRST.indexOf(i); return k < 0 ? 100 + i : k; }; return Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0 && i < 100 && BLOCKS[i]).sort((a, b) => rk(a) - rk(b)).slice(0, 9); }
 let sel = 0, mode = "dig";
 function place() {
   if (paused) return;
   const h = raycast(6); if (!h) { window.__why = 'nohit'; return; }
   const id = hotIds()[sel]; if (!id) { toast("놓을 블록이 없어요"); return; }
+  if (id === 36 && !PLANETS[S.planet].breath) { toast(`횃불에 불이 붙지 않아요. 불이 타려면 산소가 필요한데 ${PLANETS[S.planet].name}에는 숨 쉴 산소가 거의 없어요. 전기로 켜는 전등을 쓰세요.`, 4200); sfx.fizz(); return; }
   const x = h.x + h.n[0], y = h.y + h.n[1], z = h.z + h.n[2];
   if (y >= SY || SOLID(get(x, y, z))) return;
   set(x, y, z, id);
@@ -1183,6 +1317,12 @@ function deviceTick(dt) {
 
 /* ═════════════ 제작 ═════════════ */
 const RECIPES = [
+  { id: 35, n: "제작대", need: { 7: 4 }, out: 35, cat: "block", hand: true, use: "놓아 두면 4칸 안에서 곡괭이와 장비를 만들 수 있어요. 기지 코어 근처도 제작대처럼 쓸 수 있어요." },
+  { id: 36, n: "횃불 ×4", need: { 7: 1, 108: 1 }, out: 36, count: 4, cat: "block", hand: true, use: "주변을 밝혀요. 밝은 곳에는 고장 난 로봇이 생기지 않아요. 산소가 있어야 타서 지구에서만 쓸 수 있어요." },
+  { id: 37, n: "전등 ×2", need: { 109: 1, 32: 1, 101: 1 }, out: 37, count: 2, cat: "block", use: "전기로 빛을 내서 산소가 없는 달·화성·수성에서도 켜져요. 횃불보다 조금 더 밝아요." },
+  { id: "pick1", n: "돌 곡괭이", need: { 7: 2, 4: 3 }, pick: 1, cat: "tool", use: "석탄·철·구리·황 광석을 캘 수 있어요. 캐는 속도 1.8배." },
+  { id: "pick2", n: "철 곡괭이", need: { 7: 2, 100: 3 }, pick: 2, cat: "tool", use: "금·다이아몬드·티타늄·토륨 광석까지 캘 수 있어요. 캐는 속도 2.6배." },
+  { id: "pick3", n: "다이아몬드 곡괭이", need: { 7: 2, 111: 3 }, pick: 3, cat: "tool", use: "가장 단단한 날. 캐는 속도 4배, 로봇도 세게 때려요." },
   { id: 30, n: "태양광 패널", need: { 101: 2, 100: 1 }, out: 30, use: "기지 코어 6칸 안에 놓으면 해가 있을 때 전력을 만들어요. 태양에서 가까운 행성일수록 많이 만들어요." },
   { id: 31, n: "관측 장치", need: { 100: 1, 101: 2 }, out: 31, use: "땅에 놓으면 그 행성의 중력·기압·햇빛 세기를 재서 도감에 기록해요." },
   { id: 32, n: "유리 패널 ×2", need: { 101: 2 }, out: 32, count: 2, use: "투명한 벽. 황산에도 녹지 않아요." },
@@ -1192,21 +1332,58 @@ const RECIPES = [
   { id: "rtg", n: "원자력 전지 (RTG)", need: { 104: 3, 100: 4 }, gear: "rtg", use: "토륨이 붕괴할 때 나오는 열로 햇빛 없이도 늘 전기를 만들어요. 태양에서 먼 목성형 행성 탐사에 꼭 필요해요." },
   { id: "pressure", n: "내압 냉각복", need: { 100: 8, 14: 4, 102: 2 }, gear: "pressure", use: "약 120기압까지 버티는 두꺼운 철 껍데기와 얼음 냉각수. 금성 표면용." },
 ];
-function canMake(r) { return Object.entries(r.need).every(([id, n]) => (S.inv[id] || 0) >= n) && !(r.gear && r.gear !== "batt" && S.gear[r.gear]) && !(r.gear === "batt" && S.gear.batt >= 3); }
+RECIPES.forEach(r => { if (!r.cat) r.cat = r.gear ? "gear" : "block"; });
+function nearTable() {
+  const px = Math.floor(P.pos.x), py = Math.floor(P.pos.y), pz = Math.floor(P.pos.z);
+  // 제작대는 4칸, 기지 코어는 6칸 안
+  for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -3; dy <= 3; dy++) { const b = get(px + dx, py + dy, pz + dz); if (b === 33 || (b === 35 && Math.abs(dx) <= 4 && Math.abs(dz) <= 4)) return true; }
+  return false;
+}
+const owned = (r) => (r.gear && r.gear !== "batt" && S.gear[r.gear]) || (r.gear === "batt" && S.gear.batt >= 3) || (r.pick && (S.tool || 0) >= r.pick);
+const hasAll = (r, k = 1) => Object.entries(r.need).every(([id, n]) => (S.inv[id] || 0) >= n * k);
+function canMake(r) { return hasAll(r) && !owned(r) && (r.hand || nearTable()); }
+function maxMake(r) { if (!r.out) return canMake(r) ? 1 : 0; let k = 0; while (k < 64 && hasAll(r, k + 1)) k++; return r.hand || nearTable() ? k : 0; }
+function makeIt(r, k) {
+  for (let i = 0; i < k; i++) {
+    Object.entries(r.need).forEach(([id, n]) => S.inv[id] -= n);
+    if (r.pick) { S.tool = r.pick; toast(`${r.n} 완성! 이제 더 빨리, 더 단단한 광석까지 캘 수 있어요`, 2500); }
+    else if (r.gear === "batt") { S.gear.batt++; S.pw += 50; } else if (r.gear) S.gear[r.gear] = true; else S.inv[r.out] = (S.inv[r.out] || 0) + (r.count || 1);
+  }
+  sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save();
+}
+let craftTab = "all";
+const CTABS = [["all", "전체"], ["block", "블록"], ["tool", "도구"], ["gear", "장비"]];
+function recipeIcon(r) {
+  if (r.out) return iconCanvas(r.out);
+  if (r.pick) { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d"); g.fillStyle = "#8a5a2e"; for (let i = 0; i < 10; i++) g.fillRect(3 + i, 13 - i, 2, 2); g.fillStyle = PICKS[r.pick].col; g.fillRect(6, 2, 8, 2); g.fillRect(12, 2, 2, 7); g.fillRect(4, 3, 3, 2); return c; }
+  return iconCanvas(r.id === "batt" ? 100 : r.id === "pressure" ? 102 : r.id === "insul" ? 11 : r.id === "rtg" ? 104 : 34);
+}
 function openCraft() {
   pause(true);
-  $("invList").innerHTML = Object.keys(S.inv).filter(i => S.inv[i] > 0).map(i => `<span>${itemName(+i)} ${S.inv[i]}</span>`).join("") || `<span>아직 가진 자원이 없어요</span>`;
+  const near = nearTable();
+  const w = $("craftWhere"); w.className = near ? "ok" : "";
+  w.textContent = near ? `제작대 근처예요. 모든 것을 만들 수 있어요. 지금 도구: ${PICKS[S.tool || 0].n}` : `제작대가 근처에 없어요. 여기서는 제작대·횃불만 만들 수 있어요. 제작대 4칸 안이나 기지 코어 6칸 안으로 가세요. 지금 도구: ${PICKS[S.tool || 0].n}`;
+  const inv = $("invList"); inv.innerHTML = "";
+  const ids = Object.keys(S.inv).filter(i => S.inv[i] > 0);
+  if (!ids.length) inv.innerHTML = `<span>아직 가진 자원이 없어요</span>`;
+  ids.forEach(i => { const sp = document.createElement("span"); sp.appendChild(iconCanvas(+i)); sp.appendChild(document.createTextNode(`${itemName(+i)} ${S.inv[i]}`)); inv.appendChild(sp); });
+  const tabs = $("ctabs"); tabs.innerHTML = "";
+  CTABS.forEach(([k, n]) => { const b = document.createElement("button"); b.textContent = n; b.className = craftTab === k ? "on" : ""; b.onclick = () => { craftTab = k; openCraft(); }; tabs.appendChild(b); });
   const box = $("recipes"); box.innerHTML = "";
-  RECIPES.forEach(r => {
-    const have = r.gear && r.gear !== "batt" && S.gear[r.gear];
-    const need = Object.entries(r.need).map(([id, n]) => `<span class="${(S.inv[id] || 0) >= n ? "ok" : "no"}">${itemName(+id)} ${S.inv[id] || 0}/${n}</span>`).join(" · ");
-    const d = document.createElement("div"); d.className = "recipe";
-    const ic = r.out ? iconCanvas(r.out) : iconCanvas(r.id === "batt" ? 100 : r.id === "pressure" ? 102 : r.id === "insul" ? 11 : r.id === "rtg" ? 104 : 34);
-    d.appendChild(ic);
-    d.insertAdjacentHTML("beforeend", `<div><b>${r.n}${r.gear === "batt" ? ` (${S.gear.batt}/3)` : ""}</b><div class="need">${have ? "<span class=ok>완성함</span>" : need}</div><div class="use">${r.use}</div></div>`);
-    const b = document.createElement("button"); b.className = "btn"; b.textContent = "만들기"; b.disabled = !canMake(r);
-    b.onclick = () => { Object.entries(r.need).forEach(([id, n]) => S.inv[id] -= n); if (r.gear === "batt") { S.gear.batt++; S.pw += 50; } else if (r.gear) S.gear[r.gear] = true; else S.inv[r.out] = (S.inv[r.out] || 0) + (r.count || 1); sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save(); };
-    d.appendChild(b); box.appendChild(d);
+  // 지금 만들 수 있는 것 → 재료만 모자란 것 → 이미 가진 것 순서
+  const rank = (r) => owned(r) ? 3 : canMake(r) ? 0 : hasAll(r) ? 1 : 2;
+  RECIPES.filter(r => craftTab === "all" || r.cat === craftTab).map((r, i) => [r, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).forEach(([r]) => {
+    const have = owned(r);
+    const need = Object.entries(r.need).map(([id, n]) => { const ok = (S.inv[id] || 0) >= n; return `<span class="${ok ? "ok" : "no"}">${itemName(+id)} ${S.inv[id] || 0}/${n}</span>${ok || !WHERE[id] ? "" : ` <i>(${WHERE[id]})</i>`}`; }).join(" · ");
+    const d = document.createElement("div"); d.className = "recipe" + (canMake(r) ? "" : " cant");
+    d.appendChild(recipeIcon(r));
+    const why = have ? "" : !r.hand && !near && hasAll(r) ? `<div class="use" style="color:var(--ore)">제작대 근처에서 만들 수 있어요</div>` : "";
+    d.insertAdjacentHTML("beforeend", `<div><b>${r.n}${r.gear === "batt" ? ` (${S.gear.batt}/3)` : ""}</b><div class="need">${have ? "<span class=ok>가지고 있어요</span>" : need}</div>${why}<div class="use">${r.use}</div></div>`);
+    const bs = document.createElement("div"); bs.className = "btns";
+    const b = document.createElement("button"); b.className = "btn"; b.textContent = "만들기"; b.disabled = !canMake(r); b.onclick = () => makeIt(r, 1); bs.appendChild(b);
+    const mx = maxMake(r);
+    if (r.out && mx > 1) { const b2 = document.createElement("button"); b2.className = "btn ghost"; b2.textContent = `최대 ×${mx}`; b2.onclick = () => makeIt(r, mx); bs.appendChild(b2); }
+    d.appendChild(bs); box.appendChild(d);
   });
   $("craftOv").hidden = false;
 }
@@ -1275,6 +1452,9 @@ const MISSIONS = {
   earth: [
     { id: "e1", t: "첫 채굴", d: "블록을 바라보고 마우스를 누르고 있으세요(폰은 길게 누르기). 아무 블록이나 5개 캐기.", p: () => Object.values(S.mined.earth || {}).reduce((a, b) => a + b, 0) / 5,
       log: () => ({ t: "지구 훈련 기지", ev: "블록을 캐면 재료가 모여요. 철광석 → 철, 모래 → 규소, 물 → 로켓 연료.", x: "지구는 숨 쉴 수 있는 대기, 알맞은 기온, 표면의 액체 물이 모두 있는 행성이에요. 앞으로 갈 천체들과 비교하는 기준이 돼요." }) },
+    { id: "e1b", t: "생존 준비", d: "나무 줄기를 캐서 제작대(나무 4)를 만들어 놓고, 제작대 옆에서 돌 곡괭이(나무 2, 암석 3)를 만드세요. 철광석은 곡괭이가 있어야 캘 수 있어요.", p: () => (countHere(35) ? .5 : 0) + ((S.tool || 0) >= 1 ? .5 : 0), log: null },
+    { id: "e1c", t: "밤을 밝혀라", d: "석탄 광석(검은 점)을 캐서 횃불(나무 1, 석탄 1)을 만들고 3개를 놓으세요. 밤이나 어두운 굴은 위험해요.", p: () => countHere(36) / 3,
+      log: () => ({ t: "불이 타려면 산소가 필요하다", ev: `횃불 ${countHere(36)}개가 타고 있어요. 지구 공기의 약 21 %가 산소예요.`, x: "물질이 타려면 탈 물질, 산소, 충분히 높은 온도가 함께 있어야 해요. 지구는 공기 속에 산소가 많아서 횃불이 잘 타요. 달·화성처럼 산소가 거의 없는 곳에서는 불이 붙지 않으니, 전기로 빛을 내는 전등(구리 1, 유리 패널 1, 규소 1)을 챙겨 가세요." }) },
     { id: "e2", t: "관측 장치 설치", d: "제작(E)에서 관측 장치(철 1, 규소 2)를 만들어 땅에 놓으세요. 철은 회색 바탕에 주황 점이 있는 철광석에서, 규소는 바닷가 모래에서 나와요.", p: () => S.dex.earth ? 1 : 0,
       log: () => ({ t: "기준값 기록", ev: "지구: 중력 1 · 기압 1기압 · 햇빛 세기 1 · 하루 24시간", x: "이 값들이 모든 행성 비교의 기준이에요. 다른 행성에 가면 같은 장치로 재서 지구와 몇 배 차이 나는지 보게 될 거예요." }) },
     { id: "e3", t: "태양광 발전", d: "태양광 패널(규소 2, 철 1) 2개를 기지 코어(가운데 하얀 블록) 6칸 안에 놓으세요.", p: () => panelsNearCore() / 2,
@@ -1381,6 +1561,7 @@ const MISSIONS = {
       log: () => ({ t: "지구형 행성과 목성형 행성", ev: "수성·금성·지구·화성: 작고 단단한 표면, 밀도 큼, 위성 적음, 고리 없음 / 목성·토성·천왕성·해왕성: 크고 기체로 됨, 밀도 작음, 위성 많음, 고리 있음", x: "축하해요! 태양계 8개 행성을 모두 탐사했어요. 도감 표를 보면서 두 무리의 행성이 어떻게 다른지 친구와 이야기해 보세요." }) },
   ],
 };
+function countHere(id) { const ed = S.edits[S.planet] || {}; return Object.values(ed).filter(v => v === id).length; }
 function countPlaced(id) { const ed = S.edits.venus || {}; return Object.values(ed).filter(v => v === id).length; }
 function curMission() { const L = MISSIONS[S.planet]; return L.find(m => !S.done[m.id]); }
 function renderMission() {
@@ -1449,7 +1630,7 @@ function renderGauges() {
   set1("gO2", S.o2, 100, PLANETS[S.planet].breath ? "공기" : Math.round(S.o2), S.o2 < 25);
   set1("gPw", S.pw, maxPw(), Math.round(S.pw), S.pw < 20);
   const st = $("gSt"); st.querySelector("i").style.width = Math.max(4, Math.min(100, (S.st + 40) / 120 * 100)) + "%"; st.querySelector("i").style.background = S.st > 45 ? "var(--bad)" : S.st < 0 ? "var(--ice)" : "var(--good)"; st.querySelector(".v").textContent = Math.round(S.st) + "°"; st.classList.toggle("danger", S.st > 45 || S.st < 0);
-  $("suitName").textContent = `${suit().n}${S.gear.batt ? ` · 배터리 +${S.gear.batt * 50}` : ""}`;
+  $("suitName").textContent = `${suit().n}${S.gear.batt ? ` · 배터리 +${S.gear.batt * 50}` : ""} · ${PICKS[S.tool || 0].n}`;
 }
 function renderHotbar() {
   const hb = $("hotbar"); hb.innerHTML = ""; const ids = hotIds();
@@ -1465,7 +1646,8 @@ function renderHotbar() {
   $("hotName").hidden = false; $("hotName").textContent = itemName(ids[sel]);
 }
 let toastT = 0;
-function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; toastT = performance.now() + 1300; }
+function toast(t, ms = 1300) { const el = $("toast"); el.textContent = t; el.hidden = false; toastT = performance.now() + ms; }
+function showFact(t, x) { const el = $("fact"); el.innerHTML = "<b></b><span></span>"; el.querySelector("b").textContent = t; el.querySelector("span").textContent = x; el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => { el.hidden = true; }, 9000); sfx.quest(); }
 function showLog(L) {
   pause(true); $("logCard").classList.toggle("dead", !!L.dead);
   $("logNo").textContent = L.no; $("logTitle").textContent = L.t; $("logEvidence").textContent = L.ev; $("logText").textContent = L.x;
@@ -1690,7 +1872,7 @@ const itemGeos = {};
 function itemGeo(id) {
   if (itemGeos[id]) return itemGeos[id];
   const g = new THREE.BoxGeometry(1, 1, 1), uv = g.attributes.uv, mat = id >= 100;
-  const ox = mat ? (id - 100 + 35) * 16 : id * 16;
+  const ox = mat ? (id - 100 + MT) * 16 : id * 16;
   for (let f = 0; f < 6; f++) {
     const row = !mat && f === 2 && BLOCKS[id].top ? 1 : 0;
     for (let k = 0; k < 4; k++) { const i = f * 4 + k, u = uv.getX(i), v = uv.getY(i); uv.setXY(i, (ox + .3 + u * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - v * 15.4) / 32); }
@@ -1732,10 +1914,16 @@ function rebuildHand() {
   armMesh.position.set(0, 0, .12); handArm.add(armMesh);
   const glove = new THREE.Mesh(new THREE.BoxGeometry(.21, .21, .14), lam(LOOK_OPT.pack[LOOK.pack])); glove.position.set(0, 0, -.2); armMesh.add(glove);
 }
+function pickMesh(t) {
+  const g = new THREE.Group(), wood = lam("#8a5a2e"), head = lam(PICKS[t].col);
+  box(.05, .05, .5, wood, 0, 0, 0, g); box(.34, .07, .07, head, 0, 0, -.25, g); box(.07, .07, .07, head, .17, -.03, -.22, g); box(.07, .07, .07, head, -.17, -.03, -.22, g);
+  g.position.set(-.02, .1, -.3); g.rotation.set(.9, .2, -.3); return g;
+}
 function updateHeld() {
-  const id = hotIds()[sel] || null; if (id === heldId) return; heldId = id;
+  const id = S.tool ? "p" + S.tool : hotIds()[sel] || null; if (id === heldId) return; heldId = id;
   if (heldMesh) { handArm.remove(heldMesh); heldMesh = null; }
-  if (id) { heldMesh = new THREE.Mesh(itemGeo(id), itemMat); heldMesh.scale.setScalar(.22); heldMesh.position.set(-.04, .14, -.34); heldMesh.rotation.set(.1, .7, 0); handArm.add(heldMesh); }
+  if (S.tool) { heldMesh = pickMesh(S.tool); handArm.add(heldMesh); }
+  else if (id) { heldMesh = new THREE.Mesh(itemGeo(id), itemMat); heldMesh.scale.setScalar(.22); heldMesh.position.set(-.04, .14, -.34); heldMesh.rotation.set(.1, .7, 0); handArm.add(heldMesh); }
 }
 rebuildHand();
 let swing = 0, walkT = 0, walkAmt = 0, stepAcc = 0, hurtT = 0, lastHurt = -9, third = false;
@@ -1818,7 +2006,7 @@ const spec = { id: null, view: 0 };
 const net = (() => {
   const COLORS = ["#ff6b6b", "#ffb347", "#ffd65a", "#6fe39a", "#5fe0c8", "#7fd3ff", "#8f9bff", "#d68fff", "#ff8fc8", "#c7c9d1"];
   const me = { id: Math.random().toString(36).slice(2, 10), name: "", color: LOOK_OPT.pack[LOOK.pack] };
-  let peer = null, host = false, code = "", conns = [], hostConn = null, sendT = 0, live = false, teacher = false;
+  let peer = null, host = false, code = "", conns = [], hostConn = null, sendT = 0, live = false, teacher = false, roomT0 = 0, clockOff = null, clockT = 0;
   const others = {}; // id → { name, color, pk, x, y, z, yaw, done, mesh, seen }
   const PREFIX = "spacecraft-class-";
   const qs = new URLSearchParams(location.search), local = qs.get("peer");
@@ -1861,7 +2049,7 @@ const net = (() => {
     if (libs.every(r => r.status === "rejected")) return fail("lib");
     code = String(1000 + Math.floor(Math.random() * 9000));
     let opened = false, tries = 0;
-    const ready = () => { if (opened) return; opened = true; host = true; live = true; $("code").value = code; msg(`방 코드 ${code} — 친구들에게 이 4자리를 알려 주고, 시작 버튼을 누르세요.`); if (teacher) openTeacher(); };
+    const ready = () => { if (opened) return; opened = true; host = true; live = true; roomT0 = performance.now(); $("code").value = code; msg(`방 코드 ${code} — 친구들에게 이 4자리를 알려 주고, 시작 버튼을 누르세요.`); if (teacher) openTeacher(); };
     const gaveUp = () => { if (!opened && ++tries === 2) fail("network"); };
     // ① 중계 서버들: 붙는 곳마다 방을 알림(선생님이 나가면 자동으로 지워짐)
     if (window.mqtt) Promise.allSettled(BROKERS.map(u => mqOpen(u, { topic: TOP + code + "/room", payload: "", retain: true, qos: 1 }))).then(rs => {
@@ -1948,6 +2136,7 @@ const net = (() => {
       (S.edits[d.pk] = S.edits[d.pk] || {})[d.x + "," + d.y + "," + d.z] = d.b;
     }
     if (d.t === "bye" && d.from) removeOther(d.from);
+    if (d.t === "clock" && !host && Number.isFinite(d.c)) clockOff = d.c - performance.now() / 1000;
     if (d.t === "notice" && !teacher) { const n = $("notice"); n.innerHTML = "<small>선생님</small>"; n.appendChild(document.createTextNode(String(d.text || "").slice(0, 60))); n.hidden = false; clearTimeout(n._t); n._t = setTimeout(() => { n.hidden = true; }, 8000); sfx.quest(); }
   }
   function dropBy(c) { if (c._pid) { removeOther(c._pid); relay({ t: "bye", from: c._pid }, null); } }
@@ -1956,6 +2145,7 @@ const net = (() => {
   function tick(dt) {
     if (!live) return;
     sendT += dt;
+    if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000 }); }
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
     if (teacher) { tickOthers(dt); return; }
     if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
@@ -2053,7 +2243,7 @@ const net = (() => {
   });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { send, tick, get others() { return others; }, get live() { return live; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
+  return { send, tick, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
@@ -2067,6 +2257,11 @@ function frame(now) {
   if (!paused) {
     gameT += dt;
     S.time[S.planet] = (S.time[S.planet] + dt / (PL.dayMin * 60)) % 1;
+  }
+  // 같은 방이면 방장 시계로 모든 천체의 시각을 맞춰요(누구나 같은 낮·밤)
+  const rc = net.clock();
+  if (rc != null) S.time[S.planet] = (START_T(S.planet) + rc / (PL.dayMin * 60)) % 1;
+  if (!paused) {
     physics(dt / 2); physics(dt / 2);
   }
   computeEnv();
@@ -2130,11 +2325,11 @@ const saved = load();
 if (saved) $("contBtn").hidden = false;
 function start(fresh) {
   if (fresh) { S = DEF(); S.inv = {}; try { localStorage.removeItem("spacecraft2"); } catch (e) {} }
-  else { S = Object.assign(DEF(), saved); }
+  else { S = Object.assign(DEF(), saved); if (saved.tool == null) { S.tool = S.visited.moon ? 2 : 0; if (S.visited.moon) S.done.e1b = S.done.e1c = true; } }
   loadPlanet(S.planet);
   if (matchMedia("(pointer: coarse)").matches) { isTouch = true; $("touch").hidden = false; }
   $("startOv").hidden = true; showHud(true); if (fresh) pause(false); else resume();
-  if (fresh) showLog({ no: "탐사 대원 훈련", t: "지구 훈련 기지", ev: "왼쪽 아래 계기판: 체력 · 산소 · 전력 · 우주복 온도", x: "다른 천체에서는 숨 쉴 공기가 없거나, 너무 뜨겁거나 차가워요. 우주복은 전력으로 안쪽을 20 °C로 유지하고, 전력과 산소는 기지 코어 근처에서 채워져요. 먼저 지구에서 자원을 모으고 장비를 만들어 보세요." });
+  if (fresh) showLog({ no: "탐사 대원 훈련", t: "지구 훈련 기지", ev: "왼쪽 아래 계기판: 체력 · 산소 · 전력 · 우주복 온도", x: "다른 천체에서는 숨 쉴 공기가 없거나, 너무 뜨겁거나 차가워요. 우주복은 전력으로 안쪽을 20 °C로 유지하고, 전력과 산소는 기지 코어 근처에서 채워져요. 먼저 지구에서 나무를 캐서 제작대와 곡괭이를 만들고, 밤이 오기 전에 횃불을 준비하세요. 굴 속은 어두우니 조심하세요." });
 }
 $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
