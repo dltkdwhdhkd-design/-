@@ -379,6 +379,7 @@ td.unk { color: #4e5786; }
   <div class="card">
     <h2>우리 반 탐사대</h2>
     <p id="rosterNote"></p>
+    <div id="partyBox"><b>내 파티</b> <small>같은 파티끼리는 누가 임무를 끝내면 모두 완료돼요</small><div class="ctabs" id="partyPick"></div></div>
     <div class="roster" id="rosterList"></div>
     <div class="row"><button class="btn ghost" id="rosterClose">닫기</button></div>
   </div>
@@ -1062,7 +1063,7 @@ function loadPlanet(pk, spawnAtBase = true) {
   computeLight(); buildAll(); updateWrapClones(); setupSky(pk); setAir(pk);
   if (spawnAtBase) toBase();
   if (S.time[pk] == null) S.time[pk] = START_T(pk);
-  storm = 0; stormNext = gameT + 70;
+  storm = 0; stormNext = gameT + 70; clearMobs(); resetHazards();
   renderEnvStatic(); renderMission(); renderHotbar(); save();
 }
 function toBase() {
@@ -1082,6 +1083,11 @@ function relight() {
     if (z % CH === 0 && cz > 0) dirty.add(cx + "," + (cz - 1)); if (z % CH === CH - 1 && cz < n - 1) dirty.add(cx + "," + (cz + 1));
   }
   return dirty;
+}
+function editMany(L) {
+  const ch = new Set(), n = SX / CH;
+  L.forEach(([x, y, z, b]) => { if (wrapX) x = ((x % SX) + SX) % SX; set(x, y, z, b); (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b; net.send({ t: "edit", pk: S.planet, x, y, z, b }); ch.add(Math.floor(x / CH) + "," + Math.floor(z / CH)); });
+  const dirty = relight(); ch.forEach(k => dirty.add(k)); dirty.forEach(k => { const [a, c] = k.split(",").map(Number); if (a >= 0 && c >= 0 && a < n && c < n) buildChunk(a, c); }); updateWrapClones();
 }
 function edit(x, y, z, b, remote) {
   if (wrapX) x = ((x % SX) + SX) % SX;
@@ -1148,7 +1154,8 @@ function survival(dt) {
   if (S.st < 0) { dmg += Math.min(25, -S.st / 4); cause = "cold"; }
   if (env.Pa > su.pr) { dmg += 30; cause = "pressure"; }
   if (dmg) { S.hp -= dmg * dt; hurtT = Math.min(1, hurtT + dt * 2); if (gameT - lastHurt > .7) { lastHurt = gameT; sfx.hurt(); hurtT = 1; } }
-  else  if (nearCore) S.hp = Math.min(100, S.hp + 6 * dt); else S.hp = Math.min(100, S.hp + .4 * dt);
+  else if (radNow) {} // 방사선을 쬐는 동안은 회복되지 않아요
+  else if (nearCore) S.hp = Math.min(100, S.hp + 6 * dt); else S.hp = Math.min(100, S.hp + .4 * dt);
   // 경고
   if (env.Pa > su.pr) warnMsg = `기압 ${Math.round(env.Pa)}기압! 지금 우주복은 ${su.pr}기압까지만 버텨요`;
   else if (S.pw <= 0 && Math.abs(env.T - 20) > 25) warnMsg = `전력 없음: 바깥 기온 ${Math.round(env.T)} °C가 우주복 안으로 스며들어요`;
@@ -1171,13 +1178,16 @@ const DEATH = {
   hot: ["우주복이 너무 뜨거워졌어요", (pk) => pk === "mercury" ? "수성의 낮 쪽은 약 430 °C예요. 대기가 없어서 햇빛을 막아 줄 것이 없어요. 낮과 밤의 경계(새벽 띠)에 머물거나 단열 우주복을 만드세요." : pk === "venus" ? "금성 표면은 두꺼운 이산화 탄소 대기가 열을 가두는 온실 효과 때문에 약 465 °C예요. 수성보다 태양에서 멀지만 더 뜨거워요." : pk === "moon" ? "달의 낮은 100 °C가 넘어요. 대기가 없어 햇빛이 그대로 내리쬐어요. 전력이 떨어지면 우주복이 식혀 주지 못해요." : "냉각에 쓸 전력이 떨어졌어요."],
   cold: ["우주복이 얼어붙었어요", (pk) => pk === "moon" ? "달의 밤과 햇빛이 들지 않는 구덩이는 영하 170 °C 아래예요. 대기가 없어서 열을 붙잡아 두지 못해요." : pk === "mercury" ? "수성의 밤 쪽은 영하 180 °C예요. 대기가 없어서 낮의 열이 금방 우주로 빠져나가요." : pk === "mars" ? "화성은 대기가 아주 얇아서(지구의 약 1 %) 밤에 영하 90 °C까지 떨어져요. 먼지 폭풍이 오면 햇빛까지 막혀요." : PLANETS[pk].au > 5 ? `${PLANETS[pk].name}${josa(PLANETS[pk].name, "은", "는")} 태양에서 ${PLANETS[pk].au} AU나 떨어져 있어서 햇빛이 지구의 ${fmtSun(PLANETS[pk].solar)}배뿐이에요. 아주 춥고 태양광 패널도 거의 쓸모가 없어요. 원자력 전지(RTG)와 단열이 잘 되는 우주복이 필요해요.` : "난방에 쓸 전력이 떨어졌어요."],
   pressure: ["기압에 짓눌렸어요", (pk) => PLANETS[pk].gas ? `${PLANETS[pk].name}의 구름 아래로 내려갈수록 기체가 점점 빽빽해져 기압이 수백, 수천 기압까지 올라가요. 목성형 행성에는 딛고 설 단단한 땅이 없어요.` : "금성 표면의 기압은 지구의 약 92배예요. 바닷속 900 m에서 받는 압력과 비슷해서, 내압 냉각복 없이는 버틸 수 없어요."],
+  robot: ["고장 난 로봇에게 당했어요", () => "어두운 곳에서는 고장 난 탐사 로봇이 나타나요. 밝은 곳에는 생기지 않으니 횃불이나 전등으로 기지 주변과 굴을 밝혀 두세요. 곡괭이가 좋을수록 로봇을 빨리 멈출 수 있어요."],
+  meteor: ["운석에 맞았어요", (pk) => `${PLANETS[pk].name}에는 대기가 없어서 운석이 타 없어지지 않고 그대로 떨어져요. 붉은 원이 보이면 바로 원 밖으로 피하세요.`],
+  rad: ["방사선을 너무 많이 쬐었어요", (pk) => pk === "europa" ? "유로파는 목성의 강한 자기장에 붙잡힌 고에너지 입자 속을 돌아요. 경보가 울리면 얼음 속을 파고 들어가거나 지붕 아래로 피하세요." : `${PLANETS[pk].name}에는 지구처럼 태양 방사선을 막아 줄 두꺼운 대기와 자기장이 없어요. 태양 폭풍 경보가 울리면 땅속이나 지붕 아래로 피하세요.`],
   abyss: ["끝없이 가라앉았어요", (pk) => `${PLANETS[pk].name}${josa(PLANETS[pk].name, "은", "는")} 대부분 수소와 헬륨 같은 기체로 된 목성형 행성이에요. 아래로 내려가면 기체가 점점 짙어질 뿐 단단한 땅이 나오지 않아요.`],
 };
 function die() {
   const c = DEATH[cause] || ["쓰러졌어요", () => "기지에서 다시 시작해요."];
   const pk = S.planet;
   for (const id in S.inv) if (+id >= 100 || (BLOCKS[id] && !BLOCKS[id].device && !BLOCKS[id].solar)) S.inv[id] = Math.floor(S.inv[id] * .7);
-  S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; toBase();
+  S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; toBase(); clearMobs();
   showLog({ no: "구조 요청 · 기지로 이송됨", t: c[0], ev: `쓰러진 곳: ${PLANETS[pk].name} · 바깥 기온 ${Math.round(env.T)} °C · 기압 ${fmtP(env.Pa)} · 자원 30 %를 잃었어요`, x: c[1](pk), dead: true });
   sfx.die(); renderHotbar();
 }
@@ -1563,6 +1573,7 @@ const MISSIONS = {
 };
 function countHere(id) { const ed = S.edits[S.planet] || {}; return Object.values(ed).filter(v => v === id).length; }
 function countPlaced(id) { const ed = S.edits.venus || {}; return Object.values(ed).filter(v => v === id).length; }
+const MISSION_BY_ID = {}; for (const pk in MISSIONS) MISSIONS[pk].forEach(m => { MISSION_BY_ID[m.id] = { m, pk }; });
 function curMission() { const L = MISSIONS[S.planet]; return L.find(m => !S.done[m.id]); }
 function renderMission() {
   const L = MISSIONS[S.planet], m = curMission();
@@ -1583,7 +1594,9 @@ function missionTick(dt) {
   $("mBar").style.width = (p * 100) + "%";
   if (p >= 1) {
     S.done[m.id] = true; sfx.quest();
-    if (m.log) { const L = m.log(); S.logs.push({ id: m.id, pk: S.planet, ...L }); showLog({ no: `탐사 일지 · ${PLANETS[S.planet].name}`, ...L }); }
+    let L = null;
+    if (m.log) { L = m.log(); S.logs.push({ id: m.id, pk: S.planet, ...L }); showLog({ no: `탐사 일지 · ${PLANETS[S.planet].name}`, ...L }); }
+    net.partyDone(m.id, L);
     renderMission(); save();
   }
 }
@@ -1601,6 +1614,77 @@ function hazards(dt) {
     if (storm > 0) { storm -= dt; if (storm <= 0) { storm = 0; S.stormDone = true; stormNext = gameT + 240; toast("먼지 폭풍이 지나갔어요"); } }
     else if (gameT > stormNext && S.dex.mars) { storm = 45; toast("먼지 폭풍이 다가와요! 햇빛이 약해져요"); }
   }
+}
+
+/* ═════════════ 운석·태양 폭풍·별똥별 ═════════════ */
+let radNow = false, met = null, metNext = 0, flare = { st: 0, t: 0 }, flareNext = 0, shoot = null, shootNext = 0;
+const metMat = new THREE.MeshLambertMaterial({ color: 0x4a4038 }), ringMat = new THREE.MeshBasicMaterial({ color: 0xff3030, transparent: true, opacity: .6, side: THREE.DoubleSide, depthWrite: false });
+const FLARE_ON = { moon: "태양 폭풍", mercury: "태양 폭풍", mars: "태양 폭풍", europa: "목성 방사선 폭풍" };
+function resetHazards() {
+  if (met) { scene.remove(met.rock); scene.remove(met.ring); met = null; }
+  metNext = gameT + 40 + Math.random() * 30; flare = { st: 0, t: 0 }; flareNext = gameT + 100 + Math.random() * 60;
+}
+function covered() { const x = Math.floor(P.pos.x), z = Math.floor(P.pos.z); for (let y = Math.floor(P.pos.y + PH) + 1; y < SY; y++) if (SOLID(get(x, y, z)) && get(x, y, z) !== 32) return true; return false; }
+function firstLog(key, L) { S.seenHaz = S.seenHaz || {}; if (S.seenHaz[key]) return; S.seenHaz[key] = true; S.logs.push({ id: key, pk: S.planet, ...L }); showLog({ no: `탐사 일지 · ${PLANETS[S.planet].name}`, ...L }); }
+function hazards2(dt) {
+  const pk = S.planet, PL = PLANETS[pk]; radNow = false;
+  // 운석: 대기가 없는 달·수성
+  if (pk === "moon" || pk === "mercury") {
+    if (!met && gameT > metNext) {
+      const a = Math.random() * Math.PI * 2, d = 3 + Math.random() * 7;
+      let x = Math.floor(P.pos.x + Math.cos(a) * d), z = Math.floor(P.pos.z + Math.sin(a) * d);
+      if (wrapX) x = ((x % SX) + SX) % SX;
+      if (x < 3 || z < 3 || x > SX - 4 || z > SZ - 4 || Math.hypot(x - base.x, z - base.z) < 8) { metNext = gameT + 4; }
+      else {
+        const y = topY(x, z) + 1, ring = new THREE.Mesh(new THREE.RingGeometry(1.9, 2.4, 32), ringMat); ring.rotation.x = -Math.PI / 2; ring.position.set(x + .5, y + .05, z + .5); scene.add(ring);
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(.7), metMat); scene.add(rock);
+        met = { x, y, z, t: 0, T: 3.4, ring, rock, from: new THREE.Vector3(x + 30, y + 70, z - 18) };
+        toast("운석이 떨어져요! 붉은 원 밖으로 피하세요", 2600); sfx.alarm();
+      }
+    }
+    if (met) {
+      met.t += dt; const k = Math.min(1, met.t / met.T);
+      met.rock.position.lerpVectors(met.from, new THREE.Vector3(met.x + .5, met.y + .4, met.z + .5), k * k); met.rock.rotation.x += dt * 5; met.rock.rotation.z += dt * 3;
+      ringMat.opacity = .35 + .35 * Math.abs(Math.sin(met.t * 8));
+      if (k >= 1) {
+        const L = [];
+        for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = -2; dy <= 1; dy++) {
+          const r = Math.hypot(dx, dz, dy * 1.4); if (r > 2.3) continue;
+          const x = met.x + dx, y = met.y + dy, z = met.z + dz, b = get(x, y, z);
+          if (b && BLOCKS[b] && BLOCKS[b].h < 1e6) L.push([x, y, z, 0]);
+        }
+        if (SOLID(get(met.x, met.y - 3, met.z)) && BLOCKS[get(met.x, met.y - 3, met.z)].h < 1e6) L.push([met.x, met.y - 3, met.z, 9]); // 운석 속 철
+        editMany(L); burst(met.x, met.y, met.z, 12); burst(met.x, met.y, met.z, 9); sfx.boom(1); hurtT = Math.max(hurtT, .6);
+        const pd = Math.hypot(P.pos.x - met.x - .5, P.pos.z - met.z - .5, (P.pos.y - met.y) * .7);
+        if (pd < 3.5) { S.hp -= 8 + 30 * (1 - pd / 3.5); cause = "meteor"; hurtT = 1; sfx.hurt(); P.vel.y = 5; if (S.hp <= 0) die(); }
+        scene.remove(met.rock); scene.remove(met.ring); met = null; metNext = gameT + 45 + Math.random() * 40;
+        firstLog("met-" + pk, { t: "대기가 없는 곳의 운석", ev: "운석이 타지 않고 그대로 떨어져 구덩이(크레이터)를 만들었어요. 바닥에 철광석이 박혔어요.", x: `지구에서는 우주에서 들어온 작은 암석 대부분이 대기와 부딪히며 타 버려 별똥별로 보여요. ${PL.name}에는 대기가 없어서 운석이 타지 않고 표면까지 그대로 떨어져요. 그래서 ${PL.name} 표면에는 크레이터가 아주 많아요. 운석에는 철이 많이 들어 있기도 해요.` });
+      }
+    }
+  }
+  // 태양 폭풍: 대기·자기장의 보호가 없거나 약한 곳
+  const fname = FLARE_ON[pk];
+  if (fname && S.dex[pk]) {
+    if (flare.st === 0 && gameT > flareNext) { flare = { st: 1, t: 12 }; toast(`${fname} 경보! 12초 뒤 강한 방사선이 쏟아져요. 땅속이나 지붕 아래로 피하세요`, 4000); sfx.alarm(); }
+    else if (flare.st === 1) { flare.t -= dt; warnMsg = `${fname}까지 ${Math.ceil(flare.t)}초: 땅속이나 지붕 아래로!`; if (flare.t <= 0) flare = { st: 2, t: 25 }; }
+    else if (flare.st === 2) {
+      flare.t -= dt;
+      if (!covered()) { radNow = true; S.hp -= 4 * dt; cause = "rad"; hurtT = Math.min(1, hurtT + dt * 1.5); warnMsg = `${fname}! 강한 방사선 · 머리 위를 막아 주는 블록 아래로 피하세요`; if (S.hp <= 0) die(); }
+      else warnMsg = `${fname} 중 · 지붕 아래라 안전해요 (${Math.ceil(flare.t)}초)`;
+      if (flare.t <= 0) {
+        flare = { st: 0, t: 0 }; flareNext = gameT + 170 + Math.random() * 110; toast(`${fname}이 지나갔어요`, 2000);
+        firstLog("flare-" + pk, { t: pk === "europa" ? "목성 둘레의 방사선" : "태양 폭풍과 방사선", ev: `${fname} 동안 머리 위가 막혀 있을 때만 안전했어요.`, x: pk === "europa" ? "목성은 아주 강한 자기장을 가지고 있어서, 그 둘레에 고에너지 입자가 많이 붙잡혀 있어요. 유로파는 그 속을 돌기 때문에 표면의 방사선이 매우 강해요. 두꺼운 얼음 아래는 방사선이 닿지 않아요." : "태양은 가끔 폭발하듯 고에너지 입자를 쏟아내요. 지구는 자기장과 두꺼운 대기가 이 입자를 막아 줘서 표면이 안전하고, 극지방의 오로라가 그 흔적이에요. 달은 대기와 자기장이 없고, 수성은 대기가 없고 자기장이 약하며, 화성은 대기가 얇고 행성 전체를 감싸는 자기장이 없어서 방사선이 표면까지 들어와요. 그래서 우주 비행사에게는 땅속이나 두꺼운 벽으로 된 대피소가 필요해요." });
+      }
+    }
+  }
+  // 지구의 밤: 대기에서 타는 별똥별
+  if (pk === "earth" && env.e < -.1) {
+    if (!shoot && gameT > shootNext) {
+      const a = Math.random() * Math.PI * 2, p0 = new THREE.Vector3(Math.cos(a) * 300, 260 + Math.random() * 80, Math.sin(a) * 300), p1 = p0.clone().add(new THREE.Vector3(Math.random() * 120 - 60, -60, Math.random() * 120 - 60));
+      const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([p0, p1]), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, fog: false, depthWrite: false })); skyGroup.add(ln); shoot = { ln, t: 0 };
+    }
+    if (shoot) { shoot.t += dt; shoot.ln.material.opacity = Math.max(0, 1 - shoot.t / .9); if (shoot.t > .9) { skyGroup.remove(shoot.ln); shoot = null; shootNext = gameT + 5 + Math.random() * 9; } }
+  } else if (shoot) { skyGroup.remove(shoot.ln); shoot = null; }
 }
 
 /* ═════════════ 화면 정보 ═════════════ */
@@ -1739,6 +1823,10 @@ const sfx = {
   launch: () => tone(70, 2.4, "sawtooth", .08, 0, 500),
   die: () => tone(400, .8, "sawtooth", .07, 0, 60),
   fizz: () => tone(2000, .25, "sawtooth", .02, 0, 600),
+  beep: () => { tone(880, .07, "square", .035); tone(620, .09, "square", .035, .09); },
+  hit: () => { hiss("bandpass", 2600, 3, .06, .2); tone(320, .06, "square", .05); },
+  boom: (k = 1) => { hiss("lowpass", 500, .6, .5 * k + .2, .3 * k + .1); tone(90, .45 * k + .1, "sawtooth", .08 * k, 0, 40); },
+  alarm: () => [0, .25, .5].forEach(w => tone(980, .16, "square", .04, w, 760)),
 };
 
 /* ═════════════ 입력 ═════════════ */
@@ -1901,6 +1989,103 @@ function dropTick(dt) {
     return true;
   });
 }
+/* ═════════════ 고장 난 탐사 로봇 ═════════════ */
+// 어두운 곳(밤·굴 속)에서 나타나 쫓아와요. 밝은 빛(횃불·전등·한낮 햇빛) 곁에는 생기지 않아요.
+const MOB_W = .3, MOB_H = 1.3;
+let mobs = [], mobSpawnT = 0, atkCD = 0;
+function buildRobot() {
+  const g = new THREE.Group(), body = lam("#6f7686"), dark = lam("#3a3f4a"), eye = new THREE.MeshBasicMaterial({ color: 0xff3b3b });
+  box(.5, .45, .4, body, 0, .8, 0, g); box(.38, .3, .34, dark, 0, 1.15, 0, g);
+  box(.09, .06, .02, eye, -.09, 1.17, -.18, g); box(.09, .06, .02, eye, .09, 1.17, -.18, g);
+  box(.04, .2, .04, dark, .12, 1.38, 0, g); box(.08, .08, .08, eye, .12, 1.5, 0, g);
+  const limb = (x, y, w, h, m) => { const p = new THREE.Group(); p.position.set(x, y, 0); box(w, h, w, m, 0, -h / 2, 0, p); g.add(p); return p; };
+  g.userData = { legs: [limb(-.14, .58, .13, .58, dark), limb(.14, .58, .13, .58, dark)], arms: [limb(-.31, 1, .1, .45, body), limb(.31, 1, .1, .45, body)], mats: [body, dark], base: [new THREE.Color("#6f7686"), new THREE.Color("#3a3f4a")] };
+  return g;
+}
+function mobHits(px, py, pz) {
+  for (let x = Math.floor(px - MOB_W); x <= Math.floor(px + MOB_W); x++) for (let y = Math.floor(py); y <= Math.floor(py + MOB_H - .001); y++)
+    for (let z = Math.floor(pz - MOB_W); z <= Math.floor(pz + MOB_W); z++) if (SOLID(get(x, y, z))) return true;
+  return false;
+}
+const mobFree = () => PLANETS[S.planet].gas || S.planet === "venus" || net.teacher;
+function brightAt(x, y, z) { const [sk, bl] = lightAt(x, y, z); return Math.max(env.e > .05 ? sk : Math.round(sk * .15), bl); }
+function clearMobs() { mobs.forEach(m => scene.remove(m.g)); mobs = []; }
+function spawnMob() {
+  const cap = S.planet === "earth" && env.e < 0 ? 6 : 4; if (mobs.length >= cap) return;
+  const a = Math.random() * Math.PI * 2, d = 10 + Math.random() * 12;
+  let x = Math.floor(P.pos.x + Math.cos(a) * d), z = Math.floor(P.pos.z + Math.sin(a) * d);
+  if (wrapX) x = ((x % SX) + SX) % SX; else if (x < 1 || x >= SX - 1) return;
+  if (z < 1 || z >= SZ - 1 || Math.hypot(x - base.x, z - base.z) < 12) return;
+  const top = topY(x, z), ys = [];
+  for (let y = 1; y <= top + 1; y++) if (!SOLID(get(x, y, z)) && !SOLID(get(x, y + 1, z)) && SOLID(get(x, y - 1, z)) && !LIQ(get(x, y, z)) && brightAt(x, y, z) < 5) ys.push(y);
+  if (!ys.length) return;
+  const g = buildRobot(); scene.add(g);
+  mobs.push({ g, p: new THREE.Vector3(x + .5, ys[Math.floor(Math.random() * ys.length)], z + .5), v: new THREE.Vector3(), hp: 10, cd: 0, ground: false, walk: 0, seen: false, burn: 0, flash: 0, wander: Math.random() * 7 });
+}
+function mobTick(dt) {
+  if (mobFree()) { if (mobs.length) clearMobs(); return; }
+  if ((mobSpawnT += dt) > 1.6) { mobSpawnT = 0; spawnMob(); }
+  const g = G_EARTH * PLANETS[S.planet].g, dayK = smooth(-.12, .25, env.e);
+  mobs = mobs.filter(m => {
+    let dx = P.pos.x - m.p.x; if (wrapX) dx = ((dx + SX / 2) % SX + SX) % SX - SX / 2;
+    const dz = P.pos.z - m.p.z, dist = Math.hypot(dx, dz), dy = P.pos.y - m.p.y;
+    if (dist > 40) { scene.remove(m.g); return false; }
+    const fx = Math.floor(m.p.x), fy = Math.floor(m.p.y + .5), fz = Math.floor(m.p.z), [sk, bl] = lightAt(fx, fy, fz);
+    // 한낮 햇빛 아래에서는 센서가 과열돼 멈춰요
+    if (env.e > .1 && sk >= 13) { m.burn += dt; if (m.burn > 1.5) { burst(fx, fy, fz, 23); sfx.fizz(); scene.remove(m.g); return false; } }
+    let wx = 0, wz = 0;
+    if (dist < 18 && Math.abs(dy) < 8) { wx = dx / dist * 2.4; wz = dz / dist * 2.4; if (!m.seen) { m.seen = true; sfx.beep(); } }
+    else { m.wander += dt * .4; wx = Math.cos(m.wander) * .8; wz = Math.sin(m.wander * 1.3) * .8; }
+    m.v.x += (wx - m.v.x) * Math.min(1, dt * 6); m.v.z += (wz - m.v.z) * Math.min(1, dt * 6); m.v.y -= g * dt; if (m.v.y < -30) m.v.y = -30;
+    let blocked = false;
+    m.p.x += m.v.x * dt; if (mobHits(m.p.x, m.p.y, m.p.z)) { m.p.x -= m.v.x * dt; blocked = true; }
+    m.p.z += m.v.z * dt; if (mobHits(m.p.x, m.p.y, m.p.z)) { m.p.z -= m.v.z * dt; blocked = true; }
+    m.p.y += m.v.y * dt;
+    if (mobHits(m.p.x, m.p.y, m.p.z)) { if (m.v.y < 0) { m.p.y = Math.floor(m.p.y) + 1; if (mobHits(m.p.x, m.p.y, m.p.z)) m.p.y -= m.v.y * dt; m.ground = true; } else m.p.y -= m.v.y * dt; m.v.y = 0; } else m.ground = false;
+    if (blocked && m.ground) m.v.y = JUMP_V * .95;
+    if (wrapX) m.p.x = ((m.p.x % SX) + SX) % SX;
+    if (m.p.y < -5) { scene.remove(m.g); return false; }
+    // 공격
+    m.cd -= dt;
+    if (dist < 1.25 && dy > -1.4 && dy < 1.6 && m.cd <= 0 && !paused) {
+      m.cd = 1.1; S.hp -= 12; cause = "robot"; hurtT = 1; lastHurt = gameT; sfx.hurt(); P.vel.x += dx / dist * 6; P.vel.z += dz / dist * 6; P.vel.y = Math.max(P.vel.y, 3);
+    }
+    // 그리기: 주변 밝기만큼 보이고, 맞으면 붉게 번쩍
+    m.flash = Math.max(0, m.flash - dt * 4);
+    const lk = .32 + .68 * Math.max(dayK * sk / 15, bl / 15);
+    m.g.userData.mats.forEach((mt, i) => { mt.color.copy(m.g.userData.base[i]).multiplyScalar(lk); if (m.flash) mt.color.lerp(cB.set(0xff3030), m.flash); });
+    m.g.position.copy(m.p); m.g.rotation.y = Math.atan2(-dx, -dz);
+    const sp = Math.hypot(m.v.x, m.v.z); m.walk += dt * sp * 2.2;
+    const sw = Math.sin(m.walk * 3) * Math.min(1, sp / 2) * .7, u = m.g.userData;
+    u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw; u.arms[0].rotation.x = -sw - (dist < 3 ? 1.2 : 0); u.arms[1].rotation.x = sw - (dist < 3 ? 1.2 : 0);
+    return true;
+  });
+  if (S.hp <= 0 && cause === "robot") die();
+}
+// 조준한 곳에 로봇이 있으면 캐는 대신 때려요
+function attackTick(dt) {
+  atkCD -= dt; if (!wantMine || !mobs.length) return false;
+  const o = third ? new THREE.Vector3(P.pos.x, P.pos.y + EYE, P.pos.z) : camera.position.clone(), d = new THREE.Vector3(); camera.getWorldDirection(d);
+  let best = null, bt = 3.6;
+  for (const m of mobs) {
+    const c = m.p.clone(); c.y += .8; if (wrapX) { let ddx = c.x - o.x; ddx = ((ddx + SX / 2) % SX + SX) % SX - SX / 2; c.x = o.x + ddx; }
+    const t = c.clone().sub(o).dot(d); if (t < 0 || t > bt) continue;
+    if (o.clone().addScaledVector(d, t).distanceTo(c) < .6) { best = m; bt = t; }
+  }
+  if (!best) return false;
+  if (atkCD <= 0) {
+    atkCD = .45; swing = .001; best.hp -= PICKS[S.tool || 0].dmg; best.flash = 1; sfx.hit();
+    best.v.addScaledVector(d, 7); best.v.y = 3.5;
+    if (best.hp <= 0) {
+      const x = Math.floor(best.p.x), y = Math.floor(best.p.y + .5), z = Math.floor(best.p.z);
+      burst(x, y, z, 23); burst(x, y, z, 9); sfx.boom(.5); scene.remove(best.g); mobs = mobs.filter(m => m !== best);
+      const got = [100]; if (Math.random() < .45) got.push(109);
+      got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
+      S.kills = (S.kills || 0) + 1; toast(`로봇을 멈췄어요! 부품에서 ${got.map(itemName).join(", ")}`, 1800); renderHotbar();
+    }
+  }
+  return true;
+}
 // 1인칭 손: 따로 그려서 블록에 파묻히지 않게 해요
 const handScene = new THREE.Scene();
 const handHemi = new THREE.HemisphereLight(0xffffff, 0x555555, .8); handScene.add(handHemi);
@@ -2005,7 +2190,19 @@ const spec = { id: null, view: 0 };
 // 선생님이나 한 학생이 방을 만들면(호스트) 나머지가 4자리 코드로 접속해요. 모든 메시지는 호스트를 거쳐 퍼져요.
 const net = (() => {
   const COLORS = ["#ff6b6b", "#ffb347", "#ffd65a", "#6fe39a", "#5fe0c8", "#7fd3ff", "#8f9bff", "#d68fff", "#ff8fc8", "#c7c9d1"];
-  const me = { id: Math.random().toString(36).slice(2, 10), name: "", color: LOOK_OPT.pack[LOOK.pack] };
+  const me = { id: Math.random().toString(36).slice(2, 10), name: "", color: LOOK_OPT.pack[LOOK.pack], party: (() => { try { return +localStorage.getItem("spacecraft2-party") || 0; } catch (e) { return 0; } })() };
+  const PARTY_COL = ["", "#ff6b6b", "#ffb347", "#6fe39a", "#7fd3ff", "#d68fff", "#ff8fc8"];
+  let psyncT = 0;
+  function partyDone(id, L) { if (!live || !me.party || teacher) return; send({ t: "pdone", party: me.party, id, pk: S.planet, name: me.name, log: L ? { t: L.t, ev: L.ev, x: L.x } : null }); }
+  function takeParty(d) {
+    if (!me.party || teacher || d.party !== me.party || d.from === me.id) return;
+    const ids = d.t === "pdone" ? [d.id] : Array.isArray(d.done) ? d.done.slice(0, 300) : [], got = [];
+    ids.forEach(id => { id = String(id); const e = MISSION_BY_ID[id]; if (!e || S.done[id]) return; S.done[id] = true; got.push(e.m.t);
+      const L = d.t === "pdone" && d.log && typeof d.log === "object" ? d.log : null;
+      S.logs.push({ id, pk: e.pk, t: String((L && L.t) || e.m.t).slice(0, 80), ev: `파티원 ${String(d.name || "?").slice(0, 10)}의 기록${L && L.ev ? ": " + String(L.ev).slice(0, 200) : ""}`, x: String((L && L.x) || "").slice(0, 600) }); });
+    const nm = String(d.name || "파티원").slice(0, 10) || "파티원", ig = josa(nm, "이", "가");
+    if (got.length) { toast(got.length === 1 ? `파티원 ${nm}${ig} '${got[0]}' 임무를 완료했어요` : `파티원 ${nm}${ig} 끝낸 임무 ${got.length}개를 함께 완료했어요`, 2800); sfx.quest(); renderMission(); save(); }
+  }
   let peer = null, host = false, code = "", conns = [], hostConn = null, sendT = 0, live = false, teacher = false, roomT0 = 0, clockOff = null, clockT = 0;
   const others = {}; // id → { name, color, pk, x, y, z, yaw, done, mesh, seen }
   const PREFIX = "spacecraft-class-";
@@ -2127,8 +2324,8 @@ const net = (() => {
     if (d.t === "state" && d.from && d.from !== me.id) {
       const o = others[d.from] = others[d.from] || { mesh: null };
       Object.assign(o, { name: String(d.name || "?").slice(0, 10), color: /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "#ffffff", pk: String(d.pk), x: +d.x || 0, y: +d.y || 0, z: +d.z || 0, yaw: +d.yaw || 0, pitch: +d.pitch || 0, done: +d.done || 0, dex: +d.dex || 0, hp: +d.hp || 0, look: cleanLook(d.look), sw: +d.sw || 0, seen: performance.now(),
-        mission: String(d.mission || "").slice(0, 40), o2: +d.o2 || 0, pw: +d.pw || 0, T: +d.T || 0 });
-      if (teacher) { const k = o.name + o.color; const b = book[k] = book[k] || { first: Date.now() }; Object.assign(b, { id: d.from, name: o.name, color: o.color, pk: o.pk, done: o.done, dex: o.dex, hp: o.hp, seen: Date.now() }); }
+        mission: String(d.mission || "").slice(0, 40), o2: +d.o2 || 0, pw: +d.pw || 0, T: +d.T || 0, party: Number.isInteger(d.party) ? d.party : 0 });
+      if (teacher) { const k = o.name + o.color; const b = book[k] = book[k] || { first: Date.now() }; Object.assign(b, { id: d.from, name: o.name, color: o.color, pk: o.pk, done: o.done, dex: o.dex, hp: o.hp, party: o.party, seen: Date.now() }); }
     }
     if (d.t === "edit" && d.pk === S.planet && Number.isInteger(d.x) && Number.isInteger(d.y) && Number.isInteger(d.z) && (BLOCKS[d.b] || d.b === 0)) {
       edit(d.x, d.y, d.z, d.b, true);
@@ -2136,6 +2333,7 @@ const net = (() => {
       (S.edits[d.pk] = S.edits[d.pk] || {})[d.x + "," + d.y + "," + d.z] = d.b;
     }
     if (d.t === "bye" && d.from) removeOther(d.from);
+    if ((d.t === "pdone" || d.t === "psync") && Number.isInteger(d.party)) takeParty(d);
     if (d.t === "clock" && !host && Number.isFinite(d.c)) clockOff = d.c - performance.now() / 1000;
     if (d.t === "notice" && !teacher) { const n = $("notice"); n.innerHTML = "<small>선생님</small>"; n.appendChild(document.createTextNode(String(d.text || "").slice(0, 60))); n.hidden = false; clearTimeout(n._t); n._t = setTimeout(() => { n.hidden = true; }, 8000); sfx.quest(); }
   }
@@ -2148,7 +2346,8 @@ const net = (() => {
     if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000 }); }
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
     if (teacher) { tickOthers(dt); return; }
-    if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
+    if (me.party && (psyncT += dt) > 3) { psyncT = 0; send({ t: "psync", party: me.party, name: me.name, done: Object.keys(S.done) }); }
+    if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", party: me.party, look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
     tickOthers(dt);
     renderRoom();
   }
@@ -2211,7 +2410,7 @@ const net = (() => {
     L.forEach(b => {
       const on = now - b.seen < 10000, tr = document.createElement("tr"); if (!on) tr.className = "gone";
       tr.innerHTML = `<td><i style="background:${b.color}"></i><span></span></td><td>${(PLANETS[b.pk] || {}).name || "?"}</td><td>${b.done}개</td><td>${b.dex} / 11</td><td>${on ? b.hp : "—"}</td><td>${on ? "접속 중" : "나감"}</td><td>${on ? `<button class="btn watch">화면 보기</button>` : ""}</td>`;
-      tr.querySelector("span").textContent = b.name; t.appendChild(tr);
+      tr.querySelector("span").textContent = b.name + (b.party ? ` · 파티 ${b.party}` : ""); t.appendChild(tr);
       if (on && others[b.id]) { tr.className = "pick"; tr.dataset.id = b.id; }
     });
   }
@@ -2227,11 +2426,14 @@ const net = (() => {
   }
   function openRoster() {
     pause(true);
-    const L = [{ name: me.name + " (나)", color: me.color, pk: S.planet, done: Object.keys(S.done).length }].concat(Object.values(others));
-    L.sort((a, b) => b.done - a.done);
+    const L = [{ name: me.name + " (나)", color: me.color, pk: S.planet, done: Object.keys(S.done).length, party: me.party }].concat(Object.values(others));
+    L.sort((a, b) => (a.party || 9) - (b.party || 9) || b.done - a.done);
+    const pp = $("partyPick"); pp.innerHTML = "";
+    for (let k = 0; k <= 6; k++) { const b = document.createElement("button"); b.textContent = k ? `파티 ${k}` : "혼자"; b.className = me.party === k ? "on" : ""; if (k) b.style.borderColor = PARTY_COL[k];
+      b.onclick = () => { me.party = k; try { localStorage.setItem("spacecraft2-party", String(k)); } catch (e) {} psyncT = 3; openRoster(); }; pp.appendChild(b); }
     $("rosterNote").textContent = `방 코드 ${code}${host ? " · 내가 방장이에요. 내 게임을 끄면 방이 닫혀요." : ""}`;
     const box = $("rosterList"); box.innerHTML = "";
-    L.forEach(o => { const d = document.createElement("div"); d.innerHTML = `<i style="background:${o.color}"></i><b></b><small>${(PLANETS[o.pk] || {}).name || "?"}</small><small>임무 ${o.done}개</small>`; d.querySelector("b").textContent = o.name; box.appendChild(d); });
+    L.forEach(o => { const d = document.createElement("div"); d.innerHTML = `<i style="background:${o.color}"></i><b></b><small>${(PLANETS[o.pk] || {}).name || "?"}${o.party ? ` · <span style="color:${PARTY_COL[o.party]}">파티 ${o.party}</span>` : ""}</small><small>임무 ${o.done}개</small>`; d.querySelector("b").textContent = o.name; box.appendChild(d); });
     $("rosterOv").hidden = false;
   }
   $("room").onclick = openRoster; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; resume(); };
@@ -2243,7 +2445,7 @@ const net = (() => {
   });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { send, tick, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
+  return { send, tick, partyDone, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
@@ -2266,7 +2468,7 @@ function frame(now) {
   }
   computeEnv();
   net.tick(dt);
-  if (!paused) { survival(dt); missionTick(dt); hazards(dt); deviceTick(dt); recallTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
+  if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
   updateCamera(dt); if (!paused) dropTick(dt);
@@ -2300,7 +2502,7 @@ function frame(now) {
   // 조준·채굴
   const h = paused ? null : raycast(6);
   hl.visible = !!h; if (h) hl.position.set(h.x + .5, h.y + .5, h.z + .5);
-  if (!paused) mineTick(dt, h); else crack.material.opacity = 0;
+  if (!paused) { mobTick(dt); if (attackTick(dt)) { mining = null; crack.material.opacity = 0; } else mineTick(dt, h); } else crack.material.opacity = 0;
   // 파편
   parts = parts.filter(p => (p.l -= dt) > 0);
   for (let i = 0; i < PMAX; i++) {
@@ -2335,6 +2537,6 @@ $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
