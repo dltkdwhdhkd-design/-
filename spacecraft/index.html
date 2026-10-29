@@ -1836,34 +1836,103 @@ const net = (() => {
     $("hostBtn").disabled = $("joinBtn").disabled = $("teachBtn").disabled = false;
   }
   function nameOk() { me.name = ($("nick").value || "").trim().slice(0, 10); if (!me.name) { msg("먼저 내 이름을 적어 주세요.", true); $("nick").focus(); return false; } return true; }
+  // 서버 경유(MQTT) 연결: 학교 와이파이가 기기끼리 직접 연결(WebRTC)을 막아도 되도록, 공개 중계 서버를 거쳐 주고받음
+  const BROKERS = qs.get("mq") ? qs.get("mq").split(",") : ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt", "wss://test.mosquitto.org:8081/mqtt"];
+  const TOP = "spacecraft-class/v1/";
+  let mqs = [], mqJoin = null; // 호스트: 붙은 중계 서버들 · 참가자: 들어간 중계 서버
+  function loadMq() {
+    if (window.mqtt) return Promise.resolve();
+    return new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"; sc.onload = ok; sc.onerror = () => bad(new Error("lib")); document.head.appendChild(sc); });
+  }
+  function mqOpen(url, will) {
+    return new Promise((ok, bad) => {
+      let cl; try { cl = mqtt.connect(url, { connectTimeout: 6000, reconnectPeriod: 3000, clean: true, will }); } catch (e) { return bad(e); }
+      const t = setTimeout(() => { cl.end(true); bad(new Error("timeout")); }, 7000);
+      cl.once("connect", () => { clearTimeout(t); ok({ cl, url, seen: 0 }); });
+    });
+  }
+  const pub = (m, d) => { if (m.cl.connected) m.cl.publish(TOP + code + "/d", JSON.stringify(d)); };
+  function parse(buf) { try { return JSON.parse(String(buf)); } catch (e) { return null; } }
   async function makeRoom(asTeacher) {
     teacher = asTeacher === true;
     if (teacher && !$("nick").value.trim()) $("nick").value = "선생님";
     if (!nameOk()) return; $("hostBtn").disabled = $("joinBtn").disabled = $("teachBtn").disabled = true; msg("방을 만드는 중…");
-    try { await loadLib(); } catch (e) { return fail(e); }
+    const libs = await Promise.allSettled([loadLib(), loadMq()]);
+    if (libs.every(r => r.status === "rejected")) return fail("lib");
     code = String(1000 + Math.floor(Math.random() * 9000));
+    let opened = false, tries = 0;
+    const ready = () => { if (opened) return; opened = true; host = true; live = true; $("code").value = code; msg(`방 코드 ${code} — 친구들에게 이 4자리를 알려 주고, 시작 버튼을 누르세요.`); if (teacher) openTeacher(); };
+    const gaveUp = () => { if (!opened && ++tries === 2) fail("network"); };
+    // ① 중계 서버들: 붙는 곳마다 방을 알림(선생님이 나가면 자동으로 지워짐)
+    if (window.mqtt) Promise.allSettled(BROKERS.map(u => mqOpen(u, { topic: TOP + code + "/room", payload: "", retain: true, qos: 1 }))).then(rs => {
+      rs.forEach(r => {
+        if (r.status !== "fulfilled") return; const m = r.value; mqs.push(m);
+        m.cl.subscribe(TOP + code + "/d");
+        m.cl.publish(TOP + code + "/room", "1", { retain: true, qos: 1 });
+        m.cl.on("connect", () => m.cl.publish(TOP + code + "/room", "1", { retain: true, qos: 1 }));
+        m.cl.on("message", (tp, buf) => { const d = parse(buf); if (!d || d._h || d.from === me.id) return; m.seen = performance.now(); onData(d, m); });
+      });
+      if (mqs.length) ready(); else gaveUp();
+    }); else tries++;
+    // ② 직접 연결(WebRTC): 와이파이가 허락하면 이쪽도 받음
+    if (!window.Peer) { tries++; return; }
     peer = new Peer(PREFIX + code, peerOpts());
-    peer.on("open", () => { host = true; live = true; $("code").value = code; msg(`방 코드 ${code} — 친구들에게 이 4자리를 알려 주고, 시작 버튼을 누르세요.`); if (teacher) openTeacher(); });
+    peer.on("open", ready);
     peer.on("connection", (c) => { c.on("open", () => { conns.push(c); c.send({ t: "welcome", code }); }); c.on("data", (d) => onData(d, c)); c.on("close", () => { conns = conns.filter(x => x !== c); dropBy(c); }); });
-    peer.on("error", fail);
+    peer.on("error", (e) => { if (!opened && !mqs.length) { if (String(e && e.type) === "unavailable-id") fail(e); else gaveUp(); } });
     peer.on("disconnected", () => { try { peer.reconnect(); } catch (e) {} });
   }
+  // 참가: 먼저 중계 서버에서 방을 찾고, 없으면 직접 연결로 시도
+  async function joinMq() {
+    try { await loadMq(); } catch (e) { return null; }
+    const will = { topic: TOP + code + "/d", payload: JSON.stringify({ t: "bye", from: me.id }), qos: 0 };
+    return new Promise((done) => {
+      let won = null, left = BROKERS.length; const all = [];
+      const finish = (m) => { if (won !== null) return; won = m; clearTimeout(t); all.forEach(x => { if (x !== m) x.cl.end(true); }); done(m); };
+      const t = setTimeout(() => finish(false), 9000);
+      BROKERS.forEach(u => mqOpen(u, will).then(m => {
+        if (won !== null) { m.cl.end(true); return; } all.push(m);
+        m.cl.on("message", (tp, buf) => {
+          if (tp.endsWith("/room")) { if (String(buf) === "1") finish(m); else if (won === m) closed(); return; }
+          if (won !== m) return; const d = parse(buf); if (d && d.from !== me.id) onData(d, m);
+        });
+        m.cl.subscribe([TOP + code + "/room", TOP + code + "/d"]);
+        setTimeout(() => { if (won === null && --left === 0) finish(false); }, 2500); // 붙었는데 방 소식이 없음
+      }, () => { if (won === null && --left === 0) finish(false); }));
+    });
+  }
+  function closed() { if (!live) return; live = false; toast("방이 닫혔어요. 혼자 계속 탐사해요"); for (const id in others) removeOther(id); renderRoom(); }
   async function joinRoom() {
     if (!nameOk()) return; const c = ($("code").value || "").replace(/\D/g, "");
     if (c.length !== 4) { msg("방 코드 4자리 숫자를 적어 주세요.", true); return; }
     $("hostBtn").disabled = $("joinBtn").disabled = $("teachBtn").disabled = true; msg("방에 들어가는 중…");
+    code = c;
+    const m = await joinMq();
+    if (m) { mqJoin = m; live = true; msg(`방 ${code}에 들어왔어요! 시작 버튼을 누르세요.`); return; }
     try { await loadLib(); } catch (e) { return fail(e); }
-    code = c; peer = new Peer(undefined, peerOpts());
+    peer = new Peer(undefined, peerOpts());
+    // 12초 안에 못 들어가면 멈춰 있지 말고 이유를 알려 줌
+    const p0 = peer, wait = setTimeout(() => {
+      if (live || peer !== p0) return;
+      const atServer = p0.open; try { p0.destroy(); } catch (e) {} peer = null;
+      msg(atServer ? "방 코드는 찾았지만 선생님 기기와 연결이 안 돼요. 학교 인터넷이 막고 있을 수 있어요. 휴대폰 데이터·핫스팟으로 해 보거나, 혼자 하기로 진행하세요."
+        : "연결 서버에 닿지 못했어요. 학교 인터넷이 막혀 있을 수 있어요. 휴대폰 데이터·핫스팟으로 해 보거나, 혼자 하기로 진행하세요.", true);
+      $("hostBtn").disabled = $("joinBtn").disabled = $("teachBtn").disabled = false;
+    }, 12000);
     peer.on("open", () => {
       hostConn = peer.connect(PREFIX + code, { reliable: true });
-      hostConn.on("open", () => { live = true; msg(`방 ${code}에 들어왔어요! 시작 버튼을 누르세요.`); });
+      hostConn.on("open", () => { clearTimeout(wait); live = true; msg(`방 ${code}에 들어왔어요! 시작 버튼을 누르세요.`); });
       hostConn.on("data", (d) => onData(d, hostConn));
-      hostConn.on("close", () => { live = false; toast("방이 닫혔어요. 혼자 계속 탐사해요"); for (const id in others) removeOther(id); renderRoom(); });
+      hostConn.on("close", closed);
     });
-    peer.on("error", fail);
+    peer.on("error", (e) => { clearTimeout(wait); fail(e); });
   }
-  function relay(d, from) { conns.forEach(c => { if (c !== from && c.open) c.send(d); }); }
-  function send(d) { if (!live) return; d.from = me.id; if (host) relay(d, null); else if (hostConn && hostConn.open) hostConn.send(d); }
+  function relay(d, from) {
+    conns.forEach(c => { if (c !== from && c.open) c.send(d); });
+    const now = performance.now(), h = Object.assign({ _h: 1 }, d);
+    mqs.forEach(m => { if (m !== from && now - m.seen < 15000) pub(m, h); }); // 학생이 있는 중계 서버에만
+  }
+  function send(d) { if (!live) return; d.from = me.id; if (host) relay(d, null); else if (mqJoin) pub(mqJoin, d); else if (hostConn && hostConn.open) hostConn.send(d); }
   function onData(d, c) {
     if (!d || typeof d !== "object") return;
     if (host && d.t !== "welcome") { relay(d, c); if (d.from) c._pid = d.from; }
@@ -1889,7 +1958,7 @@ const net = (() => {
     sendT += dt;
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
     if (teacher) { tickOthers(dt); return; }
-    if (sendT > .1) { sendT = 0; const cm = curMission(); send({ t: "state", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
+    if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
     tickOthers(dt);
     renderRoom();
   }
@@ -1977,10 +2046,14 @@ const net = (() => {
   }
   $("room").onclick = openRoster; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; resume(); };
   $("hostBtn").onclick = () => makeRoom(false); $("joinBtn").onclick = joinRoom; $("teachBtn").onclick = () => makeRoom(true);
-  addEventListener("beforeunload", (e) => { if (teacher && conns.length) { e.preventDefault(); e.returnValue = ""; return; } try { send({ t: "bye" }); peer && peer.destroy(); } catch (e) {} });
+  addEventListener("beforeunload", (e) => {
+    if (teacher && Object.keys(others).length) { e.preventDefault(); e.returnValue = ""; return; }
+    try { send({ t: "bye" }); peer && peer.destroy(); } catch (e) {}
+    try { mqs.forEach(m => { m.cl.publish(TOP + code + "/room", "", { retain: true, qos: 1 }); m.cl.end(); }); if (mqJoin) mqJoin.cl.end(); } catch (e) {}
+  });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { send, tick, get others() { return others; }, get live() { return live; }, me };
+  return { send, tick, get others() { return others; }, get live() { return live; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
