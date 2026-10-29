@@ -165,6 +165,26 @@ td.unk { color: #4e5786; }
 .roster i { width: 14px; height: 14px; border-radius: 3px; }
 .roster small { color: var(--ink-dim); }
 @media (max-width: 760px) { #room { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 185px); } }
+#teachOv { position: fixed; inset: 0; z-index: 11; background: var(--void); overflow-y: auto; padding: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) 20px max(20px, env(safe-area-inset-left, 0px)); display: grid; gap: 18px; align-content: start; }
+.tHead { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: end; justify-content: space-between; }
+.tHead h1 { font-size: clamp(1.6rem, 3vw, 2.4rem); }
+.tCode { font-family: var(--font-display); font-size: clamp(3rem, 9vw, 6.5rem); line-height: 1; color: var(--ore); letter-spacing: .12em; }
+.tSteps { color: var(--ink-dim); line-height: 1.7; margin: 0; padding-left: 1.3em; }
+.tSteps b { color: var(--ink); }
+.tUrl { font-weight: 700; color: var(--ice); word-break: break-all; }
+.tPlanets { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.tPlanets div { background: #ffffff08; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 4px; }
+.tPlanets div.on { border-color: var(--ore); }
+.tPlanets b { font-family: var(--font-display); font-weight: 400; font-size: 1.2em; }
+.tPlanets span { font-size: 1.6em; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tPlanets small { color: var(--ink-dim); line-height: 1.4; }
+.tTable { min-width: 560px; font-size: 1em; }
+.tTable td i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+.tTable .gone { color: #4e5786; }
+.tNotice { display: flex; gap: 8px; flex-wrap: wrap; }
+.tNotice input { flex: 1 1 260px; font: inherit; color: var(--ink); background: #0a0d1c; border: 1.5px solid var(--line); border-radius: 8px; padding: .55em .8em; }
+#notice { left: 50%; top: 32%; transform: translateX(-50%); background: rgba(40, 30, 6, .92); border: 2px solid var(--ore); border-radius: 12px; padding: .7em 1.2em; font-weight: 700; font-size: 1.15em; text-align: center; max-width: min(620px, 92vw); z-index: 9; }
+#notice small { display: block; color: var(--ore); font-size: .7em; letter-spacing: .08em; }
 #flight { position: fixed; inset: 0; z-index: 12; background: #000; display: grid; place-items: center; text-align: center; }
 #flight canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 #flight .txt { position: relative; text-shadow: 0 2px 10px #000; }
@@ -200,6 +220,7 @@ td.unk { color: #4e5786; }
 </div>
 <div class="hud" id="warn" hidden></div>
 <div class="hud click" id="room" hidden></div>
+<div class="hud" id="notice" hidden></div>
 <div class="hud" id="cross" hidden></div>
 <div class="hud" id="toast" hidden></div>
 <div class="hud" id="jumpMeter" hidden></div>
@@ -230,6 +251,7 @@ td.unk { color: #4e5786; }
       <b>친구와 함께하기 (선택)</b>
       <div class="row"><input id="nick" maxlength="10" placeholder="내 이름 (예: 3번 김우주)" aria-label="내 이름"></div>
       <div class="row"><button class="btn ghost" id="hostBtn">새 방 만들기</button><span style="color:var(--ink-dim)">또는</span><input id="code" inputmode="numeric" maxlength="4" placeholder="0000" aria-label="방 코드 4자리"><button class="btn ghost" id="joinBtn">방 참여</button></div>
+      <div class="row"><button class="btn ghost" id="teachBtn">선생님 화면 (플레이 없이 방만 열기)</button></div>
       <p id="mpMsg">혼자 하려면 아래 시작 버튼만 누르면 돼요. 같은 방에 들어오면 같은 행성에서 서로 보이고, 캐고 쌓은 블록도 함께 바뀌어요.</p>
     </div>
     <div class="row"><button class="btn big" id="goBtn">지구 훈련 기지에서 시작</button><button class="btn ghost big" id="contBtn" hidden>이어서 하기</button></div>
@@ -264,6 +286,21 @@ td.unk { color: #4e5786; }
     <ul class="jlist" id="jList"></ul>
     <div class="row"><button class="btn ghost" id="dexClose">닫기 <kbd>J</kbd></button></div>
   </div>
+</div>
+
+<div id="teachOv" hidden>
+  <div class="tHead">
+    <div><div class="label">스페이스 크래프트 · 선생님 화면</div><h1>우리 반 탐사 현황</h1></div>
+    <div style="text-align:right"><div class="label">방 코드</div><div class="tCode" id="tCode">····</div></div>
+  </div>
+  <ol class="tSteps">
+    <li>학생들은 <span class="tUrl" id="tUrl"></span> 에 들어가요.</li>
+    <li><b>내 이름</b>을 적고, 위의 <b>방 코드 4자리</b>를 넣고 <b>방 참여</b>를 누른 다음 시작해요.</li>
+    <li>이 화면을 닫거나 끄면 방이 닫혀요. 수업이 끝날 때까지 켜 두세요.</li>
+  </ol>
+  <div class="tPlanets" id="tPlanets"></div>
+  <div class="tNotice"><input id="tMsg" maxlength="60" placeholder="학생 화면에 띄울 말 (예: 5분 남았어요! 기지로 돌아오세요)" aria-label="학생에게 보낼 말"><button class="btn" id="tSend">학생 화면에 띄우기</button></div>
+  <div class="tablewrap"><table class="tTable" id="tTable"></table></div>
 </div>
 
 <div class="overlay" id="rosterOv" hidden>
@@ -1474,7 +1511,7 @@ function showHud(v) { ["mission", "env", "gauges", "cross", "hotbar", "tools", "
 const net = (() => {
   const COLORS = ["#ff6b6b", "#ffb347", "#ffd65a", "#6fe39a", "#5fe0c8", "#7fd3ff", "#8f9bff", "#d68fff", "#ff8fc8", "#c7c9d1"];
   const me = { id: Math.random().toString(36).slice(2, 10), name: "", color: COLORS[Math.floor(Math.random() * COLORS.length)] };
-  let peer = null, host = false, code = "", conns = [], hostConn = null, sendT = 0, live = false;
+  let peer = null, host = false, code = "", conns = [], hostConn = null, sendT = 0, live = false, teacher = false;
   const others = {}; // id → { name, color, pk, x, y, z, yaw, done, mesh, seen }
   const PREFIX = "spacecraft-class-";
   const qs = new URLSearchParams(location.search), local = qs.get("peer");
@@ -1489,15 +1526,17 @@ const net = (() => {
     msg(t === "lib" || t === "network" || t === "server-error" || t === "socket-error" ? "연결 서버에 닿지 못했어요. 이 화면이 GitHub Pages 주소(github.io)인지, 학교 인터넷이 막혀 있지 않은지 확인하세요. 혼자 하기는 그대로 돼요."
       : t === "peer-unavailable" ? "그 코드의 방이 없어요. 코드를 다시 확인하거나, 방을 만든 사람이 게임을 켜 두었는지 확인하세요."
       : t === "unavailable-id" ? "같은 코드의 방이 이미 있어요. 다시 눌러 새 코드를 받으세요." : "연결에 실패했어요: " + t, true);
-    $("hostBtn").disabled = $("joinBtn").disabled = false;
+    $("hostBtn").disabled = $("joinBtn").disabled = $("teachBtn").disabled = false;
   }
   function nameOk() { me.name = ($("nick").value || "").trim().slice(0, 10); if (!me.name) { msg("먼저 내 이름을 적어 주세요.", true); $("nick").focus(); return false; } return true; }
-  async function makeRoom() {
-    if (!nameOk()) return; $("hostBtn").disabled = $("joinBtn").disabled = true; msg("방을 만드는 중…");
+  async function makeRoom(asTeacher) {
+    teacher = asTeacher === true;
+    if (teacher && !$("nick").value.trim()) $("nick").value = "선생님";
+    if (!nameOk()) return; $("hostBtn").disabled = $("joinBtn").disabled = $("teachBtn").disabled = true; msg("방을 만드는 중…");
     try { await loadLib(); } catch (e) { return fail(e); }
     code = String(1000 + Math.floor(Math.random() * 9000));
     peer = new Peer(PREFIX + code, peerOpts());
-    peer.on("open", () => { host = true; live = true; $("code").value = code; msg(`방 코드 ${code} — 친구들에게 이 4자리를 알려 주고, 시작 버튼을 누르세요.`); });
+    peer.on("open", () => { host = true; live = true; $("code").value = code; msg(`방 코드 ${code} — 친구들에게 이 4자리를 알려 주고, 시작 버튼을 누르세요.`); if (teacher) openTeacher(); });
     peer.on("connection", (c) => { c.on("open", () => { conns.push(c); c.send({ t: "welcome", code }); }); c.on("data", (d) => onData(d, c)); c.on("close", () => { conns = conns.filter(x => x !== c); dropBy(c); }); });
     peer.on("error", fail);
     peer.on("disconnected", () => { try { peer.reconnect(); } catch (e) {} });
@@ -1505,7 +1544,7 @@ const net = (() => {
   async function joinRoom() {
     if (!nameOk()) return; const c = ($("code").value || "").replace(/\D/g, "");
     if (c.length !== 4) { msg("방 코드 4자리 숫자를 적어 주세요.", true); return; }
-    $("hostBtn").disabled = $("joinBtn").disabled = true; msg("방에 들어가는 중…");
+    $("hostBtn").disabled = $("joinBtn").disabled = $("teachBtn").disabled = true; msg("방에 들어가는 중…");
     try { await loadLib(); } catch (e) { return fail(e); }
     code = c; peer = new Peer(undefined, peerOpts());
     peer.on("open", () => {
@@ -1523,7 +1562,8 @@ const net = (() => {
     if (host && d.t !== "welcome") { relay(d, c); if (d.from) c._pid = d.from; }
     if (d.t === "state" && d.from && d.from !== me.id) {
       const o = others[d.from] = others[d.from] || { mesh: null };
-      Object.assign(o, { name: String(d.name || "?").slice(0, 10), color: /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "#ffffff", pk: String(d.pk), x: +d.x || 0, y: +d.y || 0, z: +d.z || 0, yaw: +d.yaw || 0, done: +d.done || 0, seen: performance.now() });
+      Object.assign(o, { name: String(d.name || "?").slice(0, 10), color: /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "#ffffff", pk: String(d.pk), x: +d.x || 0, y: +d.y || 0, z: +d.z || 0, yaw: +d.yaw || 0, done: +d.done || 0, dex: +d.dex || 0, hp: +d.hp || 0, seen: performance.now() });
+      if (teacher) { const k = o.name + o.color; const b = book[k] = book[k] || { first: Date.now() }; Object.assign(b, { name: o.name, color: o.color, pk: o.pk, done: o.done, dex: o.dex, hp: o.hp, seen: Date.now() }); }
     }
     if (d.t === "edit" && d.pk === S.planet && Number.isInteger(d.x) && Number.isInteger(d.y) && Number.isInteger(d.z) && (BLOCKS[d.b] || d.b === 0)) {
       edit(d.x, d.y, d.z, d.b, true);
@@ -1531,6 +1571,7 @@ const net = (() => {
       (S.edits[d.pk] = S.edits[d.pk] || {})[d.x + "," + d.y + "," + d.z] = d.b;
     }
     if (d.t === "bye" && d.from) removeOther(d.from);
+    if (d.t === "notice" && !teacher) { const n = $("notice"); n.innerHTML = "<small>선생님</small>"; n.appendChild(document.createTextNode(String(d.text || "").slice(0, 60))); n.hidden = false; clearTimeout(n._t); n._t = setTimeout(() => { n.hidden = true; }, 8000); sfx.quest(); }
   }
   function dropBy(c) { if (c._pid) { removeOther(c._pid); relay({ t: "bye", from: c._pid }, null); } }
   function avatar(o) {
@@ -1549,7 +1590,8 @@ const net = (() => {
   function tick(dt) {
     if (!live) return;
     sendT += dt;
-    if (sendT > .1) { sendT = 0; send({ t: "state", name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
+    if (teacher) { if (performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } return; }
+    if (sendT > .1) { sendT = 0; send({ t: "state", dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length }); }
     const now = performance.now();
     for (const id in others) {
       const o = others[id];
@@ -1565,7 +1607,35 @@ const net = (() => {
     }
     renderRoom();
   }
-  let roomT = 0;
+  let roomT = 0, teachT = 0;
+  const book = {}; // 선생님 화면: 한 번이라도 들어온 학생 기록(이름+색 기준)
+  function openTeacher() {
+    $("startOv").hidden = true; $("teachOv").hidden = false;
+    $("tCode").textContent = code; $("tUrl").textContent = location.origin + location.pathname;
+    renderTeacher();
+  }
+  function renderTeacher() {
+    const L = Object.values(book), now = Date.now();
+    const box = $("tPlanets"); box.innerHTML = "";
+    TOUR.forEach(pk => {
+      const here = L.filter(b => b.pk === pk && now - b.seen < 10000);
+      const d = document.createElement("div"); if (here.length) d.className = "on";
+      d.innerHTML = `<b>${PLANETS[pk].name}</b><span>${here.length}</span><small></small>`;
+      d.querySelector("small").textContent = here.map(b => b.name).join(", ");
+      box.appendChild(d);
+    });
+    L.sort((a, b) => b.done - a.done || a.name.localeCompare(b.name));
+    const t = $("tTable");
+    t.innerHTML = `<tr><th>학생</th><th>지금 있는 곳</th><th>완료한 임무</th><th>도감 기록</th><th>체력</th><th>상태</th></tr>`;
+    if (!L.length) t.insertAdjacentHTML("beforeend", `<tr><td colspan="6" class="gone">아직 들어온 학생이 없어요.</td></tr>`);
+    L.forEach(b => {
+      const on = now - b.seen < 10000, tr = document.createElement("tr"); if (!on) tr.className = "gone";
+      tr.innerHTML = `<td><i style="background:${b.color}"></i><span></span></td><td>${(PLANETS[b.pk] || {}).name || "?"}</td><td>${b.done}개</td><td>${b.dex} / 11</td><td>${on ? b.hp : "—"}</td><td>${on ? "접속 중" : "나감"}</td>`;
+      tr.querySelector("span").textContent = b.name; t.appendChild(tr);
+    });
+  }
+  $("tSend").onclick = () => { const v = $("tMsg").value.trim(); if (!v) return; send({ t: "notice", text: v.slice(0, 60) }); $("tMsg").value = ""; $("tSend").textContent = "보냈어요"; setTimeout(() => { $("tSend").textContent = "학생 화면에 띄우기"; }, 1500); };
+  $("tMsg").addEventListener("keydown", (e) => { if (e.key === "Enter") $("tSend").click(); });
   function renderRoom() {
     const el = $("room"); if (!code || !$("startOv").hidden) { el.hidden = true; return; }
     if (performance.now() - roomT < 500) return; roomT = performance.now();
@@ -1582,8 +1652,8 @@ const net = (() => {
     $("rosterOv").hidden = false;
   }
   $("room").onclick = openRoster; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; pause(false); };
-  $("hostBtn").onclick = makeRoom; $("joinBtn").onclick = joinRoom;
-  addEventListener("beforeunload", () => { try { send({ t: "bye" }); peer && peer.destroy(); } catch (e) {} });
+  $("hostBtn").onclick = () => makeRoom(false); $("joinBtn").onclick = joinRoom; $("teachBtn").onclick = () => makeRoom(true);
+  addEventListener("beforeunload", (e) => { if (teacher && conns.length) { e.preventDefault(); e.returnValue = ""; return; } try { send({ t: "bye" }); peer && peer.destroy(); } catch (e) {} });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
   return { send, tick, get others() { return others; }, get live() { return live; }, me };
