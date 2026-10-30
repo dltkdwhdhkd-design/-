@@ -1037,10 +1037,13 @@ camera.rotation.order = "YXZ";
 const tex = new THREE.CanvasTexture(atlas); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
 const matSolid = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true, alphaTest: .5 });
 const matWater = new THREE.MeshLambertMaterial({ map: tex, vertexColors: true, transparent: true, opacity: .72, depthWrite: false });
+// 손에 든 빛(랜턴·전등·횃불): 내 위치(xyz)와 밝기(w, 0~1)
+const handU = { value: new THREE.Vector4(0, -999, 0, 0) };
 [matSolid, matWater].forEach(m => { m.onBeforeCompile = (sh) => {
-  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 lt;\nvarying vec2 vLt;").replace("#include <color_vertex>", "#include <color_vertex>\nvLt = lt;");
-  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec2 vLt;")
-    .replace("vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;", "vec3 outgoingLight = (reflectedLight.directDiffuse + reflectedLight.indirectDiffuse) * vLt.x + diffuseColor.rgb * vLt.y * vec3(1.0, 0.8, 0.55) + totalEmissiveRadiance;");
+  sh.uniforms.uHand = handU;
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 lt;\nvarying vec2 vLt;\nvarying vec3 vWp;").replace("#include <color_vertex>", "#include <color_vertex>\nvLt = lt;").replace("#include <project_vertex>", "#include <project_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+  sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec2 vLt;\nvarying vec3 vWp;\nuniform vec4 uHand;")
+    .replace("vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;", "float hL = uHand.w > 0.0 ? pow(clamp(uHand.w - distance(vWp, uHand.xyz) / 15.0, 0.0, 1.0), 1.7) * 0.95 : 0.0;\nvec3 outgoingLight = (reflectedLight.directDiffuse + reflectedLight.indirectDiffuse) * vLt.x + diffuseColor.rgb * max(vLt.y, hL) * vec3(1.0, 0.8, 0.55) + totalEmissiveRadiance;");
 }; });
 const skyF = (l) => .045 + .955 * Math.pow(l / 15, 1.6), blF = (l) => Math.pow(l / 15, 1.7) * .95;
 const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, .5); scene.add(hemi);
@@ -1678,6 +1681,10 @@ function mineTick(dt, h) {
   }
 }
 const HOT_FIRST = [120, 121, 122, 140, 129, 128, 125, 124, 123, 127, 36, 37, 80, 82, 35, 31, 30, 32];
+const HAND_LV = { 80: 14, 37: 13, 82: 13, 36: 12 };
+// 횃불은 산소가 있어야 타요
+const handLv = () => { const id = heldId(); return id === 36 && !PLANETS[S.planet].breath ? 0 : HAND_LV[id] || 0; };
+const handAt = (x, y, z) => { const lv = handLv(); return lv ? Math.max(0, Math.round(lv - Math.hypot(x - P.pos.x, y - P.pos.y - 1.2, z - P.pos.z))) : 0; };
 const heldId = () => S.hot[sel] || 0, heldTier = () => (TOOLS[heldId()] || {}).tier || 0;
 // 칸 정리: 다 쓴 칸은 비우고, 새로 생긴 블록·도구는 빈 칸에 넣어요
 function syncHot() {
@@ -1813,7 +1820,7 @@ const RECIPES = [
   { id: 35, n: "제작대", need: { 7: 4 }, out: 35, cat: "block", hand: true, use: "놓아 두면 4칸 안에서 곡괭이와 장비를 만들 수 있어요. 기지 코어 근처도 제작대처럼 쓸 수 있어요." },
   { id: 36, n: "횃불 ×4", need: { 7: 1, 108: 1 }, out: 36, count: 4, cat: "block", hand: true, use: "주변을 밝혀요. 밝은 곳에는 고장 난 로봇이 생기지 않아요. 산소가 있어야 타서 지구에서만 쓸 수 있어요." },
   { id: 37, n: "전등 ×2", need: { 109: 1, 32: 1, 101: 1 }, out: 37, count: 2, cat: "block", use: "전기로 빛을 내서 산소가 없는 달·화성·수성에서도 켜져요. 횃불보다 조금 더 밝아요." },
-  { id: 80, n: "랜턴 ×2", need: { 100: 2, 37: 1 }, out: 80, count: 2, cat: "block", use: "바닥에 놓으면 세워지고, 천장(블록 아랫면)에 놓으면 매달려요. 지나다닐 수 있어 건물 안 장식에 좋아요. 전기로 켜져서 어느 천체에서나 빛나요." },
+  { id: 80, n: "랜턴 ×2", need: { 100: 2, 37: 1 }, out: 80, count: 2, cat: "block", use: "손에 들고 다니면 내 주변이 밝아져요. 바닥에 놓으면 세워지고, 천장(블록 아랫면)에 놓으면 매달려요. 지나다닐 수 있어 건물 안 장식에 좋아요. 전기로 켜져서 어느 천체에서나 빛나요." },
   { id: 82, n: "조명 블록 ×2", need: { 32: 1, 37: 1 }, out: 82, count: 2, cat: "block", use: "벽·바닥·천장에 끼워 넣는 하얀 빛 블록이에요. 건물 벽이나 길을 밝히는 데 좋아요." },
   { id: "pick1", n: "돌 곡괭이", need: { 7: 2, 4: 3 }, pick: 1, cat: "tool", use: "석탄·철·구리·황 광석을 캘 수 있어요. 캐는 속도 1.3배." },
   { id: "pick2", n: "철 곡괭이", need: { 7: 2, 100: 3 }, pick: 2, cat: "tool", use: "금·다이아몬드·티타늄·토륨 광석까지 캘 수 있어요. 캐는 속도 1.7배." },
@@ -2622,6 +2629,8 @@ function nameTag(name, color) {
 }
 // 블록 모양 작은 상자: 손에 든 블록과 떨어진 아이템에 써요
 const itemMat = new THREE.MeshLambertMaterial({ map: tex, alphaTest: .5, side: THREE.DoubleSide });
+// 손에 든 랜턴·전등은 스스로 빛나 보여요
+const itemGlowMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: .5, side: THREE.DoubleSide });
 const itemGeos = {};
 function itemGeo(id) {
   if (itemGeos[id]) return itemGeos[id];
@@ -2936,7 +2945,7 @@ function mobHits(px, py, pz, w = .3, h = 1.3) {
   return false;
 }
 const mobFree = () => PLANETS[S.planet].gas || S.planet === "venus" || net.teacher;
-function brightAt(x, y, z) { const [sk, bl] = lightAt(x, y, z); return Math.max(env.e > .05 ? sk : Math.round(sk * .15), bl); }
+function brightAt(x, y, z) { const [sk, bl] = lightAt(x, y, z); return Math.max(env.e > .05 ? sk : Math.round(sk * .15), bl, handAt(x + .5, y + .5, z + .5)); }
 function clearMobs() { mobs.forEach(m => { scene.remove(m.g); if (m.beam) scene.remove(m.beam); }); mobs = []; if (typeof clearBoss === "function") clearBoss(); if (typeof clearAnimals === "function") clearAnimals(); }
 // 두 점 사이에 블록이 있으면 레이저(빛)가 막혀요
 function clearLine(ax, ay, az, bx, by, bz) {
@@ -2971,8 +2980,10 @@ function spawnMob(type) {
 // 천체마다 로봇 단계가 달라요: 멀리 갈수록 튼튼하고 아파요
 const MLV = { earth: 1, moon: 2, mars: 3, mercury: 4, europa: 5, titan: 6 };
 const LVL = () => { const l = MLV[S.planet] || 1; return { l, hp: 1 + (l - 1) * .35, dmg: 1 + (l - 1) * .3 }; };
-function hurtBy(dmg, kx, kz, kick = 6, boss = false) {
-  dmg *= (boss ? 1 : LVL().dmg) * (1 - armorK());
+// 보스 공격은 갑옷을 갖춰도 아프게: 기본 ×1.7에 보스마다 세기(k)를 곱해요
+const BOSS_DMG = 1.7;
+function hurtBy(dmg, kx, kz, kick = 6, isBoss = false) {
+  dmg *= (isBoss ? BOSS_DMG * (boss ? boss.B.k : 1) : LVL().dmg) * (1 - armorK());
   S.hp -= dmg; cause = "robot"; hurtT = 1; lastHurt = gameT; sfx.hurt();
   const L = Math.hypot(kx, kz) || 1; P.vel.x += kx / L * kick; P.vel.z += kz / L * kick; P.vel.y = Math.max(P.vel.y, 3);
 }
@@ -3200,7 +3211,7 @@ function bossTick(dt) {
   if (dl > 44 || S.hp <= 0) { toast("보스가 둥지로 돌아갔어요", 1800); clearBoss(); return; }
   const b = boss, B = b.B, u = b.g.userData, g = G_EARTH * PLANETS[S.planet].g, quiet = PLANETS[S.planet].airless;
   const dx = P.pos.x - b.p.x, dz = P.pos.z - b.p.z, dist = Math.hypot(dx, dz) || .001, dy = P.pos.y - b.p.y, toP = Math.atan2(-dx, -dz);
-  const hit = (n, kick = 6) => { if (!paused) hurtBy(n * B.k, dx, dz, kick, true); };
+  const hit = (n, kick = 6) => { if (!paused) hurtBy(n, dx, dz, kick, true); };
   b.stT += dt; let wx = 0, wz = 0, face = true, arms = null;
   // 체력이 2/3, 1/3이 되면 졸개를 불러요
   const ph = b.hp / B.hp; if ((ph < .67 && b.summoned < 1) || (ph < .34 && b.summoned < 2)) { b.summoned++; for (let i = 0; i < 2; i++) { const a = Math.random() * 6.28; mkMob(B.mini, b.p.x + Math.cos(a) * 2.5, b.p.y + 1, b.p.z + Math.sin(a) * 2.5); } toast(`${B.n}${josa(B.n, "이", "가")} 부하를 불렀어요!`, 1600); tone(200, .5, "square", .05, 0, 600); }
@@ -3286,7 +3297,7 @@ function bossTick(dt) {
   if (wrapX) b.p.x = ((b.p.x % SX) + SX) % SX;
   // 그리기
   b.flash = Math.max(0, b.flash - dt * 3);
-  const [sk, bl] = lightAt(Math.floor(b.p.x), Math.floor(b.p.y + 1), Math.floor(b.p.z)), lk = .45 + .55 * Math.max(smooth(-.12, .25, env.e) * sk / 15, bl / 15);
+  const [sk, bl0] = lightAt(Math.floor(b.p.x), Math.floor(b.p.y + 1), Math.floor(b.p.z)), bl = Math.max(bl0, handAt(b.p.x, b.p.y + 1, b.p.z)), lk = .45 + .55 * Math.max(smooth(-.12, .25, env.e) * sk / 15, bl / 15);
   if (b.st !== "pulse") u.mats.forEach((mt, i) => { mt.color.copy(u.base[i]).multiplyScalar(lk); if (b.flash) mt.color.lerp(cB.set(0xff3030), b.flash * .7); });
   b.g.position.copy(b.p); if (face) b.g.rotation.y = toP; else if (b.dir && b.sub === "dash") b.g.rotation.y = Math.atan2(-b.dir[0], -b.dir[1]);
   const sp = Math.hypot(b.v.x, b.v.z); b.walk += dt * sp * 1.2; const sw = Math.sin(b.walk * 3) * Math.min(1, sp / 2) * .6;
@@ -3412,7 +3423,7 @@ function heart(x, y, z) {
 }
 function tickHearts(dt) { hearts = hearts.filter(h => { h.t += dt; h.s.position.y += dt * .7; h.s.material.opacity = Math.max(0, 1 - h.t / 1.3); if (h.t > 1.3) { scene.remove(h.s); h.s.material.dispose(); return false; } return true; }); }
 function shadeAnimal(g, p, flash, dayK) {
-  const u = g.userData, [sk, bl] = lightAt(Math.floor(p.x), Math.floor(p.y + .5), Math.floor(p.z)), lk = .32 + .68 * Math.max(dayK * sk / 15, bl / 15);
+  const u = g.userData, [sk, bl0] = lightAt(Math.floor(p.x), Math.floor(p.y + .5), Math.floor(p.z)), bl = Math.max(bl0, handAt(p.x, p.y + .5, p.z)), lk = .32 + .68 * Math.max(dayK * sk / 15, bl / 15);
   u.mats.forEach((mt, i) => { mt.color.copy(u.base[i]).multiplyScalar(lk); if (flash) mt.color.lerp(cB.set(0xff3030), flash * .7); });
 }
 function legSwing(g, walk, v) { const sw = Math.sin(walk * 2.4) * Math.min(1, v) * .6; g.userData.legs.forEach((l, i) => { l.rotation.x = (i % 2 ? -sw : sw) * (i > 1 ? -1 : 1); }); }
@@ -3621,7 +3632,7 @@ function updateHeld() {
   const id = S.hot[sel] || null; if (id === heldKey) return; heldKey = id;
   if (heldMesh) { handArm.remove(heldMesh); heldMesh = null; }
   if (TOOLS[id]) { heldMesh = toolMesh(id); handArm.add(heldMesh); }
-  else if (id) { heldMesh = new THREE.Mesh(itemGeo(id), itemMat); heldMesh.scale.setScalar(.22); heldMesh.position.set(-.04, .14, -.34); heldMesh.rotation.set(.1, .7, 0); handArm.add(heldMesh); }
+  else if (id) { heldMesh = new THREE.Mesh(itemGeo(id), HAND_LV[id] ? itemGlowMat : itemMat); heldMesh.scale.setScalar(.22); heldMesh.position.set(-.04, .14, -.34); heldMesh.rotation.set(.1, .7, 0); handArm.add(heldMesh); }
 }
 rebuildHand();
 let swing = 0, walkT = 0, walkAmt = 0, stepAcc = 0, hurtT = 0, lastHurt = -9, third = false;
@@ -4110,6 +4121,7 @@ function frame(now) {
   // 조준·채굴
   const h = paused ? null : raycast(6);
   hl.visible = !!h; if (h) hl.position.set(h.x + .5, h.y + .5, h.z + .5);
+  { const lv = handLv(); handU.value.set(P.pos.x, P.pos.y + 1.2, P.pos.z, lv / 15); }
   cookTick(dt);
   if (!paused) { mobTick(dt); bossTick(dt); zoneTick(dt); animalTick(dt); if (rocketAim()) {} else if (attackTick(dt)) { mining = null; crack.material.opacity = 0; } else mineTick(dt, h); } else crack.material.opacity = 0;
   // 파편
@@ -4267,6 +4279,6 @@ $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { handLv, handAt, brightAt, handU, lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
