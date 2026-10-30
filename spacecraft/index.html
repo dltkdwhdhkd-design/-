@@ -3535,7 +3535,7 @@ function feedAnimal() {
     if (m.angry > 0) { toast("화난 늑대는 먹이를 받지 않아요. 잠시 뒤에 다시 해 보세요", 2000); return true; }
     if (ownCount() >= HERD_MAX) { toast(`동물은 ${HERD_MAX}마리까지 기를 수 있어요`, 2200); return true; }
     S.inv[id]--; renderHotbar();
-    if (Math.random() >= TAME_P) { puff(m); toast(`${T.n}${josa(T.n, "이", "가")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
+    if (Math.random() >= TAME_P) { tamePuff(m); toast(`${T.n}${josa(T.n, "이", "가")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
     m.own = true; m.id = ++S.herdN; heart(m.p.x, m.p.y + T.h + .2, m.p.z); tone(700, .08, "sine", .05, 0, 900);
     toast(m.type === "wolf" ? "늑대가 내 편이 됐어요! 따라다니며 로봇과 같이 싸워 줘요" : "고양이가 내 편이 됐어요! 졸졸 따라다녀요", 3000);
     showFact(`${T.n} 길들이기`, m.type === "wolf" ? "길든 늑대는 나를 따라다니다가 가까이 오는 로봇을 물어요. 다치면 생고기나 뼈를 주면 회복해요. 기르는 동물은 지구에 남아 기다려요." : "길든 고양이는 나를 따라다녀요. 고양이가 있으면 자폭 로봇이 가까이 오지 못하고 달아나요. 기르는 동물은 지구에 남아 기다려요.");
@@ -3548,7 +3548,7 @@ function feedAnimal() {
   if (m.baby > 0) { m.baby = Math.max(0, m.baby - 30); toast(`새끼 ${T.n}${josa(T.n, "이", "가")} 먹이를 먹고 쑥 자랐어요`, 1800); }
   else if (m.cd > 0) { toast(`${T.n}${josa(T.n, "은", "는")} 새끼를 낳고 쉬는 중이에요 (${Math.ceil(m.cd)}초)`, 1800); return true; }
   else if (m.love > 0) { toast("벌써 짝을 찾고 있어요. 먹이를 먹은 같은 동물을 가까이 데려오세요", 2200); return true; }
-  else if (!m.own && Math.random() >= TAME_P) { S.inv[id]--; puff(m); renderHotbar(); toast(`${T.n}${josa(T.n, "이", "가")} ${food}${josa(food, "을", "를")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
+  else if (!m.own && Math.random() >= TAME_P) { S.inv[id]--; tamePuff(m); renderHotbar(); toast(`${T.n}${josa(T.n, "이", "가")} ${food}${josa(food, "을", "를")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
   else { m.love = LOVE_T; toast(ownCount() + (m.own ? 0 : 1) >= HERD_MAX ? `가축이 ${HERD_MAX}마리라 새끼는 더 못 낳아요` : `${T.n}에게 ${food}${josa(food, "을", "를")} 줬어요. 먹이를 먹은 ${T.n}${josa(T.n, "이", "가")} 둘 모이면 새끼를 낳아요`, 2600); }
   if (!m.own) { m.own = true; m.id = ++S.herdN; if (!S.tamed) { S.tamed = true; showFact("내 가축이 생겼어요", "먹이를 준 동물은 내 가축이 돼요. 저장되고 친구 화면에도 보여요. 울타리(나무 판자 4 + 통나무 1)로 우리를 지어 두면 달아나지 않아요."); } }
   S.inv[id]--; heart(m.p.x, m.p.y + m.T.h * aSize(m) + .2, m.p.z); tone(700, .08, "sine", .05, 0, 900); renderHotbar(); saveHerd(); return true;
@@ -3564,7 +3564,7 @@ function breed(a, b) {
   save();
 }
 // 길들이기에 실패하면 회색 연기가 피어요
-function puff(m) { for (let i = 0; i < 3; i++) burst(Math.floor(m.p.x), Math.floor(m.p.y + m.T.h), Math.floor(m.p.z), 4); tone(260, .1, "triangle", .03, 0, 200); }
+function tamePuff(m) { for (let i = 0; i < 3; i++) burst(Math.floor(m.p.x), Math.floor(m.p.y + m.T.h), Math.floor(m.p.z), 4); tone(260, .1, "triangle", .03, 0, 200); }
 function meetAnimal(m) {
   S.aniSeen = S.aniSeen || {}; if (S.aniSeen[m.type]) return; const first = !Object.keys(S.aniSeen).length; S.aniSeen[m.type] = true;
   const x = (first ? "지금까지 생명체가 사는 것으로 확인된 천체는 지구뿐이에요. 액체 물, 숨 쉴 산소, 알맞은 온도가 모두 있기 때문이에요. " : "") + m.T.fact;
