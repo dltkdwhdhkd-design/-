@@ -61,6 +61,7 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 #compassStrip span { display: inline-block; width: 40px; text-align: center; color: var(--ink-dim); }
 #compassStrip span.c { color: var(--ink); }
 #compassSun { position: absolute; top: 3px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: radial-gradient(#fff6c8, #ffb347 60%, transparent 70%); }
+#compassLair { position: absolute; top: 2px; margin-left: -30px; width: 60px; text-align: center; font: 700 11px sans-serif; color: #e0a0ff; text-shadow: 0 0 4px #000; white-space: nowrap; opacity: 0; }
 #compass::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ore); }
 #gauges { left: max(10px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 7px; }
 .g { display: grid; grid-template-columns: 4.2em 1fr 3.3em; gap: 8px; align-items: center; font-size: .85em; font-weight: 700; }
@@ -270,7 +271,7 @@ td.unk { color: #4e5786; }
   <span class="d" id="mDesc"></span>
   <div class="bar"><i id="mBar"></i></div>
 </div>
-<div class="hud" id="compass" hidden><div id="compassStrip"></div><div id="compassSun"></div></div>
+<div class="hud" id="compass" hidden><div id="compassStrip"></div><div id="compassSun"></div><div id="compassLair"></div></div>
 <div class="hud" id="env" hidden>
   <div class="pn"><b id="pName"></b><span id="pType"></span></div>
   <dl>
@@ -571,6 +572,7 @@ const WHERE = { 100: "철광석 · 수성에 많음", 101: "모래·레골리스
 const TOOLS = { 120: { n: "돌 곡괭이", tier: 1 }, 121: { n: "철 곡괭이", tier: 2 }, 122: { n: "다이아몬드 곡괭이", tier: 3 },
   123: { n: "돌 칼", dmg: 7, col: "#8f9198" }, 124: { n: "철 칼", dmg: 10, col: "#e2e5ec" }, 126: { n: "로켓", rocket: true }, 127: { n: "괭이", hoe: true, col: "#8f9198" }, 125: { n: "다이아몬드 칼", dmg: 13, col: "#7ff0ff" },
   // 좋은 칼은 다른 천체 재료로만 만들어요
+  141: { n: "드릴", tier: 3, drill: true },
   128: { n: "티타늄 칼", dmg: 17, col: "#c9b8ff" }, 129: { n: "플라스마 칼", dmg: 22, col: "#7fffc0" }, 140: { n: "별빛 칼", dmg: 30, col: "#fff2a8" } };
 // 가방에 있는 가장 좋은 곡괭이 단계(죽어서 떨어뜨리면 내려가요)
 const bestTier = () => Math.max(0, ...Object.keys(TOOLS).filter(t => S.inv[t] > 0 && TOOLS[t].tier).map(t => TOOLS[t].tier));
@@ -736,7 +738,7 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
   [[16, 16, 2, 4], [16, 16, 30, 10], [16, 16, 8, 30], [16, 16, 28, 28], [16, 16, 20, 1]].forEach(([a, b, c, d]) => { k.beginPath(); k.moveTo(a, b); k.lineTo((a + c) / 2 + 3, (b + d) / 2 - 2); k.lineTo(c, d); k.stroke(); });
 })();
 function iconCanvas(id) {
-  if (TOOLS[id]) return TOOLS[id].rocket ? rocketIcon() : TOOLS[id].hoe ? hoeIcon() : TOOLS[id].tier ? pickIcon(TOOLS[id].tier) : swordIcon(TOOLS[id].col);
+  if (TOOLS[id]) return TOOLS[id].drill ? drillIcon() : TOOLS[id].rocket ? rocketIcon() : TOOLS[id].hoe ? hoeIcon() : TOOLS[id].tier ? pickIcon(TOOLS[id].tier) : swordIcon(TOOLS[id].col);
   const c = document.createElement("canvas"); c.width = c.height = 16;
   const ox = id >= 100 ? (id - 100 + MT) * 16 : id * 16, oy = id >= 100 ? 0 : (BLOCKS[id].top ? 16 : 0);
   c.getContext("2d").drawImage(atlas, ox, oy, 16, 16, 0, 0, 16, 16); return c;
@@ -1597,7 +1599,7 @@ function physics(dt) {
     P.vel.y *= Math.max(0, 1 - dt * 2.2);
     if (up && P.ground && !headW) { P.vel.y = JUMP_V * .8; P.ground = false; }
   } else {
-    if (up && P.ground) { P.vel.y = JUMP_V; P.ground = false; P.jumpY = P.pos.y; P.peak = 0; sfx.jump(); }
+    if (up && P.ground) { P.vel.y = JUMP_V * (S.gear.boots ? 1.35 : 1); P.ground = false; P.jumpY = P.pos.y; P.peak = 0; sfx.jump(); }
     P.vel.y -= g * dt;
   }
   // 금성: 공기가 두꺼워 천천히 떨어짐
@@ -1630,7 +1632,7 @@ function landed() {
   if (!P.ground && airStart && S.planet === "titan") { const dd = Math.hypot(P.pos.x - airStart.x, P.pos.z - airStart.z); if (airStart.y - P.pos.y > 6 && dd > (S.glide || 0)) { S.glide = dd; toast(`활공 거리 ${dd.toFixed(1)}칸`); } }
   airStart = null;
   P.ground = true;
-  if (P.jumpY != null) { const b = S.best[S.planet] || 0; if (P.peak > b) S.best[S.planet] = P.peak; P.jumpY = null; }
+  if (P.jumpY != null) { const b = S.best[S.planet] || 0; if (P.peak > b && !S.gear.boots) S.best[S.planet] = P.peak; P.jumpY = null; }
 }
 
 /* ═════════════ 조준·채굴·설치 ═════════════ */
@@ -1660,7 +1662,7 @@ function mineTick(dt, h) {
   if (!mining || mining.key !== key) mining = { key, t: 0 };
   mining.t += dt;
   const hard = !tool && MATCAT[b] === "stone" ? 2.2 : 1; // 맨손으로 돌은 오래 걸려요
-  const need = B.h * hard * (S.planet === "venus" && h.y < VENUS_BASE - 4 ? 1.4 : 1) / PICKS[tool].sp;
+  const need = B.h * hard * (S.planet === "venus" && h.y < VENUS_BASE - 4 ? 1.4 : 1) / PICKS[tool].sp / ((TOOLS[heldId()] || {}).drill ? 1.8 : 1);
   crack.position.set(h.x + .5, h.y + .5, h.z + .5); crack.material.opacity = .9; crack.material.map = crackTexs[Math.min(7, Math.floor(mining.t / need * 8))];
   if (Math.floor(mining.t * 4.5) !== Math.floor((mining.t - dt) * 4.5)) { sfx.tick(b); swing = Math.max(swing, .001); }
   if (mining.t >= need) {
@@ -1680,7 +1682,7 @@ function mineTick(dt, h) {
     mining = null; crack.material.opacity = 0; renderHotbar();
   }
 }
-const HOT_FIRST = [120, 121, 122, 140, 129, 128, 125, 124, 123, 127, 36, 37, 80, 82, 35, 31, 30, 32];
+const HOT_FIRST = [141, 120, 121, 122, 140, 129, 128, 125, 124, 123, 127, 36, 37, 80, 82, 35, 31, 30, 32];
 const HAND_LV = { 80: 14, 37: 13, 82: 13, 36: 12 };
 // 횃불은 산소가 있어야 타요
 const handLv = () => { const id = heldId(); return id === 36 && !PLANETS[S.planet].breath ? 0 : HAND_LV[id] || 0; };
@@ -1825,6 +1827,7 @@ const RECIPES = [
   { id: "pick1", n: "돌 곡괭이", need: { 7: 2, 4: 3 }, pick: 1, cat: "tool", use: "석탄·철·구리·황 광석을 캘 수 있어요. 캐는 속도 1.3배." },
   { id: "pick2", n: "철 곡괭이", need: { 7: 2, 100: 3 }, pick: 2, cat: "tool", use: "금·다이아몬드·티타늄·토륨 광석까지 캘 수 있어요. 캐는 속도 1.7배." },
   { id: "pick3", n: "다이아몬드 곡괭이", need: { 7: 2, 111: 3 }, pick: 3, cat: "tool", use: "가장 단단한 날. 캐는 속도 2.3배. 싸울 때는 칼이 훨씬 세요." },
+  { id: "drill", n: "드릴", need: { 133: 1, 100: 4, 109: 2, 110: 1 }, tool: 141, cat: "tool", use: "지구 보스의 드릴 코어로 만든 전동 드릴. 다이아몬드 곡괭이보다 1.8배 빨리 캐요(맨손의 약 4배). 구리 전선과 금 접점으로 전기를 모터에 보내요." },
   { id: "sword1", n: "돌 칼", need: { 7: 1, 4: 2 }, tool: 123, cat: "tool", use: "로봇에게 주는 피해 7 (맨손 2, 곡괭이 3~5). 정찰 로봇을 두 번에 멈춰요. 캐는 데는 쓸 수 없어요." },
   { id: "sword2", n: "철 칼", need: { 7: 1, 100: 2 }, tool: 124, cat: "tool", use: "피해 10. 지구 정찰 로봇을 한 번에 멈춰요." },
   { id: "sword3", n: "다이아몬드 칼", need: { 7: 1, 111: 2 }, tool: 125, cat: "tool", use: "피해 13. 지구에서 만들 수 있는 가장 좋은 칼이에요. 더 센 칼은 다른 천체 재료로 만들어요." },
@@ -1861,6 +1864,8 @@ const RECIPES = [
   { id: "batt", n: "배터리 팩", need: { 100: 2, 101: 2 }, gear: "batt", use: "우주복 전력 한도 +50 (최대 3개)." },
   { id: "rocket", n: "로켓", need: { 100: 6, 101: 4 }, tool: 126, cat: "gear", use: "손에 들고 발사대(착륙선 옆 주황 줄무늬 블록)에 놓으면 세워져요. 로켓을 누르거나 M으로 올라타 다른 천체로 날아가요. 연료로 물이나 얼음이 필요해요." },
   { id: "insul", n: "단열 우주복", need: { 11: 4, 100: 3 }, gear: "insul", use: "달 현무암 속 티타늄으로 만든 단열층. 바깥 열이 덜 스며들어 냉난방 전력이 약 절반으로 줄어요." },
+  { id: "boots", n: "점프 부츠", need: { 134: 1, 112: 2, 100: 2 }, gear: "boots", use: "달 보스의 거미 다리 합금으로 만든 용수철 부츠. 뛰어오르는 속도가 1.35배, 높이는 약 1.8배가 돼요. 중력이 약한 천체에서는 훨씬 높이 떠요. 신고 뛴 기록은 '최고 높이'에 넣지 않아요(중력 비교가 흐려지니까요)." },
+  { id: "radar", n: "탐사 레이더", need: { 109: 3, 110: 2, 101: 2 }, gear: "radar", use: "구리 코일로 전파를 보내고 금 접점으로 받는 장치. 나침반에 그 천체 보스 둥지 방향과 거리가 보라색으로 표시돼요." },
   { id: "rtg", n: "원자력 전지 (RTG)", need: { 104: 3, 100: 4 }, gear: "rtg", use: "토륨이 붕괴할 때 나오는 열로 햇빛 없이도 늘 전기를 만들어요. 태양에서 먼 목성형 행성 탐사에 꼭 필요해요." },
   { id: "pressure", n: "내압 냉각복", need: { 100: 8, 14: 4, 102: 2 }, gear: "pressure", use: "약 120기압까지 버티는 두꺼운 철 껍데기와 얼음 냉각수. 금성 표면용." },
 ];
@@ -1917,6 +1922,9 @@ function makeIt(r, k) {
 }
 let craftTab = "all";
 const CTABS = [["all", "전체"], ["block", "블록"], ["build", "건축"], ["food", "음식"], ["tool", "도구"], ["gear", "장비"]];
+function drillIcon() { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d");
+  g.fillStyle = "#3a3c44"; g.fillRect(1, 9, 5, 6); g.fillStyle = "#ffb347"; g.fillRect(2, 5, 8, 6); g.fillStyle = "#d8862a"; g.fillRect(2, 9, 8, 2);
+  g.fillStyle = "#c7c9d1"; g.fillRect(10, 6, 2, 4); g.fillRect(12, 7, 2, 2); g.fillRect(14, 7, 2, 1); return c; }
 function pickIcon(t) { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d"); g.fillStyle = "#8a5a2e"; for (let i = 0; i < 10; i++) g.fillRect(3 + i, 13 - i, 2, 2); g.fillStyle = PICKS[t].col; g.fillRect(6, 2, 8, 2); g.fillRect(12, 2, 2, 7); g.fillRect(4, 3, 3, 2); return c; }
 function hoeIcon() { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d"); g.fillStyle = "#8a5a2e"; for (let i = 0; i < 10; i++) g.fillRect(3 + i, 13 - i, 2, 2); g.fillStyle = "#8f9198"; g.fillRect(8, 2, 6, 2); g.fillRect(12, 2, 2, 4); return c; }
 function rocketIcon() {
@@ -2319,6 +2327,14 @@ function renderHud() {
   strip.style.transform = `translateX(${cw / 2 - 20 - wpx - hd / 360 * wpx}px)`;
   const sa = ((Math.atan2(env.sunDir.x, -env.sunDir.z) * 180 / Math.PI) + 360) % 360;
   let rel = ((sa - hd + 540) % 360) - 180; const cs = $("compassSun"); cs.style.left = (cw / 2 + rel / 360 * wpx) + "px"; cs.style.opacity = env.e > -.05 && Math.abs(rel) < 170 ? 1 : 0;
+  // 탐사 레이더: 보스 둥지 방향과 거리
+  const cl = $("compassLair");
+  if (S.gear.radar && BOSS[S.planet] && lair && lair.pk === S.planet) {
+    let dx = lair.x + .5 - P.pos.x; if (wrapX) dx = ((dx + SX / 2) % SX + SX) % SX - SX / 2;
+    const dz = lair.z + .5 - P.pos.z, la = (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360, lr = ((la - hd + 540) % 360) - 180;
+    const cd = (S.bossCD || {})[S.planet] > Date.now();
+    cl.textContent = `◆ 보스 ${Math.round(Math.hypot(dx, dz))}칸${cd ? " (쉬는 중)" : ""}`; cl.style.left = (cw / 2 + Math.max(-150, Math.min(150, lr / 360 * wpx))) + "px"; cl.style.opacity = 1;
+  } else cl.style.opacity = 0;
 }
 function renderGauges() {
   const set1 = (id, v, max, txt, danger) => { const el = $(id); el.querySelector("i").style.width = Math.max(0, Math.min(100, v / max * 100)) + "%"; el.querySelector(".v").textContent = txt; el.classList.toggle("danger", danger); };
@@ -3627,7 +3643,13 @@ function hoeMesh() {
   box(.05, .05, .5, wood, 0, 0, 0, g); box(.2, .06, .06, head, -.07, 0, -.25, g); box(.06, .06, .1, head, -.15, -.04, -.22, g);
   g.position.set(-.02, .1, -.3); g.rotation.set(.9, .2, -.3); return g;
 }
-const toolMesh = (id) => { if (TOOLS[id].hoe) return hoeMesh(); if (TOOLS[id].rocket) { const g = buildRocket(); g.scale.setScalar(.09); g.position.set(-.02, -.05, -.32); g.rotation.set(.2, 0, -.2); return g; } return TOOLS[id].tier ? pickMesh(TOOLS[id].tier) : swordMesh(TOOLS[id].col); };
+function drillMesh() {
+  const g = new THREE.Group(), body = lam("#ffb347"), dk = lam("#3a3c44"), bit = lam("#c7c9d1");
+  box(.12, .12, .26, body, 0, 0, -.05, g); box(.06, .14, .06, dk, 0, -.1, .04, g);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(.05, .2, 8), bit); cone.rotation.x = -Math.PI / 2; cone.position.set(0, 0, -.28); g.add(cone);
+  g.position.set(-.02, .02, -.34); g.rotation.set(.1, .15, 0); return g;
+}
+const toolMesh = (id) => { if (TOOLS[id].drill) return drillMesh(); if (TOOLS[id].hoe) return hoeMesh(); if (TOOLS[id].rocket) { const g = buildRocket(); g.scale.setScalar(.09); g.position.set(-.02, -.05, -.32); g.rotation.set(.2, 0, -.2); return g; } return TOOLS[id].tier ? pickMesh(TOOLS[id].tier) : swordMesh(TOOLS[id].col); };
 function updateHeld() {
   const id = S.hot[sel] || null; if (id === heldKey) return; heldKey = id;
   if (heldMesh) { handArm.remove(heldMesh); heldMesh = null; }
@@ -4135,7 +4157,7 @@ function frame(now) {
   // 화면 정보
   if (!paused || now - hudT > 250) { hudT = now; if ($("startOv").hidden) renderHud(); }
   const jm = $("jumpMeter");
-  if (P.jumpY != null && P.peak > .5) { jm.hidden = false; jm.innerHTML = `${P.peak.toFixed(1)}칸<small>최고 ${(S.best[S.planet] || 0).toFixed(1)}칸 · 지구라면 ${EARTH_JUMP.toFixed(1)}칸</small>`; jm.dataset.t = now; }
+  if (P.jumpY != null && P.peak > .5) { jm.hidden = false; jm.innerHTML = `${P.peak.toFixed(1)}칸<small>최고 ${(S.best[S.planet] || 0).toFixed(1)}칸 · 지구라면 ${EARTH_JUMP.toFixed(1)}칸${S.gear.boots ? " · 점프 부츠(기록 안 함)" : ""}</small>`; jm.dataset.t = now; }
   else if (!jm.hidden && now - (+jm.dataset.t || 0) > 1500) jm.hidden = true;
   if (toastT && now > toastT) { $("toast").hidden = true; toastT = 0; }
   if (xrOn) { renderer.autoClear = true; renderer.render(scene, camera); return; }
