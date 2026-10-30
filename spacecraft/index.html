@@ -1704,6 +1704,7 @@ function hotIds() { const rk = (i) => { const k = HOT_FIRST.indexOf(i); return k
 let sel = 0, mode = "dig";
 function place() {
   if (paused) return;
+  swing = Math.max(swing, .001);
   if (feedAnimal()) return;
   const h = raycast(6);
   if (h && useBlock(h)) return;
@@ -3661,7 +3662,7 @@ function updateHeld() {
   else if (id) { heldMesh = new THREE.Mesh(itemGeo(id), HAND_LV[id] ? itemGlowMat : itemMat); heldMesh.scale.setScalar(.22); heldMesh.position.set(-.04, .14, -.34); heldMesh.rotation.set(.1, .7, 0); handArm.add(heldMesh); }
 }
 rebuildHand();
-let swing = 0, walkT = 0, walkAmt = 0, stepAcc = 0, hurtT = 0, lastHurt = -9, third = false;
+let wantPrev = false, swing = 0, walkT = 0, walkAmt = 0, stepAcc = 0, hurtT = 0, lastHurt = -9, third = false;
 const selfAv = { g: null };
 function ensureSelf() {
   const key = JSON.stringify(cleanLook(LOOK));
@@ -3689,6 +3690,9 @@ function updateCamera(dt) {
   if (third && !spec.id) { ensureSelf(); selfAv.g.visible = true; selfAv.g.position.set(P.pos.x, P.pos.y, P.pos.z); selfAv.g.rotation.y = P.yaw; selfAv.g.userData.head.rotation.x = -P.pitch * .6; animAvatar(selfAv.g, hs, walkT / 1.25, Math.sin(Math.min(1, swing) * Math.PI)); }
   else if (selfAv.g) selfAv.g.visible = false;
   // 손 흔들기
+  // 누르는 순간 바로 휘둘러요(캐기 틱이나 공격 판정을 기다리지 않아요)
+  if (wantMine && !wantPrev && !paused) swing = Math.max(swing, .001);
+  wantPrev = wantMine;
   if (swing > 0) { swing += dt * 4.2; if (swing >= 1) swing = wantMine && mining && mining.key !== "x" ? .001 : 0; }
   const sw = Math.sin(Math.min(1, swing) * Math.PI);
   handRig.position.copy(camera.position); handRig.quaternion.copy(camera.quaternion);
@@ -4429,6 +4433,6 @@ $("goBtn").onclick = () => { start(true); if (xrOK && xrWant) startXR(); };
 $("contBtn").onclick = () => { start(false); if (xrOK && xrWant) startXR(); };
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { handLv, handAt, brightAt, handU, lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrMenu() { return xrMenu; }, xrItems, get xpVis() { return xpMesh.visible; }, get xrXT() { return xrXT; }, get xrN() { return xrN; }, get rcH() { return [recallHeld, +recall.toFixed(2), !!xrPrev.R3, paused].join("/"); }, get cine() { return cine; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { handLv, handAt, brightAt, handU, lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrMenu() { return xrMenu; }, xrItems, get xpVis() { return xpMesh.visible; }, get xrXT() { return xrXT; }, get xrN() { return xrN; }, get rcH() { return [recallHeld, +recall.toFixed(2), !!xrPrev.R3, paused].join("/"); }, get cine() { return cine; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get swing() { return swing; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
