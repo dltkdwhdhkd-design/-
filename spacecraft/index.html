@@ -306,6 +306,7 @@ td.unk { color: #4e5786; }
   <button class="btn ghost click" id="bMap">우주 지도 <kbd>M</kbd></button>
   <button class="btn ghost click" id="bLook">꾸미기 <kbd>C</kbd> · 시점 <kbd>V</kbd></button>
   <button class="btn ghost click" id="bSet">설정 <kbd>O</kbd></button>
+  <button class="btn ghost click" id="bXR" hidden>VR로 보기 (퀘스트)</button>
   <button class="btn ghost click" id="bRecall" style="position:relative;overflow:hidden">기지로 귀환 <kbd>R</kbd><span id="recallBar"></span></button>
 </div>
 <div id="touch" hidden>
@@ -393,7 +394,8 @@ td.unk { color: #4e5786; }
     <div class="setIn"><b>조작 방식</b><div class="ctabs" id="sInput"></div><small id="sInputNote"></small></div>
     <div class="setIn"><b>보이는 거리 (넓은 지구)</b><div class="ctabs" id="sView"></div><small>화면이 버벅이면 '가까이'를 고르세요. 퀘스트·태블릿은 '가까이'나 '보통'을 추천해요.</small></div>
     <div class="setIn" id="hostSet" hidden><b>방장 설정 · 플레이어끼리 대결</b><div class="ctabs" id="sPvp"></div><small>방에 있는 모두에게 바로 적용돼요. 기지 코어 6칸 안은 안전 구역이에요.</small></div>
-    <p>이 기기에만 저장돼요. 마우스와 손가락으로 화면을 끌 때 모두 적용돼요.</p>
+    <div class="setIn"><b>저장 옮기기 (다른 기기로)</b><div class="ctabs"><button id="svFile">파일로 내보내기</button><button id="svOpen">파일 불러오기</button><button id="svCopy">저장 코드 복사</button><button id="svPaste">코드 붙여넣기</button></div><small id="svNote">내 탐사 기록을 파일이나 코드로 옮겨요. 불러오면 이 기기의 기록은 바뀌어요.</small><input type="file" id="svIn" accept=".txt,.json,text/plain" hidden></div>
+    <p>설정은 이 기기에만 저장돼요. 마우스와 손가락으로 화면을 끌 때 모두 적용돼요.</p>
     <div class="row"><button class="btn" id="setClose">완료</button></div>
   </div>
 </div>
@@ -1189,7 +1191,7 @@ function thinBox(T, x, y, z, b) {
 }
 // 보이는 거리(조각 수, 1조각 16칸): 설정(O)에서 고르고, 넓은 지구에서만 써요
 const VIEWD = { near: 4.2, mid: 5.2, far: 6.5 }; let chunkQ = null, visT = 0;
-const VISC_ = () => VIEWD[SET.view] || VIEWD.mid;
+const VISC_ = () => VIEWD[xrOn ? "near" : SET.view] || VIEWD.mid;
 function buildAll() {
   for (const k in chunks) chunks[k].forEach(m => { scene.remove(m); m.geometry.dispose(); }); chunks = {}; chunkQ = null;
   if (SX <= 96) { for (let cx = 0; cx < SX / CH; cx++) for (let cz = 0; cz < SZ / CH; cz++) buildChunk(cx, cz); return; }
@@ -1372,7 +1374,7 @@ let paused = true, gameT = 0, storm = 0, stormNext = 0;
 const suit = () => S.gear.pressure ? SUITS.pressure : S.gear.insul ? SUITS.insul : SUITS.basic;
 const maxPw = () => 100 + 50 * S.gear.batt;
 
-function save() { try { localStorage.setItem("spacecraft2", JSON.stringify(S)); } catch (e) {} }
+function save() { if (window.__noSave || !$("startOv").hidden) return; try { localStorage.setItem("spacecraft2", JSON.stringify(S)); } catch (e) {} }
 function load() { try { const s = JSON.parse(localStorage.getItem("spacecraft2") || "null"); return s && s.planet ? s : null; } catch (e) { return null; } }
 
 /* ═════════════ 행성 불러오기 ═════════════ */
@@ -1963,14 +1965,32 @@ function openMap() {
     const risk = pk === "mercury" && !S.gear.insul ? "단열 우주복 없이는 낮·밤 어느 쪽도 오래 못 버텨요" : pk === "venus" && !S.gear.pressure ? "구름 위 기지는 괜찮지만, 표면은 내압 냉각복 없이 갈 수 없어요" : pk === "moon" && !S.gear.batt ? "밤이 오면 전력이 빨리 닳아요" : PLANETS[pk].au > 5 && !S.gear.rtg ? `햇빛이 지구의 ${fmtSun(PLANETS[pk].solar)}배뿐이라 원자력 전지(RTG) 없이는 전력이 바닥나요` : PLANETS[pk].gas ? "착륙할 땅이 없어서 구름 위 떠 있는 기지에 내려요" : "";
     b.disabled = here || S.rocketPk !== S.planet || !pad || fuelHave() < f;
     b.innerHTML = `<span class="orb" style="background:${ORB[pk]}"></span><span class="info"><b>${PL.name}${here ? " (지금 여기)" : ""}</b><small>${PL.type} · 태양에서 ${PL.au} AU · 연료 ${f}개${S.dex[pk] ? " · 도감 기록됨" : ""}</small>${risk ? `<small class="warn">주의: ${risk}</small>` : ""}</span><span>${S.visited[pk] ? "방문함" : ""}</span>`;
-    b.onclick = () => fly(pk);
+    b.onclick = () => landPick(pk);
     L.appendChild(b);
   });
   $("mapOv").hidden = false;
 }
 $("bMap").onclick = openMap; $("mapClose").onclick = () => { $("mapOv").hidden = true; resume(); };
-function fly(pk) {
-  let f = FUEL[pk];
+// 착륙 방법: 공기가 짙으면 낙하산, 공기가 없으면 역추진, 아주 옅으면 둘 다
+const ATM = (pk) => ["moon", "mercury", "europa"].includes(pk) ? "none" : pk === "mars" ? "thin" : "thick";
+const LANDM = { chute: { n: "낙하산", extra: 0 }, both: { n: "낙하산 + 역추진", extra: 1 }, rocket: { n: "역추진 엔진", extra: 2 } };
+function landOK(pk, m) { const a = ATM(pk); return a === "none" ? (m === "rocket" ? "ok" : m === "both" ? "rough" : "crash") : a === "thin" ? (m === "chute" ? "crash" : m === "both" ? "best" : "ok") : (m === "chute" ? "best" : "ok"); }
+function landPick(pk) {
+  const PL = PLANETS[pk], L = $("destList"), dx = S.dex[pk];
+  $("mapNote").innerHTML = `<b>${PL.name}에 어떻게 내릴까요?</b> 낙하산은 공기에 부딪혀 속도를 줄이고, 역추진 엔진은 연료를 아래로 뿜어 속도를 줄여요. ${dx ? `도감 기록: 기압 ${dx.P}` : "도감에 기압 기록이 없으면 배운 내용으로 판단하세요."}`;
+  L.innerHTML = "";
+  Object.entries(LANDM).forEach(([m, o], i) => {
+    const need = FUEL[pk] + o.extra, b = document.createElement("button");
+    b.disabled = fuelHave() < need;
+    b.innerHTML = `<span class="orb" style="background:${["#e8e0c8", "#ffb060", "#ff6a40"][i]}"></span><span class="info"><b>${o.n}</b><small>연료 ${need}개${o.extra ? ` (착륙에 +${o.extra})` : ""}</small></span><span></span>`;
+    b.onclick = () => fly(pk, m); L.appendChild(b);
+  });
+  const back = document.createElement("button"); back.innerHTML = `<span></span><span class="info"><b>← 다른 곳 고르기</b></span><span></span>`; back.onclick = openMap; L.appendChild(back);
+}
+function fly(pk, m) {
+  if (!m) return landPick(pk);
+  S.landM = { pk, m };
+  let f = FUEL[pk] + LANDM[m].extra;
   for (const id of FUELS) { const u = Math.min(f, S.inv[id] || 0); if (u) { S.inv[id] -= u; f -= u; } }
   $("mapOv").hidden = true;
   if (!launchCine(pk)) { sfx.launch(); flyAnim(pk); }
@@ -2003,7 +2023,21 @@ const ARRIVE = {
   neptune: ["해왕성 구름 기지 도착", "태양에서 가장 먼 행성이에요. 햇빛이 지구의 약 1/900이에요.", "태양계에서 가장 센 바람이 불어요. 구름 다리를 건널 때 바람에 밀려 떨어지지 않게 조심하세요."],
   earth: ["지구 귀환", "우리 행성이에요. 모든 도감 값의 기준(1)이에요.", "숨 쉴 수 있는 공기, 알맞은 기온, 액체 물이 있는 곳은 지금까지 지구뿐이었어요."],
 };
-function arriveLog(pk) { const a = ARRIVE[pk]; if (a) showLog({ no: "새 천체 도착", t: a[0], ev: a[1], x: a[2] }); }
+function arriveLog(pk) {
+  const a = ARRIVE[pk], lm = S.landM; S.landM = null;
+  if (lm && lm.pk === pk) {
+    const r = landOK(pk, lm.m), PL = PLANETS[pk], at = ATM(pk), an = at === "none" ? "공기가 거의 없어요" : at === "thin" ? "공기가 아주 옅어요(지구의 약 0.6 %)" : `공기가 있어요(${PL.gas ? "두꺼운 가스층" : "기압 " + PL.P + "기압"})`;
+    S.landLog = S.landLog || {}; S.landLog[pk] = r;
+    if (r === "crash" || r === "rough") {
+      S.hp = Math.max(10, S.hp - (r === "crash" ? 55 : 25)); hurtT = 1; sfx.hit();
+      const why = lm.m === "chute" ? "낙하산은 공기에 부딪혀야 속도가 줄어요. 공기가 없거나 너무 옅으면 거의 펴지지 않아요." : "낙하산 쪽에 연료를 나눠 써서 역추진이 모자랐어요. 공기가 없는 곳은 역추진만으로 내려야 해요.";
+      showLog({ no: r === "crash" ? "거친 착륙 · 체력 −55" : "흔들린 착륙 · 체력 −25", t: `${PL.name}: ${an}`, ev: `고른 방법: ${LANDM[lm.m].n}`, x: why + (a ? " " + a[2] : "") });
+      return;
+    }
+    toast(r === "best" ? `알맞은 착륙! ${an}. ${lm.m === "chute" ? "낙하산으로 연료를 아꼈어요" : "낙하산과 역추진을 함께 써서 부드럽게 내렸어요"}` : `무사히 착륙했어요. ${an}. ${lm.m === "rocket" ? "낙하산을 썼다면 연료를 아낄 수 있었어요" : ""}`, 4500);
+  }
+  if (a) showLog({ no: "새 천체 도착", t: a[0], ev: a[1], x: a[2] });
+}
 
 /* ═════════════ 임무 ═════════════ */
 const minedOn = (pk, id) => ((S.mined[pk] || {})[id] || 0);
@@ -2018,7 +2052,7 @@ const MISSIONS = {
       log: () => ({ t: "기준값 기록", ev: "지구: 중력 1 · 기압 1기압 · 햇빛 세기 1 · 하루 24시간", x: "이 값들이 모든 행성 비교의 기준이에요. 다른 행성에 가면 같은 장치로 재서 지구와 몇 배 차이 나는지 보게 될 거예요." }) },
     { id: "e3", t: "태양광 발전", d: "태양광 패널(규소 2, 철 1) 2개를 기지 코어(가운데 하얀 블록) 6칸 안에 놓으세요.", p: () => panelsNearCore() / 2,
       log: () => ({ t: "해가 있어야 전기가 생긴다", ev: `패널 ${panelsNearCore()}개 설치. 지금 햇빛 세기 ${env.sun.toFixed(2)}`, x: "태양광 패널은 햇빛이 있을 때만 전기를 만들어요. 지구가 하루에 한 바퀴 자전해서 밤이 오면 발전이 멈춰요. 태양에서 멀어질수록 받는 햇빛이 거리의 제곱에 반비례해서 약해져요." }) },
-    { id: "e4", t: "달로 출발", d: "로켓(철 6, 규소 4)을 만들어 들고, 발사대(착륙선 옆 주황 줄무늬 블록)에 놓아 세우세요. 물을 3개 떠 온 뒤 로켓을 누르면 올라타요.", p: () => S.visited.moon ? 1 : (S.gear.rocket ? .3 : 0) + (S.rocketPk ? .2 : 0) + Math.min(.4, fuelHave() / 3 * .4), log: null },
+    { id: "e4", t: "달로 출발", d: "로켓(철 6, 규소 4)을 만들어 들고, 발사대(착륙선 옆 주황 줄무늬 블록)에 놓아 세우세요. 물을 5개 떠 온 뒤(가는 데 3개, 착륙 방법에 따라 0~2개 더) 로켓을 누르면 올라타요. 달에 공기가 있는지 생각해 착륙 방법을 고르세요.", p: () => S.visited.moon ? 1 : (S.gear.rocket ? .3 : 0) + (S.rocketPk ? .2 : 0) + Math.min(.4, fuelHave() / 3 * .4), log: null },
   ],
   moon: [
     { id: "m1", t: "달에서 높이뛰기", d: "점프해 보세요. 6칸 이상 뛰어오르면 기록돼요.", p: () => (S.best.moon || 0) / 6,
@@ -3585,8 +3619,9 @@ function updateCamera(dt) {
   eye.set(P.pos.x, P.pos.y + EYE, P.pos.z);
   const bobY = Math.abs(Math.sin(walkT * 3.1)) * .06 * walkAmt, bobX = Math.sin(walkT * 3.1) * .03 * walkAmt;
   const shake = hurtT > 0 ? Math.sin(performance.now() / 25) * hurtT * .04 : 0;
-  camera.rotation.set(P.pitch, P.yaw, shake + bobX * .3);
-  if (third) {
+  if (xrOn) { xrRig.position.set(P.pos.x, P.pos.y + EYE, P.pos.z); xrRig.rotation.set(0, xrYaw, 0); }
+  else camera.rotation.set(P.pitch, P.yaw, shake + bobX * .3);
+  if (xrOn) {} else if (third) {
     camera.getWorldDirection(fwd); let d = 4;
     for (let k = .5; k <= 4; k += .25) { const p = eye.clone().addScaledVector(fwd, -k); if (SOLID(get(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)))) { d = k - .3; break; } }
     camera.position.copy(eye).addScaledVector(fwd, -Math.max(.3, d));
@@ -3600,7 +3635,7 @@ function updateCamera(dt) {
   handRig.position.copy(camera.position); handRig.quaternion.copy(camera.quaternion);
   handArm.position.set(.42 + bobX * .6 - sw * .12, -.42 - bobY * .6 + sw * .1, -.55 - sw * .12);
   handArm.rotation.set(-.15 - sw * 1.0, -.25 + sw * .3, sw * .2);
-  handRig.visible = !third && !spec.id && $("startOv").hidden;
+  handRig.visible = !third && !spec.id && $("startOv").hidden && !xrOn;
   const li = Math.max(.25, Math.min(1, sunLight.intensity + hemi.intensity));
   handHemi.intensity = li * .9; handSun.intensity = li * .5;
   // 다쳤을 때 붉은 테두리
@@ -4004,6 +4039,7 @@ const cA = new THREE.Color(), cB = new THREE.Color();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
   const PL = PLANETS[S.planet];
+  if (xrOn) xrTick(dt, now);
   if (!paused) {
     gameT += dt;
     S.time[S.planet] = warpT(S.planet, (unwarpT(S.planet, S.time[S.planet]) + dt / (PL.wrap ? PL.dayMin * 60 : cycleSec(PL))) % 1);
@@ -4068,10 +4104,121 @@ function frame(now) {
   if (P.jumpY != null && P.peak > .5) { jm.hidden = false; jm.innerHTML = `${P.peak.toFixed(1)}칸<small>최고 ${(S.best[S.planet] || 0).toFixed(1)}칸 · 지구라면 ${EARTH_JUMP.toFixed(1)}칸</small>`; jm.dataset.t = now; }
   else if (!jm.hidden && now - (+jm.dataset.t || 0) > 1500) jm.hidden = true;
   if (toastT && now > toastT) { $("toast").hidden = true; toastT = 0; }
+  if (xrOn) { renderer.autoClear = true; renderer.render(scene, camera); return; }
   renderer.autoClear = false; renderer.clear(); renderer.render(scene, camera);
   if (handRig.visible) { renderer.clearDepth(); renderer.render(handScene, camera); }
   requestAnimationFrame(frame);
 }
+
+/* ═════════════ 저장 옮기기 ═════════════ */
+// "SC1." + gzip → base64. 압축이 안 되는 브라우저는 "SC0." + 그냥 base64
+const b64 = (u8) => { let t = ""; for (let i = 0; i < u8.length; i += 8192) t += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return btoa(t); };
+const unb64 = (t) => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+async function packSave() {
+  if ($("startOv").hidden) save();
+  const raw = localStorage.getItem("spacecraft2"); if (!raw) return null;
+  const u8 = new TextEncoder().encode(raw);
+  if (window.CompressionStream) { const z = new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer()); return "SC1." + b64(z); }
+  return "SC0." + b64(u8);
+}
+async function unpackSave(code) {
+  code = (code || "").replace(/\s+/g, "");
+  const [v, body] = [code.slice(0, 4), code.slice(4)]; let u8 = unb64(body);
+  if (v === "SC1.") u8 = new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+  else if (v !== "SC0.") throw new Error("ver");
+  const o = JSON.parse(new TextDecoder().decode(u8)); if (!o || !o.planet || !o.inv) throw new Error("bad"); return o;
+}
+async function useCode(code) {
+  let o; try { o = await unpackSave(code); } catch (e) { $("svNote").textContent = "저장 코드가 올바르지 않아요. 처음부터 끝까지 빠짐없이 복사했는지 확인하세요."; return; }
+  const vis = Object.keys(o.visited || {}).filter(k => o.visited[k]).length;
+  if (!confirm(`가져온 기록: ${PLANETS[o.planet] ? PLANETS[o.planet].name : o.planet}에 있음, 방문한 천체 ${vis}곳.\n이 기기의 지금 기록을 이걸로 바꿀까요?`)) return;
+  try { localStorage.setItem("spacecraft2", JSON.stringify(o)); } catch (e) { $("svNote").textContent = "이 기기에 저장할 수 없어요(저장 공간이 꽉 찼거나 막혀 있어요)."; return; }
+  window.__noSave = true; location.reload();
+}
+$("svFile").onclick = async () => { const c = await packSave(); if (!c) { $("svNote").textContent = "아직 저장된 기록이 없어요."; return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([c], { type: "text/plain" })); a.download = `스페이스크래프트-${($("nick").value || "기록").trim()}.txt`; document.body.appendChild(a); a.click(); a.remove();
+  $("svNote").textContent = "파일을 내려받았어요. 다른 기기에서 '파일 불러오기'로 여세요."; };
+$("svOpen").onclick = () => $("svIn").click();
+$("svIn").onchange = async (e) => { const fl = e.target.files[0]; e.target.value = ""; if (fl) useCode(await fl.text()); };
+$("svCopy").onclick = async () => { const c = await packSave(); if (!c) { $("svNote").textContent = "아직 저장된 기록이 없어요."; return; }
+  try { await navigator.clipboard.writeText(c); $("svNote").textContent = `저장 코드(${c.length}글자)를 복사했어요. 메신저나 메모에 붙여 넣어 옮기세요.`; }
+  catch (err) { prompt("이 코드를 모두 선택해 복사하세요", c); } };
+$("svPaste").onclick = async () => { let c = ""; try { c = await navigator.clipboard.readText(); } catch (e) {} if (!c || !/^SC[01]\./.test(c.trim())) c = prompt("저장 코드를 붙여 넣으세요") || ""; if (c) useCode(c); };
+
+/* ═════════════ VR 모드 (퀘스트 3) ═════════════ */
+// 머리를 돌려 둘러보고, 바라보는 곳을 캐요. 메뉴(제작·가방·지도)는 VR 밖 화면에서 열려요
+var xrOn = false; let xrSes = null, xrYaw = 0, xrPrev = {}, xrMine = false, xrHudT = 0;
+renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType("local");
+const xrRig = new THREE.Group(); scene.add(xrRig);
+const xrCv = document.createElement("canvas"); xrCv.width = 640; xrCv.height = 200;
+const xrTex = new THREE.CanvasTexture(xrCv);
+const xrHud = new THREE.Mesh(new THREE.PlaneGeometry(.64, .2), new THREE.MeshBasicMaterial({ map: xrTex, transparent: true, depthTest: false, depthWrite: false }));
+xrHud.position.set(0, -.3, -.8); xrHud.rotation.x = -.35; xrHud.renderOrder = 999;
+const xrDot = new THREE.Mesh(new THREE.RingGeometry(.006, .011, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, depthWrite: false, transparent: true, opacity: .85 }));
+xrDot.position.set(0, 0, -1); xrDot.renderOrder = 999;
+function xrHudDraw() {
+  const g = xrCv.getContext("2d"); g.clearRect(0, 0, 640, 200);
+  g.fillStyle = "#0b1020cc"; g.beginPath(); g.roundRect ? g.roundRect(0, 0, 640, 200, 24) : g.rect(0, 0, 640, 200); g.fill();
+  g.font = "bold 30px sans-serif"; g.fillStyle = "#fff";
+  const bar = (x, l, v, c) => { g.fillStyle = "#ffffff30"; g.fillRect(x, 22, 130, 14); g.fillStyle = c; g.fillRect(x, 22, 130 * Math.max(0, Math.min(1, v)), 14); g.fillStyle = "#fff"; g.font = "22px sans-serif"; g.fillText(l, x, 62); };
+  bar(20, `체력 ${Math.round(S.hp)}`, S.hp / 100, "#ff6a6a"); bar(175, `산소 ${Math.round(S.o2)}`, S.o2 / 100, "#7cc8ff"); bar(330, `전력 ${Math.round(S.pw)}`, S.pw / Math.max(1, maxPw()), "#ffd24a"); bar(485, `배부름 ${Math.round(S.food == null ? 20 : S.food)}`, (S.food == null ? 20 : S.food) / 20, "#f0a040");
+  const id = S.hot[sel]; g.font = "bold 28px sans-serif"; g.fillStyle = "#ffe08a";
+  g.fillText(`손: ${id ? itemName(id) + (TOOLS[id] ? "" : ` ×${S.inv[id] || 0}`) : "맨손"}  (${sel + 1}/9)`, 20, 110);
+  const tt = $("toast").hidden ? "" : $("toast").textContent; g.font = "22px sans-serif"; g.fillStyle = "#cfe0ff";
+  const msg = tt || "트리거 캐기·공격 · 그립 놓기 · A 점프 · B/Y 물건 바꾸기 · X 나가기"; g.fillText(msg.length > 34 ? msg.slice(0, 34) + "…" : msg, 20, 150);
+  if (msg.length > 34) g.fillText(msg.slice(34, 68), 20, 182);
+  xrTex.needsUpdate = true;
+}
+async function startXR() {
+  if (xrOn || !navigator.xr) return;
+  let ses; try { ses = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor"] }); } catch (e) { toast("VR을 시작할 수 없어요. 퀘스트 브라우저에서 열었는지 확인하세요", 3500); return; }
+  try { document.exitPointerLock(); } catch (e) {}
+  xrSes = ses; xrOn = true; xrYaw = P.yaw; xrPrev = {}; third = false;
+  ses.addEventListener("end", endXR);
+  await renderer.xr.setSession(ses);
+  xrRig.add(camera); camera.position.set(0, 0, 0); camera.quaternion.identity(); camera.matrixAutoUpdate = false; camera.add(xrHud); camera.add(xrDot);
+  if (paused && $("startOv").hidden) resume();
+  renderer.setAnimationLoop(frame);
+}
+function endXR() {
+  if (!xrOn) return; xrOn = false; xrSes = null; renderer.setAnimationLoop(null);
+  camera.remove(xrHud); camera.remove(xrDot); xrRig.remove(camera); camera.scale.set(1, 1, 1); camera.matrixAutoUpdate = true;
+  if (xrMine) { wantMine = false; xrMine = false; } stickV = { x: 0, y: 0 }; touchJump = false;
+  requestAnimationFrame(frame);
+}
+function xrTick(dt, now) {
+  // 지난 그림의 머리 자세(세계 좌표)를 카메라에 옮겨 조준·소리·하늘이 그대로 동작하게 해요.
+  // matrixAutoUpdate를 꺼 두어서 이 값이 행렬을 다시 바꾸지는 않아요
+  camera.matrixWorld.decompose(camera.position, camera.quaternion, camera.scale);
+  const d = new THREE.Vector3(); camera.getWorldDirection(d);
+  P.yaw = Math.atan2(-d.x, -d.z); P.pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
+  if (paused && $("startOv").hidden) { const s = xrSes; toast("메뉴는 VR 밖 화면에서 열려요. 다시 들어가려면 VR 버튼을 누르세요", 4000); s.end().catch(() => {}); return; }
+  const was = (k) => xrPrev[k], btn = {};
+  let lx = 0, ly = 0, rx = 0;
+  for (const src of xrSes.inputSources) {
+    const gp = src.gamepad; if (!gp) continue; const h = src.handedness === "left" ? "L" : "R";
+    const ax = gp.axes, b = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+    const sx = ax.length >= 4 ? ax[2] : ax[0] || 0, sy = ax.length >= 4 ? ax[3] : ax[1] || 0;
+    if (h === "L") { lx = sx; ly = sy; } else rx = sx;
+    [0, 1, 4, 5].forEach(i => { btn[h + i] = b(i); });
+  }
+  const dz = (v) => Math.abs(v) < .18 ? 0 : v;
+  stickV = { x: dz(lx), y: dz(ly) };
+  const turn = rx > .7 ? 1 : rx < -.7 ? -1 : 0;
+  if (turn && !xrPrev.turn) xrYaw -= turn * Math.PI / 6;
+  btn.turn = turn;
+  if (btn.R0) { wantMine = true; xrMine = true; } else if (xrMine) { wantMine = false; xrMine = false; }
+  if (btn.R1 && !was("R1")) place();
+  touchJump = !!btn.R4;
+  if (btn.R5 && !was("R5")) { sel = (sel + 1) % 9; renderHotbar(); }
+  if (btn.L5 && !was("L5")) { sel = (sel + 8) % 9; renderHotbar(); }
+  if (btn.L4 && !was("L4")) { xrSes.end().catch(() => {}); }
+  xrPrev = btn;
+  if (now - xrHudT > 200) { xrHudT = now; xrHudDraw(); }
+}
+const xrShow = () => { $("bXR").hidden = false; };
+if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported("immersive-vr").then(ok => { if (ok) xrShow(); }).catch(() => {});
+$("bXR").onclick = startXR;
 
 /* ═════════════ 시작 ═════════════ */
 const saved = load();
@@ -4098,6 +4245,6 @@ $("goBtn").onclick = () => start(true);
 $("contBtn").onclick = () => start(false);
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
