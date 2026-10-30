@@ -561,13 +561,18 @@ const MATS = {
   // 보스가 떨어뜨리는 코어와 그것으로 만드는 합금
   133: { n: "드릴 코어", c: "#ffb347" }, 134: { n: "거미 다리 합금", c: "#c8ccd8" }, 135: { n: "붉은 폭풍 코어", c: "#ff5a3a" }, 136: { n: "태양열 코어", c: "#ffd23f" },
   137: { n: "심해 얼음 코어", c: "#6fd8ff" }, 138: { n: "메테인 코어", c: "#f0a040" }, 139: { n: "별빛 합금", c: "#efe4ff" },
+  // 물고기(바다·민물)와 뼈
+  142: { n: "고등어", c: "#3d6f9e" }, 143: { n: "복어", c: "#e8c870" }, 144: { n: "흰동가리", c: "#ff7a2a" },
+  145: { n: "붕어", c: "#a89060" }, 146: { n: "메기", c: "#5a5448" }, 147: { n: "잉어", c: "#d8a040" },
+  148: { n: "구운 생선", c: "#b07038" }, 149: { n: "뼈", c: "#ece6d8" },
 };
 // 먹으면 차는 배부름(최대 20)
-const FOOD = { 113: 3, 114: 8, 115: 1, 116: 1, 117: 2, 118: 6, 119: 6, 130: 5, 131: 6, 132: 4 };
+const FOOD = { 113: 3, 114: 8, 115: 1, 116: 1, 117: 2, 118: 6, 119: 6, 130: 5, 131: 6, 132: 4, 142: 2, 143: 1, 144: 1, 145: 2, 146: 2, 147: 2, 148: 6 };
+const RAWFISH = [142, 143, 144, 145, 146, 147], SEAFISH = [142, 143, 144], FRESHFISH = [145, 146, 147];
 // 심을 수 있는 알갱이 → 작물 종류
 const SEED = { 115: 0, 116: 1, 117: 2 };
 // 재료를 어디서 구하는지 (제작 창에 보여 줘요)
-const WHERE = { 100: "철광석 · 수성에 많음", 101: "모래·레골리스", 102: "수성·금성 황 광석", 103: "지구 바다", 104: "금성 표면·화성 땅속", 105: "목성형 행성 구름", 106: "유로파 얼음", 107: "타이탄 호수",
+const WHERE = { 142: "지구 바다(섬 바깥쪽)", 143: "지구 바다(섬 바깥쪽)", 144: "지구 바다(섬 바깥쪽)", 145: "지구 호수(섬 안쪽)", 146: "지구 호수(섬 안쪽)", 147: "지구 호수(섬 안쪽)", 149: "지구 동물·늑대", 100: "철광석 · 수성에 많음", 101: "모래·레골리스", 102: "수성·금성 황 광석", 103: "지구 바다", 104: "금성 표면·화성 땅속", 105: "목성형 행성 구름", 106: "유로파 얼음", 107: "타이탄 호수",
   108: "지구 땅속 (검은 점)", 109: "지구 땅속 (청록 점)", 110: "지구 깊은 땅속 (노란 점)", 111: "지구 가장 깊은 곳 (하늘색 점)", 112: "달의 바다 현무암 (보라 점)",
   4: "지구 땅속 회색 돌", 7: "지구 나무 줄기", 11: "달의 바다", 14: "그늘진 구덩이·극관", 32: "제작",
   113: "지구 동물(소·돼지·닭·양)", 115: "지구 들판의 야생 밀·밭", 116: "지구 들판의 야생 보리·밭", 117: "지구 들판의 야생 옥수수·밭", 68: "지구의 양", 3: "지구 흙", 43: "나무로 제작",
@@ -590,7 +595,7 @@ const LIQ = (b) => !!(BLOCKS[b] && BLOCKS[b].liquid);
 const STYLE = {1:"bedrock", 2:"grass", 3:"dirt", 4:"stone", 5:"sand", 6:"water", 7:"log", 8:"leaves", 9:"ore", 10:"regolith", 11:"basalt", 12:"stone", 14:"ice", 15:"dirt", 16:"stone", 17:"snow", 18:"pebble", 19:"stone", 20:"ore", 21:"basalt", 22:"sand", 24:"ore", 25:"cloud", 26:"cloud", 27:"striped", 28:"water", 29:"icerock", 23:"metal", 34:"pad", 38:"ore", 39:"ore", 40:"ore", 41:"gem", 42:"ore",
   43:"planks", 44:"furnace", 45:"farmland", 47:"stonebrick", 48:"brick", 49:"metalblock", 62:"copperblock", 63:"metalblock", 64:"gemblock", 65:"metalblock", 66:"coalblock", 67:"crystal", 68:"wool", 69:"door", 70:"door", 71:"door", 72:"door", 73:"bed", 74:"crystal", 75:"pad", 76:"fence", 77:"fence", 78:"fence", 79:"furnace"};
 for (let i = 50; i < 62; i++) STYLE[i] = "crop";
-const NT = 140, MT = 100; // 블록 칸 0~99, 재료 칸 100~
+const NT = 152, MT = 100; // 블록 칸 0~99, 재료 칸 100~
 const atlas = document.createElement("canvas"); atlas.width = 16 * NT; atlas.height = 48;
 const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height = 32;
 (function paint() {
@@ -728,6 +733,11 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
     132: (ox, c, hi, lo) => { blobAt(ox, 8, 9.5, 5, 4.6, (x, y) => x < 7 && y < 8 ? hi : x > 10 ? lo : c); put(ox, 0, 8, 3, [100, 70, 40]); put(ox, 0, 8, 4, [100, 70, 40]); put(ox, 0, 9, 3, [90, 170, 60]); put(ox, 0, 10, 2, [90, 170, 60]); } };
   const coreIcon = (ox, c, hi, lo) => { for (let y = 2; y < 14; y++) for (let x = 2; x < 14; x++) { const q = Math.abs(x - 7.5) + Math.abs(y - 7.5) * .6; if (q < 6) put(ox, 0, x, y, q < 2.2 ? [255, 255, 255] : q < 3.6 ? hi : q > 5 ? lo : c); } };
   [133, 135, 136, 137, 138].forEach(id => { FOODI[id] = coreIcon; });
+  const fishIcon = (ox, c, hi, lo) => { blobAt(ox, 7, 8, 5.2, 3, (x, y) => y < 7 ? hi : y > 9 ? lo : c); for (let y = 4; y < 13; y++) { const w = Math.abs(y - 8); for (let x = 12 + Math.floor(w * .3); x < 15; x++) if (x - 12 < w * .7 + 1) put(ox, 0, x, y, c); } put(ox, 0, 4, 7, [20, 20, 24]); };
+  RAWFISH.concat([148]).forEach(id => { FOODI[id] = fishIcon; });
+  FOODI[143] = (ox, c, hi, lo) => { blobAt(ox, 7, 8, 5, 4.6, (x, y) => (x + y) % 3 === 0 ? lo : y < 7 ? hi : c); for (const [x, y] of [[2, 4], [7, 2], [12, 4], [2, 12], [7, 14], [12, 12]]) put(ox, 0, x, y, [140, 110, 40]); put(ox, 0, 5, 7, [20, 20, 24]); };
+  FOODI[144] = (ox, c, hi, lo) => { fishIcon(ox, c, hi, lo); for (const x of [5, 9]) for (let y = 5; y < 12; y++) put(ox, 0, x, y, [255, 255, 255]); };
+  FOODI[149] = (ox, c, hi, lo) => { for (let i = 0; i < 9; i++) { put(ox, 0, 4 + i, 11 - i, c); put(ox, 0, 5 + i, 11 - i, lo); } blobAt(ox, 3.5, 12, 2, 2, c); blobAt(ox, 5, 13.5, 2, 2, c); blobAt(ox, 12.5, 3.5, 2, 2, c); blobAt(ox, 13.5, 5, 2, 2, c); };
   FOODI[134] = FOODI[139] = (ox, c, hi, lo) => { for (let y = 5; y < 12; y++) for (let x = 2; x < 14; x++) if (x >= 2 + (11 - y) / 2 && x <= 13 - (y - 5) / 2) put(ox, 0, x, y, y === 5 ? [255, 255, 255] : y < 8 ? hi : y === 11 ? lo : c); };
   const ING = { 100: 1, 109: 1, 110: 1, 112: 1 }, GEM = { 111: 1, 104: 1 }, DUST = { 101: 1, 102: 1, 106: 1 }, DROP = { 103: 1, 105: 1, 107: 1 };
   for (const id in MATS) {
@@ -1775,7 +1785,9 @@ function eat(id) {
   S.inv[id]--; S.food = Math.min(20, S.food + FOOD[id]); swing = .001;
   [0, .12, .24].forEach(w => hiss("bandpass", 900 + Math.random() * 500, 2, .07, .12, w));
   let msg = `${itemName(id)}${josa(itemName(id), "을", "를")} 먹었어요 (배부름 +${FOOD[id]})`;
-  if (id === 113 && Math.random() < .3) { S.hp = Math.max(1, S.hp - 6); hurtT = .6; msg = "날고기를 먹고 배탈이 났어요! 화로에서 구워 먹으면 안전해요"; showFact("익혀 먹어야 하는 까닭", "날고기에는 세균이 있을 수 있어요. 높은 열로 익히면 세균이 죽고 단백질이 소화하기 쉬워져요."); }
+  if (id === 143) { S.hp = Math.max(1, S.hp - 14); hurtT = .8; msg = "복어를 먹고 독에 중독됐어요! 체력 −14"; if (!S.pufferHint) { S.pufferHint = true; showFact("복어의 독", "복어의 간·알·껍질에는 테트로도톡신이라는 강한 독이 있어요. 익혀도 독이 없어지지 않아서, 자격을 갖춘 요리사만 독이 있는 부분을 떼어 내고 손질할 수 있어요."); } }
+  else if (FRESHFISH.includes(id) && Math.random() < .3) { S.hp = Math.max(1, S.hp - 6); hurtT = .6; msg = "날 민물고기를 먹고 탈이 났어요! 화로에서 구워 먹으면 안전해요"; showFact("민물고기는 익혀 먹어요", "강·호수의 민물고기에는 간흡충 같은 기생충이 있을 수 있어요. 사람 몸에 들어오면 간에 살면서 병을 일으켜요. 충분히 익히면 기생충이 죽어요."); }
+  else if (id === 113 && Math.random() < .3) { S.hp = Math.max(1, S.hp - 6); hurtT = .6; msg = "날고기를 먹고 배탈이 났어요! 화로에서 구워 먹으면 안전해요"; showFact("익혀 먹어야 하는 까닭", "날고기에는 세균이 있을 수 있어요. 높은 열로 익히면 세균이 죽고 단백질이 소화하기 쉬워져요."); }
   toast(msg, 1800);
   if (!S.ate) { S.ate = true; showFact("음식과 에너지", "음식 속 영양소(탄수화물·단백질·지방)가 몸속에서 분해되면서 움직이는 데 필요한 에너지가 나와요. 그래서 움직이고 일할수록 배가 빨리 고파져요."); }
   renderHotbar(); renderGauges(); save();
@@ -1876,6 +1888,10 @@ const RECIPES = [
   { id: 74, n: "소금 블록", need: { 106: 4 }, out: 74, cat: "build", use: "소금(염화 나트륨) 알갱이는 정육면체 모양 결정이에요. 확대경으로 보면 작은 주사위처럼 보여요." },
   { id: 75, n: "발사대", need: { 100: 4, 108: 2 }, out: 75, cat: "build", use: "어디에나 놓을 수 있는 내 발사대. 집 옆에 두고 로켓을 세워 그 자리에서 출발해요." },
   { id: "hoe", n: "괭이", need: { 7: 2, 4: 2 }, tool: 127, cat: "tool", use: "풀이나 흙을 갈아 농지를 만들어요(놓기·오른쪽 클릭). 농지에 밀·보리·옥수수 알갱이를 심어요." },
+  { id: "fish1", n: "구운 생선 (고등어)", need: { 142: 1, 108: 1 }, out: 148, cat: "food", fire: true, use: "배부름 +6. 바닷물고기 고등어는 등이 푸른 생선이에요." },
+  { id: "fish2", n: "구운 생선 (붕어)", need: { 145: 1, 108: 1 }, out: 148, cat: "food", fire: true, use: "배부름 +6. 민물고기는 기생충이 있을 수 있어서 꼭 익혀 먹어요." },
+  { id: "fish3", n: "구운 생선 (메기)", need: { 146: 1, 108: 1 }, out: 148, cat: "food", fire: true, use: "배부름 +6. 민물고기는 꼭 익혀 먹어요." },
+  { id: "fish4", n: "구운 생선 (잉어)", need: { 147: 1, 108: 1 }, out: 148, cat: "food", fire: true, use: "배부름 +6. 민물고기는 꼭 익혀 먹어요." },
   { id: 114, n: "구운 고기 ×2", need: { 113: 2, 108: 1 }, out: 114, count: 2, cat: "food", fire: true, use: "배부름 +8. 높은 열로 익히면 세균이 죽고 소화가 잘 돼요." },
   { id: 118, n: "빵 ×2", need: { 115: 3, 108: 1 }, out: 118, count: 2, cat: "food", fire: true, use: "배부름 +6. 밀가루 속 녹말(탄수화물)은 몸을 움직이는 에너지가 돼요." },
   { id: 119, n: "보리밥 ×2", need: { 116: 2, 103: 1, 108: 1 }, out: 119, count: 2, cat: "food", fire: true, use: "배부름 +6. 보리에는 소화를 돕는 식이 섬유가 많아요." },
@@ -3069,6 +3085,10 @@ function mobTick(dt) {
           m.st = "go"; m.cd = 2.6;
         }
       }
+    } else if (m.type === "bomber" && m.st === "go" && animals.some(c => c.type === "cat" && c.own && Math.hypot(c.p.x - m.p.x, c.p.z - m.p.z) < 6)) {
+      // 고양이가 가까이 있으면 자폭 로봇은 겁먹고 달아나요
+      const c = animals.find(c => c.type === "cat" && c.own && Math.hypot(c.p.x - m.p.x, c.p.z - m.p.z) < 6), ax = m.p.x - c.p.x, az = m.p.z - c.p.z, q = Math.hypot(ax, az) || 1;
+      wx = ax / q * T.sp * .8; wz = az / q * T.sp * .8;
     } else if (m.type === "bomber") {
       if (m.st === "go") { wx = dx / dist * T.sp; wz = dz / dist * T.sp; if (dist < 2 && Math.abs(dy) < 1.6) { m.st = "fuse"; m.stT = 0; m.bp = 0; } }
       else if (m.st === "fuse") {
@@ -3100,7 +3120,13 @@ function mobTick(dt) {
       wx = dx / dist * T.sp; wz = dz / dist * T.sp;
     }
     const quick = m.st === "dash" || m.st === "air" ? 12 : 6;
-    m.v.x += (wx - m.v.x) * Math.min(1, dt * quick); m.v.z += (wz - m.v.z) * Math.min(1, dt * quick); m.v.y -= g * dt; if (m.v.y < -30) m.v.y = -30;
+    // 물에 빠지면 사람처럼 느려지고 둥둥 떠요(바닥을 걸어 다니지 않아요)
+    const mW = m.type !== "drone" && LIQ(get(fx, Math.floor(m.p.y + Math.min(.9, T.h * .5)), fz));
+    if (mW) { wx *= .45; wz *= .45; }
+    m.v.x += (wx - m.v.x) * Math.min(1, dt * quick); m.v.z += (wz - m.v.z) * Math.min(1, dt * quick);
+    if (mW) { const head = LIQ(get(fx, Math.floor(m.p.y + T.h * .85), fz)), want = head ? 1.6 : Math.max(-1, Math.min(1.4, dy * 1.2)); m.v.y += (want - m.v.y) * Math.min(1, dt * 2); m.ground = false; } // 물속에서는 떠오르려는 힘(부력)이 중력과 거의 맞먹어요
+    else m.v.y -= g * dt;
+    if (m.v.y < -30) m.v.y = -30;
     if (m.type === "drone") m.v.y = ((sees ? P.pos.y + 3.2 : m.p.y) - m.p.y) * 2;
     if (m.st === "wind" || m.st === "aim" || m.st === "stun" || m.st === "crouch") { m.v.x *= .8; m.v.z *= .8; }
     let blocked = false;
@@ -3110,6 +3136,7 @@ function mobTick(dt) {
     if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) { if (m.v.y < 0) { m.p.y = Math.floor(m.p.y) + 1; if (mobHits(m.p.x, m.p.y, m.p.z, T.w, T.h)) m.p.y -= m.v.y * dt; m.ground = true; } else m.p.y -= m.v.y * dt; m.v.y = 0; } else m.ground = false;
     if (m.st === "dash" && blocked && m.stT > .1) { m.st = "stun"; m.stT = 0; m.v.set(0, 0, 0); burst(fx, fy + 1, fz, 23); sfx.hit(); }
     else if (blocked && m.ground && m.st === "go") m.v.y = JUMP_V * .95;
+    else if (blocked && mW) m.v.y = Math.max(m.v.y, 3.6); // 물가 벽에 닿으면 기어올라요
     if (wrapX) m.p.x = ((m.p.x % SX) + SX) % SX;
     if (m.p.y < -5) return gone();
     // 몸으로 부딪히는 공격
@@ -3384,6 +3411,10 @@ const ANIMT = {
     fact: "돼지는 식물과 동물을 모두 먹는 잡식 동물이에요. 땀샘이 거의 없어서 진흙에 뒹굴어 몸을 식혀요." },
   chicken: { n: "닭", hp: 4, sp: 1.6, w: .22, h: .75, wt: 3, drop: [[113, 1]], col: ["#ffffff", "#e8b030"],
     fact: "닭은 날개와 깃털이 있는 새(조류)지만 몸이 무거워 멀리 날지 못해요. 깃털 사이 공기층이 체온을 지켜 줘요." },
+  cat: { n: "고양이", hp: 8, sp: 1.7, w: .2, h: .62, wt: 1, drop: [], col: ["#e0a050", "#f4e8d8"], pet: true,
+    fact: "고양이는 고기를 먹는 육식 동물이에요. 눈 뒤쪽의 반사층 덕분에 어두운 곳에서도 잘 보고, 수염으로 좁은 틈을 지나갈 수 있는지 느껴요. 사람이 고양이를 기르기 시작한 건 곡식 창고의 쥐를 잡아 주었기 때문이라고 해요." },
+  wolf: { n: "늑대", hp: 18, sp: 1.9, w: .3, h: .95, wt: 1, drop: [[149, 1], [113, .5]], col: ["#8a8a90", "#d8d8dc"], pet: true, fight: true,
+    fact: "늑대는 무리를 지어 함께 사냥하는 육식 동물이에요. 개는 아주 오래전 사람 곁에 머문 늑대가 길들여져 생긴 동물이에요. 그래서 개와 늑대는 같은 종으로 분류하기도 해요." },
   sheep: { n: "양", hp: 8, sp: 1.2, w: .4, h: 1.15, wt: 2, drop: [[113, 1], [68, 1]], col: ["#f4f2ec", "#3a3530"],
     fact: "양털은 꼬불꼬불해서 사이사이에 공기를 많이 품어요. 공기는 열을 잘 전달하지 않아서 양털 옷과 이불이 따뜻해요." },
 };
@@ -3392,7 +3423,18 @@ function buildAnimal(type) {
   const T = ANIMT[type], g = new THREE.Group(), a = lam(T.col[0]), b = lam(T.col[1]), dk = lam("#22201e"), legs = [];
   const leg = (x, z, h, w, m) => { const p = new THREE.Group(); p.position.set(x, h, z); box(w, h, w, m, 0, -h / 2, 0, p); g.add(p); legs.push(p); };
   let head;
-  if (type === "chicken") {
+  if (type === "cat" || type === "wolf") {
+    const W = type === "wolf", L = W ? .42 : .2, bw = W ? .34 : .24, bh = W ? .36 : .24, bl = W ? .82 : .52;
+    box(bw, bh, bl, a, 0, L + bh / 2, 0, g); if (W) box(bw + .04, bh + .06, .3, a, 0, L + bh / 2 + .02, -bl / 2 + .14, g);
+    head = new THREE.Group(); head.position.set(0, L + bh * .9, -bl / 2 - .08); g.add(head);
+    box(W ? .3 : .24, W ? .28 : .22, W ? .26 : .2, a, 0, 0, -.02, head); box(W ? .14 : .1, W ? .12 : .08, W ? .18 : .06, b, 0, -.06, W ? -.2 : -.13, head);
+    box(.05, .05, .02, W ? lam("#e8c040") : lam("#60c060"), -.07, .05, W ? -.16 : -.13, head); box(.05, .05, .02, W ? lam("#e8c040") : lam("#60c060"), .07, .05, W ? -.16 : -.13, head);
+    box(.07, .1, .04, a, -.09, W ? .18 : .14, 0, head); box(.07, .1, .04, a, .09, W ? .18 : .14, 0, head);
+    if (!W) { for (const z of [-.12, .02, .16]) box(bw + .01, .04, .05, b, 0, L + bh * .85, z, g); box(.12, .02, .02, lam("#f0f0f0"), 0, -.04, -.14, head); }
+    const tail = new THREE.Group(); tail.position.set(0, L + bh * .8, bl / 2); g.add(tail); box(.07, .07, W ? .38 : .34, W ? b : a, 0, W ? -.06 : .08, .16, tail); tail.rotation.x = W ? .5 : -.7;
+    const lw = W ? .1 : .07, lx = bw / 2 - lw / 2, lz = bl / 2 - lw / 2 - .03;
+    leg(-lx, -lz, L, lw, a); leg(lx, -lz, L, lw, a); leg(-lx, lz, L, lw, W ? a : b); leg(lx, lz, L, lw, W ? a : b);
+  } else if (type === "chicken") {
     box(.34, .3, .44, a, 0, .42, .02, g); head = new THREE.Group(); head.position.set(0, .62, -.2); g.add(head);
     box(.2, .26, .2, a, 0, .06, 0, head); box(.1, .06, .1, lam("#e8a020"), 0, .04, -.14, head); box(.05, .1, .12, lam("#e03030"), 0, .24, 0, head); box(.06, .1, .06, lam("#d02828"), 0, -.06, -.11, head);
     box(.04, .04, .02, dk, -.08, .1, -.1, head); box(.04, .04, .02, dk, .08, .1, -.1, head);
@@ -3419,8 +3461,12 @@ function buildAnimal(type) {
 }
 // 좋아하는 먹이: 들고 있으면 따라오고, 주면 짝을 찾아요(새끼를 낳아요)
 const BREED = { cow: 115, sheep: 115, pig: 117, chicken: 116 }, ANIMK = Object.keys(ANIMT);
+// 길들이기 먹이(짝짓기는 안 해요): 고양이는 날물고기(복어 빼고), 늑대는 뼈
+const TAME = { cat: [142, 144, 145, 146, 147], wolf: [149] }, TAME_P = .3;
+const likes = (type, id) => BREED[type] === id || (TAME[type] || []).includes(id);
 const GROWUP = 150, BREED_CD = 60, LOVE_T = 30, HERD_MAX = 40;
 let herdLoaded = false, herdSaveT = 0, hearts = [], heartMat = null, newborn = [];
+function nearTree(cx, cz) { for (let dx = -8; dx <= 8; dx += 2) for (let dz = -8; dz <= 8; dz += 2) { const x = cx + dx, z = cz + dz, y = topY(x, z); if (get(x, y, z) === 8 || get(x, y - 1, z) === 7 || get(x, y, z) === 7) return true; } return false; }
 function pickAnimal() { let tot = 0; for (const k in ANIMT) tot += ANIMT[k].wt; let r = Math.random() * tot; for (const k in ANIMT) { r -= ANIMT[k].wt; if (r <= 0) return k; } return "cow"; }
 function mkAnimal(type, x, y, z, o = {}) {
   const g = buildAnimal(type); scene.add(g);
@@ -3435,7 +3481,8 @@ function spawnHerd() {
   if (animals.filter(m => !m.own).length >= 9) return;
   const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 18, cx = Math.floor(P.pos.x + Math.cos(a) * d), cz = Math.floor(P.pos.z + Math.sin(a) * d);
   if (cx < 2 || cz < 2 || cx >= SX - 2 || cz >= SZ - 2 || Math.hypot(cx - base.x, cz - base.z) < 9) return;
-  const type = pickAnimal(), n = 1 + Math.floor(Math.random() * 3);
+  let type = pickAnimal(); const n = type === "cat" ? 1 : 1 + Math.floor(Math.random() * (type === "wolf" ? 2 : 3));
+  if (type === "wolf" && !nearTree(cx, cz)) type = "sheep";
   for (let i = 0; i < n && animals.filter(m => !m.own).length < 9; i++) {
     const x = cx + Math.floor(Math.random() * 5) - 2, z = cz + Math.floor(Math.random() * 5) - 2; if (x < 1 || z < 1 || x >= SX - 1 || z >= SZ - 1) continue;
     const y = topY(x, z); if (get(x, y, z) !== 2 || SOLID(get(x, y + 1, z)) || SOLID(get(x, y + 2, z)) || lightAt(x, y + 1, z)[0] < 12) continue;
@@ -3475,16 +3522,33 @@ function aimAnimal(max) {
   const h = raycast(bt); return h && !BLOCKS[h.b].fence ? null : best; // 울타리 너머로도 먹이를 줄 수 있어요
 }
 function feedAnimal() {
-  const id = heldId(); if (S.planet !== "earth" || !(S.inv[id] > 0) || !Object.values(BREED).includes(id)) return false;
+  const id = heldId(); if (S.planet !== "earth" || !(S.inv[id] > 0) || !(Object.values(BREED).includes(id) || RAWFISH.includes(id) || id === 149 || id === 113)) return false;
   const m = aimAnimal(4.5); if (!m) return false;
   swing = .001;
   if (m.owner) { toast(`친구 ${m.owner}의 가축이에요`); return true; }
-  const T = m.T, food = itemName(BREED[m.type]);
+  const T = m.T;
+  if (TAME[m.type]) {
+    if (m.own) { if (!(id === 113 || likes(m.type, id))) { toast(`${T.n}${josa(T.n, "은", "는")} ${m.type === "cat" ? "날물고기" : "뼈나 생고기"}${josa(m.type === "cat" ? "날물고기" : "뼈나 생고기", "을", "를")} 좋아해요`, 2000); return true; }
+      if (m.hp >= T.hp) { toast(`${T.n}${josa(T.n, "은", "는")} 배불러요`, 1500); return true; }
+      S.inv[id]--; m.hp = Math.min(T.hp, m.hp + 8); heart(m.p.x, m.p.y + T.h + .2, m.p.z); toast(`${T.n}${josa(T.n, "이", "가")} 먹고 기운을 차렸어요 (체력 ${Math.round(m.hp)}/${T.hp})`, 1800); renderHotbar(); return true; }
+    if (!likes(m.type, id)) { toast(m.type === "cat" ? "고양이는 날물고기(고등어·흰동가리·붕어·메기·잉어)를 좋아해요" : "늑대는 뼈를 좋아해요. 동물을 잡으면 가끔 뼈가 나와요", 2400); return true; }
+    if (m.angry > 0) { toast("화난 늑대는 먹이를 받지 않아요. 잠시 뒤에 다시 해 보세요", 2000); return true; }
+    if (ownCount() >= HERD_MAX) { toast(`동물은 ${HERD_MAX}마리까지 기를 수 있어요`, 2200); return true; }
+    S.inv[id]--; renderHotbar();
+    if (Math.random() >= TAME_P) { puff(m); toast(`${T.n}${josa(T.n, "이", "가")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
+    m.own = true; m.id = ++S.herdN; heart(m.p.x, m.p.y + T.h + .2, m.p.z); tone(700, .08, "sine", .05, 0, 900);
+    toast(m.type === "wolf" ? "늑대가 내 편이 됐어요! 따라다니며 로봇과 같이 싸워 줘요" : "고양이가 내 편이 됐어요! 졸졸 따라다녀요", 3000);
+    showFact(`${T.n} 길들이기`, m.type === "wolf" ? "길든 늑대는 나를 따라다니다가 가까이 오는 로봇을 물어요. 다치면 생고기나 뼈를 주면 회복해요. 기르는 동물은 지구에 남아 기다려요." : "길든 고양이는 나를 따라다녀요. 고양이가 있으면 자폭 로봇이 가까이 오지 못하고 달아나요. 기르는 동물은 지구에 남아 기다려요.");
+    saveHerd(); return true;
+  }
+  if (!BREED[m.type] || !Object.values(BREED).includes(id)) return false;
+  const food = itemName(BREED[m.type]);
   if (BREED[m.type] !== id) { toast(`${T.n}${josa(T.n, "은", "는")} ${food}${josa(food, "을", "를")} 좋아해요`, 2000); return true; }
   if (!m.own && ownCount() >= HERD_MAX) { toast(`가축은 ${HERD_MAX}마리까지 기를 수 있어요`, 2200); return true; }
   if (m.baby > 0) { m.baby = Math.max(0, m.baby - 30); toast(`새끼 ${T.n}${josa(T.n, "이", "가")} 먹이를 먹고 쑥 자랐어요`, 1800); }
   else if (m.cd > 0) { toast(`${T.n}${josa(T.n, "은", "는")} 새끼를 낳고 쉬는 중이에요 (${Math.ceil(m.cd)}초)`, 1800); return true; }
   else if (m.love > 0) { toast("벌써 짝을 찾고 있어요. 먹이를 먹은 같은 동물을 가까이 데려오세요", 2200); return true; }
+  else if (!m.own && Math.random() >= TAME_P) { S.inv[id]--; puff(m); renderHotbar(); toast(`${T.n}${josa(T.n, "이", "가")} ${food}${josa(food, "을", "를")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
   else { m.love = LOVE_T; toast(ownCount() + (m.own ? 0 : 1) >= HERD_MAX ? `가축이 ${HERD_MAX}마리라 새끼는 더 못 낳아요` : `${T.n}에게 ${food}${josa(food, "을", "를")} 줬어요. 먹이를 먹은 ${T.n}${josa(T.n, "이", "가")} 둘 모이면 새끼를 낳아요`, 2600); }
   if (!m.own) { m.own = true; m.id = ++S.herdN; if (!S.tamed) { S.tamed = true; showFact("내 가축이 생겼어요", "먹이를 준 동물은 내 가축이 돼요. 저장되고 친구 화면에도 보여요. 울타리(나무 판자 4 + 통나무 1)로 우리를 지어 두면 달아나지 않아요."); } }
   S.inv[id]--; heart(m.p.x, m.p.y + m.T.h * aSize(m) + .2, m.p.z); tone(700, .08, "sine", .05, 0, 900); renderHotbar(); saveHerd(); return true;
@@ -3499,10 +3563,78 @@ function breed(a, b) {
     showFact("새끼 낳기 (생식)", x); S.logs.push({ id: "breed", pk: S.planet, t: "가축 번식", ev: `${T.n} 두 마리에게 ${itemName(BREED[a.type])}${josa(itemName(BREED[a.type]), "을", "를")} 먹였더니 새끼가 태어났어요.`, x }); }
   save();
 }
+// 길들이기에 실패하면 회색 연기가 피어요
+function puff(m) { for (let i = 0; i < 3; i++) burst(Math.floor(m.p.x), Math.floor(m.p.y + m.T.h), Math.floor(m.p.z), 4); tone(260, .1, "triangle", .03, 0, 200); }
 function meetAnimal(m) {
   S.aniSeen = S.aniSeen || {}; if (S.aniSeen[m.type]) return; const first = !Object.keys(S.aniSeen).length; S.aniSeen[m.type] = true;
   const x = (first ? "지금까지 생명체가 사는 것으로 확인된 천체는 지구뿐이에요. 액체 물, 숨 쉴 산소, 알맞은 온도가 모두 있기 때문이에요. " : "") + m.T.fact;
   showFact(`지구 동물: ${m.T.n}`, x); S.logs.push({ id: "ani" + m.type, pk: S.planet, t: `동물 발견: ${m.T.n}`, ev: `지구에서 ${m.T.n}${josa(m.T.n, "을", "를")} 처음 만났어요.`, x });
+}
+// 길든 늑대: 내 근처(12칸)의 로봇이나 보스를 찾아 물어요
+function petTarget(m) { let best = null, bd = 12; for (const r of mobs) { const q = Math.hypot(r.p.x - P.pos.x, r.p.z - P.pos.z), q2 = Math.hypot(r.p.x - m.p.x, r.p.z - m.p.z); if (q < 12 && q2 < bd && Math.abs(r.p.y - m.p.y) < 4) { bd = q2; best = r; } }
+  if (!best && boss && Math.hypot(boss.p.x - P.pos.x, boss.p.z - P.pos.z) < 12) best = boss; return best; }
+function petBite(m, tg) {
+  const dmg = 4 + (MLV[S.planet] || 1) * 1.5; tone(200, .1, "sawtooth", .05, 0, 120);
+  if (tg === boss) { boss.hp -= dmg * .5; boss.flash = 1; if (boss.hp <= 0) bossDie(); }
+  else { tg.hp -= dmg; tg.flash = 1; if (tg.hp <= 0) { const x = Math.floor(tg.p.x), y = Math.floor(tg.p.y + .5), z = Math.floor(tg.p.z);
+      burst(x, y, z, 23); sfx.boom(.4); scene.remove(tg.g); if (tg.beam) scene.remove(tg.beam); mobs = mobs.filter(o => o !== tg);
+      const got = []; tg.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); }); got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
+      S.kills = (S.kills || 0) + 1; toast(`늑대가 ${tg.T.n}${josa(tg.T.n, "을", "를")} 멈췄어요!${got.length ? " 부품: " + got.map(itemName).join(", ") : ""}`, 1800); renderHotbar(); } }
+  // 로봇과 붙어 싸우면 늑대도 다쳐요. 쓰러지면 기지로 돌아가 쉬어요
+  m.hp -= 1.2 + (MLV[S.planet] || 1) * .6; m.flash = 1;
+  if (m.hp <= 0) { m.hp = m.T.hp * .5; m.rest = 40; m.p.set(base.x + 1.5, topY(base.x + 1, base.z + 2) + 1.2, base.z + 2.5); m.v.set(0, 0, 0); toast("늑대가 많이 다쳐서 기지로 돌아가 쉬어요(40초)", 2400); }
+}
+// 물고기: 섬 바깥쪽 바다와 섬 안쪽 호수에 서로 다른 물고기가 살아요
+const FISHT = {
+  mackerel: { n: "고등어", item: 142, sea: true, hp: 3, sp: 2.4, len: .42, col: ["#3d6f9e", "#d8e4ee"], fact: "고등어는 바다에서 큰 무리를 지어 빠르게 헤엄쳐요. 등은 푸르고 배는 하얘서, 위에서 보면 바다색에, 아래에서 보면 밝은 수면에 섞여 잘 안 보여요." },
+  puffer: { n: "복어", item: 143, sea: true, hp: 3, sp: 1.1, len: .3, col: ["#e8c870", "#f4ecd0"], puff: true, fact: "복어는 위험하면 물을 들이마셔 몸을 공처럼 부풀려요. 몸에 테트로도톡신이라는 강한 독이 있어서 먹으면 안 돼요." },
+  clown: { n: "흰동가리", item: 144, sea: true, hp: 2, sp: 1.6, len: .2, col: ["#ff7a2a", "#ffffff"], stripe: true, fact: "흰동가리는 따뜻한 바다의 말미잘 촉수 사이에 숨어 살아요. 말미잘은 흰동가리를 지켜 주고, 흰동가리는 말미잘을 청소해 줘요. 이렇게 서로 돕고 사는 것을 공생이라고 해요." },
+  crucian: { n: "붕어", item: 145, sea: false, hp: 3, sp: 1.6, len: .28, col: ["#a89060", "#d8c8a0"], fact: "붕어는 호수·연못·강에 사는 민물고기예요. 더러운 물에서도 잘 버티고, 바닥의 작은 생물과 물풀을 먹어요." },
+  catfish: { n: "메기", item: 146, sea: false, hp: 4, sp: 1.2, len: .5, col: ["#5a5448", "#8a8070"], whisk: true, fact: "메기는 흙탕물 바닥에 사는 민물고기예요. 긴 수염에 맛을 느끼는 감각 세포가 많아서, 앞이 잘 안 보여도 먹이를 찾아요." },
+  carp: { n: "잉어", item: 147, sea: false, hp: 4, sp: 1.4, len: .46, col: ["#d8a040", "#f0d8a0"], fact: "잉어는 호수와 강에 사는 큰 민물고기예요. 입가에 짧은 수염이 두 쌍 있어요. 오래 사는 물고기로, 수십 년을 사는 것도 있어요." },
+};
+let fishes = [], fishT = 0;
+const isSea = (x, z) => Math.hypot(x - SX / 2, z - SZ / 2) / (SX / 2 - 3) > .76;
+function buildFish(T) {
+  const g = new THREE.Group(), a = lam(T.col[0]), b = lam(T.col[1]), L = T.len, H = T.puff ? L * .8 : L * .42, W = T.puff ? L * .7 : L * .22;
+  box(W, H, L * .7, a, 0, 0, 0, g); box(W * .9, H * .45, L * .6, b, 0, -H * .3, 0, g);
+  const tail = new THREE.Group(); tail.position.set(0, 0, L * .35); g.add(tail); box(W * .3, H * .9, L * .3, a, 0, 0, L * .15, tail);
+  box(.03, .03, .02, lam("#141418"), -W / 2, H * .15, -L * .26, g); box(.03, .03, .02, lam("#141418"), W / 2, H * .15, -L * .26, g);
+  if (T.stripe) for (const z of [-.04, .04]) box(W + .01, H + .01, .025, b, 0, 0, z, g);
+  if (T.whisk) for (const s2 of [-1, 1]) box(.015, .015, .16, lam("#2a2620"), s2 * W * .4, -H * .2, -L * .42, g);
+  if (T.puff) for (let i = 0; i < 8; i++) { const an = i / 8 * Math.PI * 2; box(.02, .02, .02, lam("#8a6a20"), Math.cos(an) * W * .55, Math.sin(an) * H * .55, 0, g); }
+  const mats = []; g.traverse(o => { if (o.material && !mats.includes(o.material)) mats.push(o.material); });
+  g.userData = { tail, mats, base: mats.map(m => m.color.clone()) }; return g;
+}
+const inWater = (x, y, z) => LIQ(get(Math.floor(x), Math.floor(y), Math.floor(z)));
+function fishTick(dt) {
+  if (S.planet !== "earth" || net.teacher) { if (fishes.length) { fishes.forEach(f => scene.remove(f.g)); fishes = []; } return; }
+  if ((fishT -= dt) <= 0) { fishT = 1.5;
+    if (fishes.length < 10) { const an = Math.random() * 6.28, d = 6 + Math.random() * 20, x = Math.floor(P.pos.x + Math.cos(an) * d), z = Math.floor(P.pos.z + Math.sin(an) * d);
+      if (x > 1 && z > 1 && x < SX - 1 && z < SZ - 1 && LIQ(get(x, 16, z)) && LIQ(get(x, 15, z))) {
+        let y0 = 16; while (y0 > 1 && LIQ(get(x, y0 - 1, z))) y0--;
+        const sea = isSea(x, z), pool = Object.keys(FISHT).filter(k => FISHT[k].sea === sea), k = pool[Math.floor(Math.random() * pool.length)], T = FISHT[k];
+        for (let i = 0, n = k === "mackerel" ? 3 : 1 + Math.floor(Math.random() * 2); i < n; i++) {
+          const fx = x + .5 + (Math.random() - .5) * 1.5, fz = z + .5 + (Math.random() - .5) * 1.5, fy = y0 + .4 + Math.random() * Math.max(.2, 16.4 - y0);
+          if (!inWater(fx, fy, fz)) continue;
+          const g = buildFish(T); scene.add(g); fishes.push({ fishy: true, type: k, T, g, p: new THREE.Vector3(fx, fy, fz), hp: T.hp, yaw: Math.random() * 6.28, pitch: 0, t: Math.random() * 3, flee: 0, flash: 0, w: Math.random() * 6 }); } } } }
+  fishes = fishes.filter(f => {
+    const dx = P.pos.x - f.p.x, dz = P.pos.z - f.p.z, dist = Math.hypot(dx, dz);
+    if (dist > 40) { scene.remove(f.g); return false; }
+    f.t -= dt; f.w += dt * (f.flee > 0 ? 18 : 8);
+    if (f.flee > 0) { f.flee -= dt; f.yaw = Math.atan2(dx, dz); }
+    else if (dist < 3 && Math.abs(P.pos.y + 1 - f.p.y) < 2) { f.flee = 1.5; }
+    else if (f.t <= 0) { f.t = 1.5 + Math.random() * 3; f.yaw += (Math.random() - .5) * 2.4; f.pitch = (Math.random() - .5) * .6; }
+    const sp = f.T.sp * (f.flee > 0 ? 1.8 : .5), vx = -Math.sin(f.yaw) * sp * dt, vz = -Math.cos(f.yaw) * sp * dt, vy = Math.sin(f.pitch) * sp * dt;
+    // 물 밖으로는 나가지 않아요(가장자리에서 돌아서요)
+    if (inWater(f.p.x + vx * 4, f.p.y, f.p.z + vz * 4)) { f.p.x += vx; f.p.z += vz; } else { f.yaw += Math.PI * (.6 + Math.random() * .5); f.t = 1; }
+    if (inWater(f.p.x, f.p.y + vy * 3 + (vy > 0 ? .25 : -.2), f.p.z)) f.p.y += vy; else f.pitch = -f.pitch;
+    if (!inWater(f.p.x, f.p.y, f.p.z)) f.p.y -= dt * 2;
+    f.g.position.copy(f.p); f.g.rotation.set(-f.pitch * .6, f.yaw, 0); f.g.userData.tail.rotation.y = Math.sin(f.w) * .5;
+    if (f.T.puff) f.g.scale.setScalar(f.flee > 0 ? 1.5 : 1);
+    if (f.flash > 0) f.flash = Math.max(0, f.flash - dt * 3); shadeAnimal(f.g, f.p, f.flash, smooth(-.12, .25, env.e));
+    return true;
+  });
 }
 // 먹이통: 근처 동물이 다가와 먹어요(새끼는 자라고, 어른은 짝을 찾고, 야생은 내 가축이 돼요)
 const TROUGH_MAX = 32, troughKey = (x, y, z) => S.planet + ":" + x + "," + y + "," + z;
@@ -3517,14 +3649,14 @@ function troughTick(dt) {
     const [x, y, z] = k.slice(6).split(",").map(Number), T = S.trough[k], b = get(x, y, z);
     if (b !== 83 && b !== 84) continue;
     for (const m of animals) {
-      const f = BREED[m.type]; if (!(T[f] > 0) || (m.trT || 0) > gameT || m.st === "flee") continue;
+      const f = BREED[m.type]; if (!f || !(T[f] > 0) || (m.trT || 0) > gameT || m.st === "flee") continue;
       const q = Math.hypot(m.p.x - x - .5, m.p.z - z - .5); if (q > 12 || Math.abs(m.p.y - y) > 4) continue;
       const room = ownCount() < HERD_MAX, grow = m.baby > 0, mate = !grow && !(m.cd > 0) && !(m.love > 0) && room;
       if (!m.own ? !room : !grow && !mate) continue;
       if (q > 1.9) { if (!m.trG || q < m.trG[2]) m.trG = [x + .5, z + .5, q]; continue; }
       T[f]--; m.trT = gameT + 15; m.trG = null; changed = true;
       if (grow) m.baby = Math.max(0, m.baby - 30); else if (mate) m.love = LOVE_T;
-      if (!m.own) { m.own = true; m.id = ++S.herdN; toast(`${m.T.n}${josa(m.T.n, "이", "가")} 먹이통에서 ${itemName(f)}${josa(itemName(f), "을", "를")} 먹고 내 가축이 됐어요`, 2400); }
+      if (!m.own && Math.random() < TAME_P) { m.own = true; m.id = ++S.herdN; toast(`${m.T.n}${josa(m.T.n, "이", "가")} 먹이통에서 ${itemName(f)}${josa(itemName(f), "을", "를")} 먹고 내 가축이 됐어요`, 2400); }
       heart(m.p.x, m.p.y + m.T.h * aSize(m) + .2, m.p.z); tone(700, .06, "sine", .03, 0, 900);
     }
     if (!Object.values(T).some(n => n > 0)) { delete S.trough[k]; if (b === 84) edit(x, y, z, 83); }
@@ -3532,7 +3664,7 @@ function troughTick(dt) {
   if (changed) { saveHerd(); save(); }
 }
 function animalTick(dt) {
-  troughTick(dt);
+  troughTick(dt); fishTick(dt);
   tickHearts(dt);
   if (S.planet !== "earth" || net.teacher) { if (animals.length || herdLoaded) clearAnimals(); return; }
   if (!herdLoaded) loadHerd();
@@ -3550,8 +3682,20 @@ function animalTick(dt) {
     if (m.st === "flee") { m.yaw = Math.atan2(-dx, -dz) + Math.sin(gameT * 3 + m.walk) * .4; sp = T.sp * 2.4; if (m.stT <= 0) { m.st = "idle"; m.stT = 2; } }
     else if (mate) { const q = mate.p.distanceTo(m.p); m.yaw = Math.atan2(-(mate.p.x - m.p.x), -(mate.p.z - m.p.z)); sp = q > 1.2 ? T.sp : 0;
       if (q < 1.4 && animals.indexOf(m) < animals.indexOf(mate) && ownCount() < HERD_MAX) breed(m, mate); }
+    else if (m.angry > 0) { m.angry -= dt; m.yaw = Math.atan2(-dx, -dz); sp = dist > 1.2 ? T.sp * 1.5 : 0; m.bite = (m.bite || 0) - dt;
+      if (dist < 1.5 && Math.abs(P.pos.y - m.p.y) < 1.6 && m.bite <= 0 && !paused) { m.bite = 1.1; hurtBy(5, -dx, -dz, 3); tone(160, .12, "sawtooth", .05, 0, 90); } }
+    else if (m.own && T.pet) {
+      const tg = T.fight && !(m.rest > 0) ? petTarget(m) : null;
+      if (m.rest > 0) m.rest -= dt;
+      if (tg) { const tx = tg.p.x - m.p.x, tz = tg.p.z - m.p.z, q = Math.hypot(tx, tz); m.yaw = Math.atan2(-tx, -tz); sp = q > 1.1 ? T.sp * 1.6 : 0; m.bite = (m.bite || 0) - dt;
+        if (q < 1.6 && Math.abs(tg.p.y - m.p.y) < 1.8 && m.bite <= 0) { m.bite = .8; petBite(m, tg); } }
+      else if (dist > 26) { m.p.set(P.pos.x - Math.sin(P.yaw) * -2, P.pos.y + .2, P.pos.z - Math.cos(P.yaw) * -2); m.v.set(0, 0, 0); }
+      else if (dist > 3.2) { m.yaw = Math.atan2(dx, dz) + Math.PI; sp = T.sp * (dist > 8 ? 1.7 : 1.1); }
+      else if (m.st === "walk") { sp = T.sp * .4; if (m.stT <= 0) { m.st = "idle"; m.stT = 2 + Math.random() * 3; } }
+      else if (m.stT <= 0) { m.st = "walk"; m.stT = 1; m.yaw += (Math.random() - .5) * 2; }
+      if (m.hp < T.hp) m.hp = Math.min(T.hp, m.hp + dt * .25); }
     else if (m.trG) { const tx = m.trG[0] - m.p.x, tz = m.trG[1] - m.p.z; m.yaw = Math.atan2(-tx, -tz); sp = Math.hypot(tx, tz) > 1.6 ? T.sp : 0; }
-    else if (held === BREED[m.type] && dist < 10) { m.yaw = Math.atan2(dx, dz) + Math.PI; sp = dist > 2.2 ? T.sp * 1.15 : 0;
+    else if ((held === BREED[m.type] || (!m.own && (TAME[m.type] || []).includes(held))) && dist < 10) { m.yaw = Math.atan2(dx, dz) + Math.PI; sp = dist > 2.2 ? T.sp * 1.15 : 0;
       if (!S.lureHint) { S.lureHint = true; toast(`${T.n}${josa(T.n, "이", "가")} 먹이를 보고 따라와요! 동물을 보고 놓기(오른쪽 클릭·짧게 탭)로 먹이를 주세요`, 3600); } }
     else if (m.st === "walk") { sp = T.sp; if (m.stT <= 0) { m.st = "idle"; m.stT = 1.5 + Math.random() * 3; } }
     else if (m.stT <= 0) { m.st = "walk"; m.stT = 1.5 + Math.random() * 3; m.yaw += (Math.random() - .5) * 2.6; }
@@ -3613,7 +3757,8 @@ function attackTick(dt) {
   };
   if (boss) { const c = boss.p.clone(); c.y += boss.B.h * .45; const t = c.clone().sub(o).dot(d); if (t >= 0 && t <= 5.5 && o.clone().addScaledVector(d, t).distanceTo(c) < (boss.B.w + 1.1) * (isTouch ? 1.3 : 1)) { best = boss; bt = Math.min(t, isTouch ? 4.2 : 3.6); } }
   for (const m of mobs) { const c = m.p.clone(); c.y += m.T.h * .6; const t = aim(c, .6 * m.T.sc); if (t >= 0) { best = m; bt = t; } }
-  for (const m of animals) { const k = aSize(m), c = m.p.clone(); c.y += m.T.h * .55 * k; const t = aim(c, (.35 + m.T.w) * k); if (t >= 0) { best = m; bt = t; } }
+  for (const m of animals) { if (m.own && m.T.pet) continue; const k = aSize(m), c = m.p.clone(); c.y += m.T.h * .55 * k; const t = aim(c, (.35 + m.T.w) * k); if (t >= 0) { best = m; bt = t; } }
+  for (const f of fishes) { const t = aim(f.p.clone(), .3 + f.T.len * .6); if (t >= 0) { best = f; bt = t; } }
   for (const r of net.herdList()) { const t = aim(r.c.clone(), r.r); if (t >= 0) { best = { owner: r.owner }; bt = t; } }
   // 대결이 켜져 있으면 같은 행성의 다른 대원도 때릴 수 있어요
   if (pv) for (const id in net.others) {
@@ -3634,16 +3779,26 @@ function attackTick(dt) {
     return true;
   }
   if (best.owner) { if (atkCD <= 0) { atkCD = .45; swing = .001; toast(`친구 ${best.owner}의 가축은 때릴 수 없어요`); } return true; }
+  if (best.fishy) {
+    if (atkCD <= 0) { atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; best.flee = 3; tone(700, .08, "sine", .04, 0, 400);
+      if (best.hp <= 0) { const T = best.T, x = Math.floor(best.p.x), y = Math.floor(best.p.y), z = Math.floor(best.p.z); scene.remove(best.g); fishes = fishes.filter(f => f !== best);
+        S.inv[T.item] = (S.inv[T.item] || 0) + 1; spawnDrop(T.item, x, y, z); burst(x, y, z, 6); sfx.pop(); renderHotbar();
+        toast(`${T.n}${josa(T.n, "을", "를")} 잡았어요!`, 1600);
+        S.fishSeen = S.fishSeen || {}; if (!S.fishSeen[T.item]) { S.fishSeen[T.item] = true; showFact(`${T.sea ? "바닷물고기" : "민물고기"}: ${T.n}`, T.fact); }
+        firstLog(T.sea ? "fish-sea" : "fish-fresh", { t: T.sea ? "바다에 사는 물고기" : "호수·강에 사는 물고기", ev: `${T.sea ? "섬 바깥쪽 바다" : "섬 안쪽 호수"}에서 ${T.n}${josa(T.n, "을", "를")} 잡았어요.`,
+          x: "바닷물에는 소금 같은 물질(염분)이 약 3.5% 녹아 있어 짜고, 호수와 강의 물(민물)에는 거의 없어요. 물고기 몸속의 소금 농도는 그 사이라서, 바닷물고기는 몸의 물을 빼앗기지 않게 바닷물을 마시고 소금을 아가미로 내보내고, 민물고기는 들어오는 물을 오줌으로 많이 내보내요. 그래서 대부분의 물고기는 바다와 민물 중 한 곳에서만 살 수 있어요." }); } }
+    return true;
+  }
   if (best.g && best.T && ANIMT[best.type]) {
     if (atkCD <= 0) {
-      atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; best.st = "flee"; best.stT = 4; tone(best.type === "chicken" ? 900 : 200, .14, "triangle", .06, 0, best.type === "chicken" ? 1300 : 150);
+      atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; if (best.type === "wolf" && !best.own) { best.angry = 12; best.st = "idle"; } else { best.st = "flee"; best.stT = 4; } tone(best.type === "chicken" ? 900 : 200, .14, "triangle", .06, 0, best.type === "chicken" ? 1300 : 150);
       best.v.addScaledVector(d, 5); best.v.y = 4;
       // 맞으면 주변 무리도 함께 달아나요
-      animals.forEach(o => { if (o !== best && o.type === best.type && o.p.distanceTo(best.p) < 7) { o.st = "flee"; o.stT = 3; } });
+      animals.forEach(o => { if (o !== best && o.type === best.type && o.p.distanceTo(best.p) < 7 && !(o.own && o.T.pet)) { if (o.type === "wolf") o.angry = 10; else { o.st = "flee"; o.stT = 3; } } });
       if (best.hp <= 0) {
         const x = Math.floor(best.p.x), y = Math.floor(best.p.y + .5), z = Math.floor(best.p.z);
         burst(x, y, z, best.type === "sheep" ? 68 : 3); sfx.pop(); scene.remove(best.g); animals = animals.filter(m => m !== best); if (best.own) saveHerd();
-        const got = []; if (!(best.baby > 0)) best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); });
+        const got = []; if (!(best.baby > 0)) { best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); }); if (best.type !== "wolf" && best.type !== "cat" && Math.random() < .35) got.push(149); }
         got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
         if (!got.length) toast(`새끼 ${best.T.n}${josa(best.T.n, "은", "는")} 잡아도 얻는 것이 없어요`, 2000); else toast(`${best.T.n}${josa(best.T.n, "을", "를")} 잡았어요! ${got.map(itemName).join(", ")}${S.ate ? "" : " · 화로에서 구워 먹으세요"}`, 2000); renderHotbar();
       }
@@ -4516,6 +4671,6 @@ $("goBtn").onclick = () => { start(true); if (xrOK && xrWant) startXR(); };
 $("contBtn").onclick = () => { start(false); if (xrOK && xrWant) startXR(); };
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { handLv, handAt, brightAt, handU, lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrHit() { return xrHit; }, get xrSrc() { return xrSes ? [...xrSes.inputSources].map(x => x.handedness).join(",") : "none"; }, get xrToolOn() { return !!xrTool.parent; }, get atkCD() { return atkCD; }, troughTick, get animals() { return animals; }, get xrMenu() { return xrMenu; }, xrItems, get xpVis() { return xpMesh.visible; }, get xrXT() { return xrXT; }, get xrN() { return xrN; }, get rcH() { return [recallHeld, +recall.toFixed(2), !!xrPrev.R3, paused].join("/"); }, get cine() { return cine; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get swing() { return swing; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { handLv, handAt, brightAt, handU, lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get fishes() { return fishes; }, FISHT, isSea, feedAnimal, get mobs() { return mobs; }, mkMob, get xrHit() { return xrHit; }, get xrSrc() { return xrSes ? [...xrSes.inputSources].map(x => x.handedness).join(",") : "none"; }, get xrToolOn() { return !!xrTool.parent; }, get atkCD() { return atkCD; }, troughTick, get animals() { return animals; }, get xrMenu() { return xrMenu; }, xrItems, get xpVis() { return xpMesh.visible; }, get xrXT() { return xrXT; }, get xrN() { return xrN; }, get rcH() { return [recallHeld, +recall.toFixed(2), !!xrPrev.R3, paused].join("/"); }, get cine() { return cine; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get swing() { return swing; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
