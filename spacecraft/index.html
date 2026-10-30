@@ -542,6 +542,8 @@ const BLOCKS = {
   // 8차: 굽는 동안 불이 붙는 화로(친구 화면에도 불이 보여요)
   80: { n: "랜턴", c: ["#2e3038", "#ffd870", "#ff9a3a"], h: .2, light: 15, lantern: true, soft: true, shape: [.3, 0, .3, .7, .62, .7] },
   81: { n: "랜턴", c: ["#2e3038", "#ffd870", "#ff9a3a"], h: .2, light: 15, lantern: true, soft: true, shape: [.3, .3, .3, .7, .92, .7], drop: 80 },
+  83: { n: "먹이통", c: ["#7a4e26", "#a8743c", "#5a3a1a"], top: ["#2a1a0c", "#3e2814", "#1e1208"], h: .6, trough: true },
+  84: { n: "먹이통", c: ["#7a4e26", "#a8743c", "#5a3a1a"], top: ["#c8a23a", "#f0d870", "#a8862a"], h: .6, trough: true, drop: 83 },
   82: { n: "조명 블록", c: ["#e8f4ff", "#ffffff", "#bcdcff"], h: .3, light: 15, lamp: true, glowc: ["#9cc4ee", "#c8e2ff", "#e8f4ff", "#ffffff"] },
   79: { n: "화로", c: ["#6a6c72", "#8f9198", "#4a4c52"], top: ["#5a5c62", "#7d7f86", "#3a3c42"], h: 1.0, furnace: true, lit: true, light: 13, drop: 44 },
 };
@@ -699,6 +701,8 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
       if (!top && row === 0) { g.fillStyle = "#c7c9d1"; g.fillRect(ox + 3, oy + 3, 4, 2); g.fillStyle = "#6e4622"; g.fillRect(ox + 4, oy + 5, 2, 7); g.fillStyle = "#8f9198"; g.fillRect(ox + 9, oy + 4, 3, 3); g.fillStyle = "#6e4622"; g.fillRect(ox + 10, oy + 7, 1, 6); }
       g.fillStyle = "#4a2c14"; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); }
     if (b.thin && !b.plant && !b.door && !b.fence) { g.clearRect(ox, oy, 16, 16); g.fillStyle = c[0]; g.fillRect(ox, oy + 5, 16, 11); g.fillStyle = c[2]; g.fillRect(ox, oy + 2, 16, 4); g.fillStyle = c[1]; g.fillRect(ox, oy, 16, 3); g.fillRect(ox + 5, oy + 2, 6, 3); }
+    if (b.trough) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, pick(P, .25 + R() * .55));
+      g.fillStyle = top ? "#8a5a2e" : "#4a2c14"; if (top) { g.fillRect(ox, oy, 16, 2); g.fillRect(ox, oy + 14, 16, 2); g.fillRect(ox, oy, 2, 16); g.fillRect(ox + 14, oy, 2, 16); } else { g.fillRect(ox, oy + 5, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox + 2, oy, 1, 16); g.fillRect(ox + 13, oy, 1, 16); } }
     if (b.lantern) { g.clearRect(ox, oy, 16, 16); g.fillStyle = "#2e3038"; g.fillRect(ox, oy, 16, 16); g.fillStyle = "#ffd870"; g.fillRect(ox + 3, oy + 3, 10, 10); g.fillStyle = "#fff4c0"; g.fillRect(ox + 6, oy + 5, 4, 6); g.fillStyle = "#ff9a3a"; g.fillRect(ox + 3, oy + 11, 10, 2); g.fillStyle = "#2e3038"; g.fillRect(ox + 7, oy + 3, 2, 10); }
     if (b.lamp) { const P = (b.glowc || ["#c89a3a", "#f2c860", "#ffe6a0", "#fffbe8"]).map(rgb); const N = vnoise(5); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, pick(P, N(x, y) * .7 + R() * .4));
       g.fillStyle = "#8a8f99"; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); }
@@ -1669,6 +1673,7 @@ function mineTick(dt, h) {
   if (Math.floor(mining.t * 4.5) !== Math.floor((mining.t - dt) * 4.5)) { sfx.tick(b); swing = Math.max(swing, .001); }
   if (mining.t >= need) {
     edit(h.x, h.y, h.z, 0); burst(h.x, h.y, h.z, b);
+    if (B.trough && S.trough) { const k = troughKey(h.x, h.y, h.z), T = S.trough[k]; if (T) { for (const i in T) if (T[i] > 0) S.inv[i] = (S.inv[i] || 0) + T[i]; delete S.trough[k]; } }
     let drop = B.drop != null ? B.drop : b, cnt = 1;
     // 다 자란 작물은 알갱이 2~3개, 덜 자란 것은 심은 알갱이 1개만 돌려줘요
     if (B.crop != null) { drop = 115 + B.crop; cnt = (b - 50) % 4 === 3 ? 2 + (Math.random() < .5 ? 1 : 0) : 1; }
@@ -1742,6 +1747,17 @@ function useBlock(h) {
   if (b === 77 || b === 78) {
     if (b === 78) { set(h.x, h.y, h.z, 77); const bad = hits(P.pos.x, P.pos.y, P.pos.z); set(h.x, h.y, h.z, 78); if (bad) { toast("울타리 문 사이에 서 있어서 닫을 수 없어요"); return true; } }
     edit(h.x, h.y, h.z, b === 77 ? 78 : 77); tone(b === 77 ? 160 : 220, .08, "triangle", .06); swing = .001; return true;
+  }
+  if (b === 83 || b === 84) {
+    const k = troughKey(h.x, h.y, h.z), T = (S.trough = S.trough || {})[k] || {}, id = heldId(), tot = Object.values(T).reduce((a, n) => a + n, 0);
+    if (Object.values(BREED).includes(id) && S.inv[id] > 0) {
+      const n = Math.min(S.inv[id], TROUGH_MAX - tot);
+      if (n <= 0) { toast(`먹이통이 가득 찼어요 (${TROUGH_MAX}개)`, 1800); return true; }
+      T[id] = (T[id] || 0) + n; S.inv[id] -= n; S.trough[k] = T; if (b === 83) edit(h.x, h.y, h.z, 84);
+      toast(`먹이통에 ${itemName(id)} ${n}개를 넣었어요. 근처 동물이 와서 알아서 먹어요`, 2600); sfx.place(8); swing = .001; renderHotbar(); save(); return true;
+    }
+    const L = Object.entries(T).filter(e => e[1] > 0).map(([i, n]) => `${itemName(+i)} ${n}`);
+    toast(L.length ? `먹이통: ${L.join(", ")} (곡식을 들고 누르면 더 넣어요)` : "빈 먹이통이에요. 밀·옥수수·보리를 손에 들고 놓기를 누르면 넣어요", 2600); return true;
   }
   if (b === 73) { S.spawn = S.spawn || {}; S.spawn[S.planet] = [h.x, h.y, h.z]; toast("침대에 누웠어요. 쓰러지면 이 침대에서 다시 시작해요", 2600); sfx.pop(); save(); return true; }
   if (b === 35 || isFurnace(b)) { if (isFurnace(b)) craftTab = "food"; openCraft(); return true; }
@@ -1844,6 +1860,7 @@ const RECIPES = [
   { id: 43, n: "나무 판자 ×4", need: { 7: 1 }, out: 43, count: 4, cat: "build", hand: true, use: "통나무를 켜서 만든 판자. 집 벽과 바닥, 문·침대 재료예요." },
   { id: 44, n: "화로", need: { 4: 8 }, out: 44, cat: "build", hand: true, use: "4칸 안에서 석탄으로 고기·빵·벽돌을 구워요. 화로를 누르면 바로 음식 만들기가 열려요. 불은 산소가 있어야 타서 지구에서만 써요." },
   { id: 69, n: "문", need: { 43: 6 }, out: 69, cat: "build", use: "두 칸 높이 나무 문. 놓기(오른쪽 클릭)로 열고 닫아요. 열면 지나갈 수 있어요." },
+  { id: 83, n: "먹이통", need: { 43: 5 }, out: 83, cat: "build", hand: true, use: "밀·옥수수·보리를 넣어 두면 근처(12칸) 동물이 다가와 알아서 먹어요. 새끼는 빨리 자라고, 어른은 짝을 찾고, 야생 동물은 내 가축이 돼요." },
   { id: 76, n: "울타리 ×3", need: { 43: 4, 7: 1 }, out: 76, count: 3, cat: "build", hand: true, use: "가축우리를 만들어요. 한 칸이지만 높아서 동물도 사람도 뛰어넘지 못해요. 옆 울타리·블록과 저절로 이어져요." },
   { id: 77, n: "울타리 문", need: { 43: 2, 7: 2 }, out: 77, cat: "build", hand: true, use: "울타리 사이에 놓고 누르면(놓기·오른쪽 클릭) 열리고 닫혀요. 동물은 문을 열지 못해요." },
   { id: 73, n: "침대", need: { 43: 3, 68: 3 }, out: 73, cat: "build", use: "놓은 뒤 누르면(오른쪽 클릭) 그 천체에서 쓰러졌을 때 기지 대신 침대에서 다시 시작해요. 양털은 양에게서 얻어요." },
@@ -3487,7 +3504,35 @@ function meetAnimal(m) {
   const x = (first ? "지금까지 생명체가 사는 것으로 확인된 천체는 지구뿐이에요. 액체 물, 숨 쉴 산소, 알맞은 온도가 모두 있기 때문이에요. " : "") + m.T.fact;
   showFact(`지구 동물: ${m.T.n}`, x); S.logs.push({ id: "ani" + m.type, pk: S.planet, t: `동물 발견: ${m.T.n}`, ev: `지구에서 ${m.T.n}${josa(m.T.n, "을", "를")} 처음 만났어요.`, x });
 }
+// 먹이통: 근처 동물이 다가와 먹어요(새끼는 자라고, 어른은 짝을 찾고, 야생은 내 가축이 돼요)
+const TROUGH_MAX = 32, troughKey = (x, y, z) => S.planet + ":" + x + "," + y + "," + z;
+let troughT = 0;
+function troughTick(dt) {
+  if ((troughT -= dt) > 0) return; troughT = .5;
+  animals.forEach(m => { m.trG = null; });
+  if (S.planet !== "earth" || !S.trough) return;
+  let changed = false;
+  for (const k in S.trough) {
+    if (!k.startsWith("earth:")) continue;
+    const [x, y, z] = k.slice(6).split(",").map(Number), T = S.trough[k], b = get(x, y, z);
+    if (b !== 83 && b !== 84) continue;
+    for (const m of animals) {
+      const f = BREED[m.type]; if (!(T[f] > 0) || (m.trT || 0) > gameT || m.st === "flee") continue;
+      const q = Math.hypot(m.p.x - x - .5, m.p.z - z - .5); if (q > 12 || Math.abs(m.p.y - y) > 4) continue;
+      const room = ownCount() < HERD_MAX, grow = m.baby > 0, mate = !grow && !(m.cd > 0) && !(m.love > 0) && room;
+      if (!m.own ? !room : !grow && !mate) continue;
+      if (q > 1.9) { if (!m.trG || q < m.trG[2]) m.trG = [x + .5, z + .5, q]; continue; }
+      T[f]--; m.trT = gameT + 15; m.trG = null; changed = true;
+      if (grow) m.baby = Math.max(0, m.baby - 30); else if (mate) m.love = LOVE_T;
+      if (!m.own) { m.own = true; m.id = ++S.herdN; toast(`${m.T.n}${josa(m.T.n, "이", "가")} 먹이통에서 ${itemName(f)}${josa(itemName(f), "을", "를")} 먹고 내 가축이 됐어요`, 2400); }
+      heart(m.p.x, m.p.y + m.T.h * aSize(m) + .2, m.p.z); tone(700, .06, "sine", .03, 0, 900);
+    }
+    if (!Object.values(T).some(n => n > 0)) { delete S.trough[k]; if (b === 84) edit(x, y, z, 83); }
+  }
+  if (changed) { saveHerd(); save(); }
+}
 function animalTick(dt) {
+  troughTick(dt);
   tickHearts(dt);
   if (S.planet !== "earth" || net.teacher) { if (animals.length || herdLoaded) clearAnimals(); return; }
   if (!herdLoaded) loadHerd();
@@ -3505,6 +3550,7 @@ function animalTick(dt) {
     if (m.st === "flee") { m.yaw = Math.atan2(-dx, -dz) + Math.sin(gameT * 3 + m.walk) * .4; sp = T.sp * 2.4; if (m.stT <= 0) { m.st = "idle"; m.stT = 2; } }
     else if (mate) { const q = mate.p.distanceTo(m.p); m.yaw = Math.atan2(-(mate.p.x - m.p.x), -(mate.p.z - m.p.z)); sp = q > 1.2 ? T.sp : 0;
       if (q < 1.4 && animals.indexOf(m) < animals.indexOf(mate) && ownCount() < HERD_MAX) breed(m, mate); }
+    else if (m.trG) { const tx = m.trG[0] - m.p.x, tz = m.trG[1] - m.p.z; m.yaw = Math.atan2(-tx, -tz); sp = Math.hypot(tx, tz) > 1.6 ? T.sp : 0; }
     else if (held === BREED[m.type] && dist < 10) { m.yaw = Math.atan2(dx, dz) + Math.PI; sp = dist > 2.2 ? T.sp * 1.15 : 0;
       if (!S.lureHint) { S.lureHint = true; toast(`${T.n}${josa(T.n, "이", "가")} 먹이를 보고 따라와요! 동물을 보고 놓기(오른쪽 클릭·짧게 탭)로 먹이를 주세요`, 3600); } }
     else if (m.st === "walk") { sp = T.sp; if (m.stT <= 0) { m.st = "idle"; m.stT = 1.5 + Math.random() * 3; } }
@@ -3555,11 +3601,12 @@ const atkDmg = () => (TOOLS[heldId()] || {}).dmg || PICKS[heldTier()].dmg;
 function attackTick(dt) {
   atkCD -= dt; const pv = net.pvp && !net.teacher;
   const tap = tapHit > 0; tapHit -= dt;
-  if (!(wantMine || tap) || (!mobs.length && !boss && !animals.length && !net.herdList().length && !pv)) return false;
+  if (xrOn) { xrHit -= dt; if (!(xrHit > 0)) return false; }
+  if (!(wantMine || tap || xrOn) || (!mobs.length && !boss && !animals.length && !net.herdList().length && !pv)) return false;
   // 터치는 정확히 겨누기 어려워서 맞는 범위를 넓혀 줘요
   const ak = isTouch ? 1.9 : 1;
-  const o = third ? new THREE.Vector3(P.pos.x, P.pos.y + EYE, P.pos.z) : camera.position.clone(), d = new THREE.Vector3(); camera.getWorldDirection(d);
-  let best = null, who = null, bt = isTouch ? 4.2 : 3.6;
+  const o = xrOn ? xrHitO.clone() : third ? new THREE.Vector3(P.pos.x, P.pos.y + EYE, P.pos.z) : camera.position.clone(), d = new THREE.Vector3(); if (xrOn) d.copy(xrHitD); else camera.getWorldDirection(d);
+  let best = null, who = null, bt = isTouch ? 4.2 : xrOn ? 3.4 : 3.6;
   const aim = (c, r) => {
     if (wrapX) { let ddx = c.x - o.x; ddx = ((ddx + SX / 2) % SX + SX) % SX - SX / 2; c.x = o.x + ddx; }
     const t = c.clone().sub(o).dot(d); return t >= 0 && t <= bt && o.clone().addScaledVector(d, t).distanceTo(c) < r * ak ? t : -1;
@@ -4217,6 +4264,22 @@ $("svPaste").onclick = async () => { let c = ""; try { c = await navigator.clipb
 var xrOn = false; let xrSes = null, xrYaw = 0, xrPrev = {}, xrMine = false, xrHudT = 0;
 renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType("local");
 const xrRig = new THREE.Group(); scene.add(xrRig);
+// 컨트롤러(손잡이·조준선)도 머리와 같은 기준(xrRig)에 붙여요
+const xrGrip = [0, 1].map(i => renderer.xr.getControllerGrip(i)), xrAimC = [0, 1].map(i => renderer.xr.getController(i));
+[0, 1].forEach(i => { xrRig.add(xrGrip[i]); xrRig.add(xrAimC[i]);
+  xrAimC[i].addEventListener("connected", e => { xrGrip[i].userData.hand = xrAimC[i].userData.hand = e.data.handedness; xrGrip[i].userData.gp = e.data.gamepad; });
+  xrAimC[i].addEventListener("disconnected", () => { xrGrip[i].userData.hand = xrAimC[i].userData.hand = null; }); });
+const xrTool = new THREE.Group(); let xrToolKey = -1, xrHit = 0, xrSwCD = 0, xrAtkPrev = 0, xrGP = null, xrT0 = 0;
+const xrHitO = new THREE.Vector3(), xrHitD = new THREE.Vector3(), xrPrevP = new THREE.Vector3(); let xrHasPrev = false;
+function xrToolSync() {
+  const id = S.hot[sel] || 0; if (id === xrToolKey) return; xrToolKey = id;
+  while (xrTool.children.length) xrTool.remove(xrTool.children[0]);
+  const glove = new THREE.Mesh(new THREE.BoxGeometry(.07, .07, .1), lam(LOOK_OPT.pack[LOOK.pack])); xrTool.add(glove);
+  let m = null;
+  if (TOOLS[id]) { m = toolMesh(id); m.position.set(0, .01, -.04); }
+  else if (id) { m = new THREE.Mesh(itemGeo(id), HAND_LV[id] ? itemGlowMat : itemMat); m.scale.setScalar(.12); m.position.set(0, .02, -.1); }
+  if (m) xrTool.add(m);
+}
 const xrCv = document.createElement("canvas"); xrCv.width = 640; xrCv.height = 200;
 const xrTex = new THREE.CanvasTexture(xrCv);
 const xrHud = new THREE.Mesh(new THREE.PlaneGeometry(.64, .2), new THREE.MeshBasicMaterial({ map: xrTex, transparent: true, depthTest: false, depthWrite: false }));
@@ -4247,7 +4310,7 @@ const xpMesh = new THREE.Mesh(new THREE.PlaneGeometry(.72, .6), new THREE.MeshBa
 xpMesh.position.set(0, .03, -.85); xpMesh.renderOrder = 1000; xpMesh.visible = false;
 let xrMenu = null, xrXT = -1, xrX0 = 0, xrN = 0, xrNav = 0, xrNavT = 0, xpT = 0, xrOK = false, xrWant = true;
 function wrapTx(g, t, w) { const out = []; String(t || "").split("\n").forEach(par => { let line = ""; for (const ch of par) { if (g.measureText(line + ch).width > w && line) { out.push(line); line = ch.trim() ? ch : ""; } else line += ch; } out.push(line); }); return out; }
-const XR_HELP = ["오른쪽 트리거: 캐기·공격", "오른쪽 그립: 블록 놓기·쓰기", "A: 점프 · B/Y: 손에 든 물건 바꾸기", "왼쪽 스틱: 걷기 · 오른쪽 스틱: 돌기", "왼쪽 트리거: 먹기 · 왼쪽 그립: 버리기", "오른쪽 스틱 누르고 있기: 기지로 귀환", "X 짧게: 이 메뉴 · X 3초 길게: VR 끄기"];
+const XR_HELP = ["오른쪽 트리거 누르고 있기: 캐기", "트리거를 누른 채 휘두르기: 공격(휘두른 방향)", "오른쪽 그립: 블록 놓기·쓰기", "A: 점프 · B/Y: 손에 든 물건 바꾸기", "왼쪽 스틱: 걷기 · 오른쪽 스틱: 돌기", "왼쪽 트리거: 먹기 · 왼쪽 그립: 버리기", "오른쪽 스틱 누르고 있기: 기지로 귀환", "X 짧게: 이 메뉴 · X 3초 길게: VR 끄기"];
 function xrItems() {
   const m = xrMenu; if (!m) return [];
   if (m.pg === "main") return [
@@ -4288,7 +4351,7 @@ function xrItems() {
   }
   return [];
 }
-let xrFlyMsg = false;
+let xrFlyMsg = false; const xrQ = new THREE.Quaternion();
 const XR_TITLE = { main: "VR 메뉴", craft: "제작", bag: "가방 · 손에 들 것", map: "우주 지도", land: "어떻게 내릴까요?", help: "VR 조작법" };
 function xpDraw() {
   if (!xrMenu && $("logOv").hidden) return;
@@ -4325,14 +4388,14 @@ async function startXR() {
   ses.addEventListener("end", endXR);
   await renderer.xr.setSession(ses);
   xrRig.add(camera); camera.position.set(0, 0, 0); camera.quaternion.identity(); camera.matrixAutoUpdate = false; camera.add(xrHud); camera.add(xrDot); camera.add(xpMesh);
-  xrMenu = null; xrXT = -1; xpMesh.visible = false;
+  xrMenu = null; xrXT = -1; xpMesh.visible = false; xrToolKey = -1; xrHasPrev = false; xrHit = 0;
   if (paused && $("startOv").hidden && [...document.querySelectorAll(".overlay")].every(o => o.hidden)) resume();
   toast("X를 짧게 누르면 메뉴, 3초 길게 누르면 VR이 꺼져요", 4500);
   renderer.setAnimationLoop(frame);
 }
 function endXR() {
   if (!xrOn) return; xrOn = false; xrSes = null; renderer.setAnimationLoop(null);
-  camera.remove(xrHud); camera.remove(xrDot); camera.remove(xpMesh); xrRig.remove(camera); xrMenu = null; recallHeld = false; camera.scale.set(1, 1, 1); camera.matrixAutoUpdate = true;
+  camera.remove(xrHud); camera.remove(xrDot); camera.remove(xpMesh); xrRig.remove(camera); xrMenu = null; recallHeld = false; if (xrTool.parent) xrTool.parent.remove(xrTool); xrHit = 0; camera.scale.set(1, 1, 1); camera.matrixAutoUpdate = true;
   if (xrMine) { wantMine = false; xrMine = false; } stickV = { x: 0, y: 0 }; touchJump = false;
   requestAnimationFrame(frame);
 }
@@ -4390,6 +4453,26 @@ function xrTick(dt) {
   if (turn && !xrPrev.turn) xrYaw -= turn * Math.PI / 6;
   btn.turn = turn;
   if (btn.R0) { wantMine = true; xrMine = true; } else if (xrMine) { wantMine = false; xrMine = false; }
+  // 오른손 컨트롤러에 든 도구를 보여 주고, 트리거를 누른 채 빠르게 휘두르면 그 방향으로 공격해요
+  // three.js 컨트롤러 번호는 inputSources 순서와 같아요(연결 이벤트가 늦게 와도 손을 알 수 있게)
+  const srcs = [...xrSes.inputSources], ri = srcs.findIndex(x => x.handedness === "right");
+  const rg = ri >= 0 && ri < 2 ? xrGrip[ri] : null, ra = ri >= 0 && ri < 2 ? xrAimC[ri] : null;
+  if (ri >= 0) rg && (rg.userData.gp = srcs[ri].gamepad);
+  if (rg) {
+    if (xrTool.parent !== rg) rg.add(xrTool); xrToolSync();
+    const wdt = Math.max(.001, (now - xrT0) / 1000), v = xrHasPrev ? rg.position.distanceTo(xrPrevP) / wdt : 0;
+    xrPrevP.copy(rg.position); xrHasPrev = true; xrSwCD -= wdt;
+    if (btn.R0 && v > (window.__xrSwingV || 1.8) && xrSwCD <= 0) {
+      xrSwCD = .35; xrHit = .2; rg.getWorldPosition(xrHitO);
+      (ra || rg).getWorldQuaternion(xrQ); xrHitD.set(0, 0, -1).applyQuaternion(xrQ);
+      // 머리 쪽으로 조금 당겨서 시작해요(손이 로봇 몸 속에 들어가 있어도 맞게)
+      xrHitO.addScaledVector(xrHitD, -.3);
+    }
+    xrGP = rg.userData.gp || null;
+  }
+  xrT0 = now;
+  if (atkCD > xrAtkPrev + .2 && xrGP && xrGP.hapticActuators && xrGP.hapticActuators[0]) { try { xrGP.hapticActuators[0].pulse(.7, 60); } catch (e) {} }
+  xrAtkPrev = atkCD;
   if (tap("R1")) place();
   touchJump = !!btn.R4;
   if (tap("R5")) { sel = (sel + 1) % 9; renderHotbar(); }
@@ -4433,6 +4516,6 @@ $("goBtn").onclick = () => { start(true); if (xrOK && xrWant) startXR(); };
 $("contBtn").onclick = () => { start(false); if (xrOK && xrWant) startXR(); };
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
-window.__dbg = { handLv, handAt, brightAt, handU, lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrMenu() { return xrMenu; }, xrItems, get xpVis() { return xpMesh.visible; }, get xrXT() { return xrXT; }, get xrN() { return xrN; }, get rcH() { return [recallHeld, +recall.toFixed(2), !!xrPrev.R3, paused].join("/"); }, get cine() { return cine; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get swing() { return swing; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
+window.__dbg = { handLv, handAt, brightAt, handU, lightAt, get keys() { return keys; }, SOLID, landOK, landPick, ATM, packSave, unpackSave, startXR, get xrOn() { return xrOn; }, get xrHit() { return xrHit; }, get xrSrc() { return xrSes ? [...xrSes.inputSources].map(x => x.handedness).join(",") : "none"; }, get xrToolOn() { return !!xrTool.parent; }, get atkCD() { return atkCD; }, troughTick, get animals() { return animals; }, get xrMenu() { return xrMenu; }, xrItems, get xpVis() { return xpMesh.visible; }, get xrXT() { return xrXT; }, get xrN() { return xrN; }, get rcH() { return [recallHeld, +recall.toFixed(2), !!xrPrev.R3, paused].join("/"); }, get cine() { return cine; }, get xrYaw() { return xrYaw; }, get sel() { return sel; }, place, warpT, unwarpT, get tapHit() { return tapHit; }, bossTick, zoneTick, hurtBy, get slowT() { return slowT; }, get boss() { return boss; }, get lair() { return lair; }, spawnBoss, bossDie, get zones() { return zones; }, mkMob, armorK, LVL, cookTick, makeIt, RECIPES, mkAnimal, feedAnimal, saveHerd, BREED, ownCount, get hearts() { return hearts; }, rinfo: () => new Promise(r => { renderer.info.autoReset = false; renderer.info.reset(); requestAnimationFrame(() => requestAnimationFrame(() => { const i = renderer.info.render; r([i.triangles, i.calls, i.frame]); renderer.info.autoReset = true; })); }), get chunks() { return chunks; }, atlas, get animals() { return animals; }, spawnHerd, cropTick, get crops() { return S.crops; }, eat, useBlock, place, edit, get: (x, y, z) => get(x, y, z), topY, raycast, get cine() { return cine; }, get rocketG() { return rocketG; }, fly, syncRocket, findPad, get S() { return S; }, dropHeld, makePile, takeHit, kill: (c) => { cause = c || "robot"; die(); }, get net() { return net; }, get pileMesh() { return pileMesh; }, lightCheck: () => { const a = SKL.slice(), b = LT.slice(); computeLight(); let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== SKL[i] || b[i] !== LT[i]) d++; return d; }, get mobs() { return mobs; }, spawnMob, get met() { return met; }, get flare() { return flare; }, haz: (m, f) => { if (m != null) metNext = m; if (f != null) flareNext = f; }, get gameT() { return gameT; }, spec, get LOOK() { return LOOK; }, openLook, get third() { return third; }, toggleView, get drops() { return drops; }, net, get S() { return S; }, P, env, loadPlanet, place, get, set, edit, topY, camera, openCraft, openMap, fly, base: () => base, setWant: (v) => { wantMine = v; }, get swing() { return swing; }, get wantMine() { return wantMine; }, panelsNearCore, MISSIONS };
 })();
 </script>
