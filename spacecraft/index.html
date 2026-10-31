@@ -566,6 +566,7 @@ const BLOCKS = {
   // 8차: 굽는 동안 불이 붙는 화로(친구 화면에도 불이 보여요)
   80: { n: "랜턴", c: ["#2e3038", "#ffd870", "#ff9a3a"], h: .2, light: 15, lantern: true, soft: true, shape: [.3, 0, .3, .7, .62, .7] },
   81: { n: "랜턴", c: ["#2e3038", "#ffd870", "#ff9a3a"], h: .2, light: 15, lantern: true, soft: true, shape: [.3, .3, .3, .7, .92, .7], drop: 80 },
+  85: { n: "묘목", c: ["#4f9a3a", "#76c050", "#6e5233"], h: .05, thin: true, plant: true, sapling: true },
   83: { n: "먹이통", c: ["#7a4e26", "#a8743c", "#5a3a1a"], top: ["#2a1a0c", "#3e2814", "#1e1208"], h: .6, trough: true },
   84: { n: "먹이통", c: ["#7a4e26", "#a8743c", "#5a3a1a"], top: ["#c8a23a", "#f0d870", "#a8862a"], h: .6, trough: true, drop: 83 },
   82: { n: "조명 블록", c: ["#e8f4ff", "#ffffff", "#bcdcff"], h: .3, light: 15, lamp: true, glowc: ["#9cc4ee", "#c8e2ff", "#e8f4ff", "#ffffff"] },
@@ -619,6 +620,7 @@ const LIQ = (b) => !!(BLOCKS[b] && BLOCKS[b].liquid);
 const STYLE = {1:"bedrock", 2:"grass", 3:"dirt", 4:"stone", 5:"sand", 6:"water", 7:"log", 8:"leaves", 9:"ore", 10:"regolith", 11:"basalt", 12:"stone", 14:"ice", 15:"dirt", 16:"stone", 17:"snow", 18:"pebble", 19:"stone", 20:"ore", 21:"basalt", 22:"sand", 24:"ore", 25:"cloud", 26:"cloud", 27:"striped", 28:"water", 29:"icerock", 23:"metal", 34:"pad", 38:"ore", 39:"ore", 40:"ore", 41:"gem", 42:"ore",
   43:"planks", 44:"furnace", 45:"farmland", 47:"stonebrick", 48:"brick", 49:"metalblock", 62:"copperblock", 63:"metalblock", 64:"gemblock", 65:"metalblock", 66:"coalblock", 67:"crystal", 68:"wool", 69:"door", 70:"door", 71:"door", 72:"door", 73:"bed", 74:"crystal", 75:"pad", 76:"fence", 77:"fence", 78:"fence", 79:"furnace"};
 for (let i = 50; i < 62; i++) STYLE[i] = "crop";
+STYLE[85] = "sapling";
 const NT = 152, MT = 100; // 블록 칸 0~99, 재료 칸 100~
 const atlas = document.createElement("canvas"); atlas.width = 16 * NT; atlas.height = 48;
 const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height = 32;
@@ -709,6 +711,9 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
         if (ripe && k === 1) for (let y = h; y < Math.min(16, h + 3); y++) put(ox, oy, x + (y % 2), 15 - y, RC[2]); }
       if (k === 2 && s >= 1) { for (let i = 0; i < 4; i++) { const x = 2 + i * 4, yy = 15 - Math.floor(h * .55); put(ox, oy, x + 1, yy, G[0]); put(ox, oy, x + 2, yy - 1, G[1]); put(ox, oy, x - 1, yy + 1, G[2]); } }
       if (k === 2 && ripe) for (const x of [4, 10]) for (let y = 5; y < 10; y++) { put(ox, oy, x, y, y % 2 ? [250, 214, 70] : [228, 182, 40]); put(ox, oy, x + 1, y, y % 2 ? [228, 182, 40] : [255, 230, 110]); put(ox, oy, x - 1, y + 1, [120, 170, 70]); } },
+    sapling(ox, oy) { g.clearRect(ox, oy, 16, 16); const W = [[110, 82, 51], [131, 98, 64], [90, 67, 41]], G = [[61, 138, 52], [96, 176, 72], [47, 111, 40], [118, 192, 80]];
+      for (let y = 7; y < 16; y++) put(ox, oy, 7 + (y > 12 ? 0 : y % 2), y, W[y % 3]); put(ox, oy, 8, 10, W[0]); put(ox, oy, 9, 9, W[1]);
+      for (const [cx, cy, r] of [[8, 5, 3.6], [4.5, 8, 2.4], [11.5, 7.5, 2.6]]) for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (Math.hypot(x - cx, y - cy) < r && R() < .9) put(ox, oy, x, y, G[Math.floor(R() * 4)]); },
     fence(ox, oy, c, b, row) { S.planks(ox, oy, c); if (row !== 1) return; const P = pal(c); g.clearRect(ox, oy, 16, 16);
       const gate = b.fence > 1, post = (x0) => { for (let y = gate ? 4 : 1; y < 16; y++) for (let x = x0; x < x0 + 3; x++) put(ox, oy, x, y, x === x0 ? P[0] : pick(P, .5 + R() * .3)); };
       if (gate) { post(0); post(13); for (const y0 of [5, 10]) for (let y = y0; y < y0 + 2; y++) for (let x = 3; x < 13; x++) put(ox, oy, x, y, pick(P, .55 + R() * .2)); for (let y = 5; y < 12; y++) for (let x = 7; x < 9; x++) put(ox, oy, x, y, P[0]); }
@@ -925,7 +930,7 @@ const GEN = {
       ores(x, z, h - 2, 38, .045, 5, 8); ores(x, z, h - 2, 9, .034, 3); ores(x, z, h - 2, 39, .022, 7);
       ores(x, z, h - 2, 40, .016, 8, 1, 9); ores(x, z, h - 2, 41, .011, 9, 1, 5);
       const forest = SX > 96 ? .006 + .055 * smooth(.52, .74, noise(x / 22, z / 22, 88)) : .02 + .06 * smooth(.5, .72, noise(x / 14, z / 14, 88));
-      if (h >= 19 && !rocky && hash(x, z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) tree(x, h + 1, z);
+      if (h >= 19 && !rocky && hash(x, z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) { tree(x, h + 1, z); treeSpots.push([x, h + 1, z]); }
       else if (h >= 18 && get(x, h, z) === 2 && !get(x, h + 1, z) && hash(x, z, 91) < .014 && Math.hypot(x - base.x, z - base.z) > 5) set(x, h + 1, z, 53 + Math.floor(noise(x / 9, z / 9, 93) * 2.99) * 4);
     }
     // 바위 절벽에 드러난 철광석·석탄
@@ -1059,6 +1064,7 @@ Object.assign(GEN, {
     placeLander(12, 23);
   },
 });
+let treeSpots = []; // 처음 숲에 나무가 서 있던 자리: 베어 내면 시간이 지나 묘목이 다시 돋아요
 function tree(x, y, z) {
   const h = 4 + Math.floor(hash(x, z, 5) * 2);
   for (let i = 0; i < h; i++) set(x, y + i, z, 7);
@@ -1438,7 +1444,7 @@ function loadPlanet(pk, spawnAtBase = true) {
   S.planet = pk; S.visited[pk] = true;
   SX = SZ = PLANETS[pk].size || 96;
   W.fill(0); SH.fill(0); wrapX = PLANETS[pk].wrap; placedTimes = {};
-  GEN[pk]();
+  treeSpots = []; GEN[pk]();
   const ed = S.edits[pk] || {};
   for (const k in ed) { const [x, y, z] = k.split(",").map(Number); set(x, y, z, ed[k]); if (ed[k] && pk === "venus") placedTimes[k] = gameT; }
   computeLight(); buildAll(); updateWrapClones(); setupSky(pk); setAir(pk);
@@ -1487,6 +1493,7 @@ function edit(x, y, z, b, remote) {
   if (wrapX) x = ((x % SX) + SX) % SX;
   set(x, y, z, b); const dirty = relight(x, x, z, z); rebuildAt(x, z, dirty); updateWrapClones();
   (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b;
+  if (b === 85) { const L = (S.sapl = S.sapl || {})[S.planet] = (S.sapl || {})[S.planet] || {}, k = x + "," + y + "," + z; if (L[k] == null) L[k] = gameT + SAPL_T * (.8 + Math.random() * .5); }
   if (!remote) net.send({ t: "edit", pk: S.planet, x, y, z, b });
 }
 
@@ -1711,7 +1718,7 @@ function mineTick(dt, h) {
     let drop = B.drop != null ? B.drop : b, cnt = 1;
     // 다 자란 작물은 알갱이 2~3개, 덜 자란 것은 심은 알갱이 1개만 돌려줘요
     if (B.crop != null) { drop = 115 + B.crop; cnt = (b - 50) % 4 === 3 ? 2 + (Math.random() < .5 ? 1 : 0) : 1; }
-    if (b === 8 && Math.random() < .12) drop = 132;
+    if (b === 8) { const r = Math.random(); if (r < .12) drop = 132; else if (r < .32) drop = 85; }
     if (B.door) { const oy = B.door % 2 ? h.y + 1 : h.y - 1; if (isDoor(get(h.x, oy, h.z))) edit(h.x, oy, h.z, 0); }
     // 농지를 부수면 위에 심은 작물도 떨어져요
     if (b === 45 && BLOCKS[get(h.x, h.y + 1, h.z)] && BLOCKS[get(h.x, h.y + 1, h.z)].plant) { const cb = get(h.x, h.y + 1, h.z); edit(h.x, h.y + 1, h.z, 0); S.inv[115 + BLOCKS[cb].crop] = (S.inv[115 + BLOCKS[cb].crop] || 0) + 1; }
@@ -1759,6 +1766,7 @@ function place() {
   const x = h.x + h.n[0], y = h.y + h.n[1], z = h.z + h.n[2];
   if (y >= SY || SOLID(get(x, y, z))) return;
   if (id === 69) { placeDoor(x, y, z); return; }
+  if (id === 85 && (h.n[1] !== 1 || ![2, 3].includes(get(h.x, h.y, h.z)))) { toast("묘목은 풀이나 흙 위에 심어요", 2000); return; }
   // 랜턴을 블록 아랫면에 놓으면 매달린 랜턴
   const pid = id === 80 && h.n[1] < 0 ? 81 : id;
   set(x, y, z, pid);
@@ -1766,6 +1774,7 @@ function place() {
   edit(x, y, z, pid); S.inv[id]--; sfx.place(id); swing = .001;
   if (S.planet === "venus") placedTimes[(((x % SX) + SX) % SX) + "," + y + "," + z] = gameT;
   if (id === 31) deviceRun(x, y, z);
+  if (id === 85 && !S.planted85) { S.planted85 = true; showFact("묘목 심기", "묘목은 어린나무예요. 햇빛을 받아 광합성으로 양분을 만들며 자라요. 위가 트여 있고 햇빛이 드는 곳에 심으면 2분쯤 뒤 큰 나무가 돼요. 나뭇잎을 캐면 가끔 묘목이 나와요."); }
   renderHotbar();
 }
 
@@ -1836,6 +1845,37 @@ function plant(h, id) {
   renderHotbar();
 }
 // 내가 심은 작물이 시간이 지나면 자라요(자라는 모습은 같은 방 친구에게도 보여요)
+const SAPL_T = 110; let saplT = 0, regrowT = 0;
+// 묘목: 심은 뒤 SAPL_T초쯤 지나면 위 공간이 비어 있고 햇빛이 들 때 나무로 자라요
+function saplingTick(dt) {
+  if ((saplT += dt) < 2) return; saplT = 0;
+  const L = (S.sapl || {})[S.planet];
+  if (L) for (const key in L) {
+    const [x, y, z] = key.split(",").map(Number);
+    if (get(x, y, z) !== 85 || ![2, 3].includes(get(x, y - 1, z))) { delete L[key]; continue; }
+    if (gameT < L[key]) continue;
+    const h = 4 + Math.floor(hash(x, z, 5) * 2); let room = lightAt(x, y, z)[0] >= 9;
+    for (let i = 1; i <= h && room; i++) { const b = get(x, y + i, z); if (b && b !== 8) room = false; }
+    if (!room) { L[key] = gameT + 30; continue; } // 막혀 있으면 조금 뒤에 다시 봐요
+    const E = []; for (let i = 0; i < h; i++) E.push([x, y + i, z, 7]);
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = h - 2; dy <= h; dy++) {
+      if (Math.abs(dx) + Math.abs(dz) + (dy === h ? 1 : 0) > 3 || (!dx && !dz && dy < h)) continue;
+      if (!get(x + dx, y + dy, z + dz) && y + dy < SY) E.push([x + dx, y + dy, z + dz, 8]);
+    }
+    delete L[key]; editMany(E);
+    if (Math.hypot(P.pos.x - x, P.pos.z - z) < 20) toast("묘목이 자라 나무가 됐어요", 1800);
+  }
+  // 숲 되살리기: 처음 나무가 서 있던 자리 가운데 베어 낸 곳에 가끔 묘목이 다시 돋아요(지구, 기지 근처 빼고)
+  if (S.planet !== "earth" || net.teacher || !treeSpots.length || (regrowT += 2) < 12) return; regrowT = 0;
+  if (Object.keys(L || {}).length >= 24) return;
+  const C = treeSpots.filter(([x, y, z]) => { const d = Math.hypot(P.pos.x - x, P.pos.z - z); return d >= 8 && d <= 70 && Math.hypot(x - base.x, z - base.z) >= 9 && get(x, y, z) === 0 && [2, 3].includes(get(x, y - 1, z)); });
+  for (let t = 0; t < 6 && C.length; t++) {
+    const [x, y, z] = C.splice(Math.floor(Math.random() * C.length), 1)[0];
+    let ok = true; // 누가 지은 것이 둘레에 있으면 건드리지 않아요
+    for (let dx = -2; dx <= 2 && ok; dx++) for (let dz = -2; dz <= 2 && ok; dz++) for (let dy = 0; dy <= 6 && ok; dy++) { const b = get(x + dx, y + dy, z + dz); if (b && b !== 7 && b !== 8 && !(BLOCKS[b] && BLOCKS[b].plant)) ok = false; }
+    if (ok) { edit(x, y, z, 85); return; }
+  }
+}
 const GROW = 40; let cropT = 0;
 function cropTick(dt) {
   if ((cropT += dt) < 1) return; const t = cropT; cropT = 0;
@@ -3490,10 +3530,14 @@ function buildAnimal(type) {
 const BREED = { cow: 115, sheep: 115, pig: 117, chicken: 116 }, ANIMK = Object.keys(ANIMT);
 // 길들이기 먹이(짝짓기는 안 해요): 고양이는 날물고기(복어 빼고), 늑대는 뼈
 const TAME = { cat: [142, 144, 145, 146, 147], wolf: [149] }, TAME_P = .3;
+// 길들이기: 처음 30%, 실패할 때마다 그 동물은 20%씩 더 쉬워져요(30 → 50 → 70 → 90 → 100%)
+const tameP = (m) => Math.min(1, TAME_P + .2 * (m.tries || 0));
+const tameFail = (m) => { m.tries = (m.tries || 0) + 1; return `다음엔 ${Math.round(tameP(m) * 100)}%`; };
 const likes = (type, id) => BREED[type] === id || (TAME[type] || []).includes(id);
 const GROWUP = 150, BREED_CD = 60, LOVE_T = 30, HERD_MAX = 40;
 let herdLoaded = false, herdSaveT = 0, hearts = [], heartMat = null, newborn = [];
 function nearTree(cx, cz) { for (let dx = -8; dx <= 8; dx += 2) for (let dz = -8; dz <= 8; dz += 2) { const x = cx + dx, z = cz + dz, y = topY(x, z); if (get(x, y, z) === 8 || get(x, y - 1, z) === 7 || get(x, y, z) === 7) return true; } return false; }
+const WILD_MAX = 10;
 function pickAnimal() { let tot = 0; for (const k in ANIMT) tot += ANIMT[k].wt; let r = Math.random() * tot; for (const k in ANIMT) { r -= ANIMT[k].wt; if (r <= 0) return k; } return "cow"; }
 function mkAnimal(type, x, y, z, o = {}) {
   const g = buildAnimal(type); scene.add(g);
@@ -3505,14 +3549,20 @@ function mkAnimal(type, x, y, z, o = {}) {
 const ownCount = () => animals.filter(m => m.own).length;
 const aSize = (m) => m.baby > 0 ? .5 + .35 * (1 - m.baby / GROWUP) : 1;
 function spawnHerd() {
-  if (animals.filter(m => !m.own).length >= 9) return;
-  const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 18, cx = Math.floor(P.pos.x + Math.cos(a) * d), cz = Math.floor(P.pos.z + Math.sin(a) * d);
-  if (cx < 2 || cz < 2 || cx >= SX - 2 || cz >= SZ - 2 || Math.hypot(cx - base.x, cz - base.z) < 9) return;
+  if (animals.filter(m => !m.own).length >= WILD_MAX) return;
+  // 풀밭을 찾을 때까지 여러 곳을 살펴봐요(숲·물가·내가 지은 곳은 건너뛰어요)
+  let cx = 0, cz = 0, found = false;
+  for (let t = 0; t < 8 && !found; t++) {
+    const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 18; cx = Math.floor(P.pos.x + Math.cos(a) * d); cz = Math.floor(P.pos.z + Math.sin(a) * d);
+    if (cx < 2 || cz < 2 || cx >= SX - 2 || cz >= SZ - 2 || Math.hypot(cx - base.x, cz - base.z) < 9) continue;
+    const y = topY(cx, cz); found = get(cx, y, cz) === 2 && lightAt(cx, y + 1, cz)[0] >= 10;
+  }
+  if (!found) return;
   let type = pickAnimal(); const n = type === "cat" ? 1 : 1 + Math.floor(Math.random() * (type === "wolf" ? 2 : 3));
   if (type === "wolf" && !nearTree(cx, cz)) type = "sheep";
-  for (let i = 0; i < n && animals.filter(m => !m.own).length < 9; i++) {
+  for (let i = 0; i < n && animals.filter(m => !m.own).length < WILD_MAX; i++) {
     const x = cx + Math.floor(Math.random() * 5) - 2, z = cz + Math.floor(Math.random() * 5) - 2; if (x < 1 || z < 1 || x >= SX - 1 || z >= SZ - 1) continue;
-    const y = topY(x, z); if (get(x, y, z) !== 2 || SOLID(get(x, y + 1, z)) || SOLID(get(x, y + 2, z)) || lightAt(x, y + 1, z)[0] < 12) continue;
+    const y = topY(x, z); if (get(x, y, z) !== 2 || SOLID(get(x, y + 1, z)) || SOLID(get(x, y + 2, z)) || lightAt(x, y + 1, z)[0] < 10) continue;
     mkAnimal(type, x + .5, y + 1, z + .5);
   }
 }
@@ -3562,7 +3612,7 @@ function feedAnimal() {
     if (m.angry > 0) { toast("화난 늑대는 먹이를 받지 않아요. 잠시 뒤에 다시 해 보세요", 2000); return true; }
     if (ownCount() >= HERD_MAX) { toast(`동물은 ${HERD_MAX}마리까지 기를 수 있어요`, 2200); return true; }
     S.inv[id]--; renderHotbar();
-    if (Math.random() >= TAME_P) { tamePuff(m); toast(`${T.n}${josa(T.n, "이", "가")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
+    if (Math.random() >= tameP(m)) { tamePuff(m); toast(`${T.n}${josa(T.n, "이", "가")} 먹었지만 아직 경계해요 (${tameFail(m)})`, 2000); return true; }
     m.own = true; m.id = ++S.herdN; heart(m.p.x, m.p.y + T.h + .2, m.p.z); tone(700, .08, "sine", .05, 0, 900);
     toast(m.type === "wolf" ? "늑대가 내 편이 됐어요! 따라다니며 로봇과 같이 싸워 줘요" : "고양이가 내 편이 됐어요! 졸졸 따라다녀요", 3000);
     showFact(`${T.n} 길들이기`, m.type === "wolf" ? "길든 늑대는 나를 따라다니다가 가까이 오는 로봇을 물어요. 다치면 생고기나 뼈를 주면 회복해요. 기르는 동물은 지구에 남아 기다려요." : "길든 고양이는 나를 따라다녀요. 고양이가 있으면 자폭 로봇이 가까이 오지 못하고 달아나요. 기르는 동물은 지구에 남아 기다려요.");
@@ -3575,7 +3625,7 @@ function feedAnimal() {
   if (m.baby > 0) { m.baby = Math.max(0, m.baby - 30); toast(`새끼 ${T.n}${josa(T.n, "이", "가")} 먹이를 먹고 쑥 자랐어요`, 1800); }
   else if (m.cd > 0) { toast(`${T.n}${josa(T.n, "은", "는")} 새끼를 낳고 쉬는 중이에요 (${Math.ceil(m.cd)}초)`, 1800); return true; }
   else if (m.love > 0) { toast("벌써 짝을 찾고 있어요. 먹이를 먹은 같은 동물을 가까이 데려오세요", 2200); return true; }
-  else if (!m.own && Math.random() >= TAME_P) { S.inv[id]--; tamePuff(m); renderHotbar(); toast(`${T.n}${josa(T.n, "이", "가")} ${food}${josa(food, "을", "를")} 먹었지만 아직 경계해요 (성공 확률 30%)`, 1800); return true; }
+  else if (!m.own && Math.random() >= tameP(m)) { S.inv[id]--; tamePuff(m); renderHotbar(); toast(`${T.n}${josa(T.n, "이", "가")} ${food}${josa(food, "을", "를")} 먹었지만 아직 경계해요 (${tameFail(m)})`, 2000); return true; }
   else { m.love = LOVE_T; toast(ownCount() + (m.own ? 0 : 1) >= HERD_MAX ? `가축이 ${HERD_MAX}마리라 새끼는 더 못 낳아요` : `${T.n}에게 ${food}${josa(food, "을", "를")} 줬어요. 먹이를 먹은 ${T.n}${josa(T.n, "이", "가")} 둘 모이면 새끼를 낳아요`, 2600); }
   if (!m.own) { m.own = true; m.id = ++S.herdN; if (!S.tamed) { S.tamed = true; showFact("내 가축이 생겼어요", "먹이를 준 동물은 내 가축이 돼요. 저장되고 친구 화면에도 보여요. 울타리(나무 판자 4 + 통나무 1)로 우리를 지어 두면 달아나지 않아요."); } }
   S.inv[id]--; heart(m.p.x, m.p.y + m.T.h * aSize(m) + .2, m.p.z); tone(700, .08, "sine", .05, 0, 900); renderHotbar(); saveHerd(); return true;
@@ -3634,11 +3684,16 @@ function buildFish(T) {
   g.userData = { tail, mats, base: mats.map(m => m.color.clone()) }; return g;
 }
 const inWater = (x, y, z) => LIQ(get(Math.floor(x), Math.floor(y), Math.floor(z)));
+const FISH_MAX = 16;
 function fishTick(dt) {
   if (S.planet !== "earth" || net.teacher) { if (fishes.length) { fishes.forEach(f => scene.remove(f.g)); fishes = []; } return; }
-  if ((fishT -= dt) <= 0) { fishT = 1.5;
-    if (fishes.length < 10) { const an = Math.random() * 6.28, d = 6 + Math.random() * 20, x = Math.floor(P.pos.x + Math.cos(an) * d), z = Math.floor(P.pos.z + Math.sin(an) * d);
-      if (x > 1 && z > 1 && x < SX - 1 && z < SZ - 1 && LIQ(get(x, 16, z)) && LIQ(get(x, 15, z))) {
+  if ((fishT -= dt) <= 0) { fishT = fishes.length < 6 ? .8 : 1.5;
+    // 물이 두 칸 이상 깊은 곳을 찾을 때까지 여러 곳을 살펴봐요(작은 호수 옆에서도 물고기가 잘 생겨요)
+    let x = 0, z = 0, ok = false;
+    for (let t = 0; t < 12 && !ok && fishes.length < FISH_MAX; t++) { const an = Math.random() * 6.28, d = 4 + Math.random() * 22; x = Math.floor(P.pos.x + Math.cos(an) * d); z = Math.floor(P.pos.z + Math.sin(an) * d);
+      ok = x > 1 && z > 1 && x < SX - 1 && z < SZ - 1 && LIQ(get(x, 16, z)) && LIQ(get(x, 15, z)); }
+    if (ok) {
+      {
         let y0 = 16; while (y0 > 1 && LIQ(get(x, y0 - 1, z))) y0--;
         const sea = isSea(x, z), pool = Object.keys(FISHT).filter(k => FISHT[k].sea === sea), k = pool[Math.floor(Math.random() * pool.length)], T = FISHT[k];
         for (let i = 0, n = k === "mackerel" ? 3 : 1 + Math.floor(Math.random() * 2); i < n; i++) {
@@ -3683,7 +3738,7 @@ function troughTick(dt) {
       if (q > 1.9) { if (!m.trG || q < m.trG[2]) m.trG = [x + .5, z + .5, q]; continue; }
       T[f]--; m.trT = gameT + 15; m.trG = null; changed = true;
       if (grow) m.baby = Math.max(0, m.baby - 30); else if (mate) m.love = LOVE_T;
-      if (!m.own && Math.random() < TAME_P) { m.own = true; m.id = ++S.herdN; toast(`${m.T.n}${josa(m.T.n, "이", "가")} 먹이통에서 ${itemName(f)}${josa(itemName(f), "을", "를")} 먹고 내 가축이 됐어요`, 2400); }
+      if (!m.own && (Math.random() < tameP(m) || (tameFail(m), false))) { m.own = true; m.id = ++S.herdN; toast(`${m.T.n}${josa(m.T.n, "이", "가")} 먹이통에서 ${itemName(f)}${josa(itemName(f), "을", "를")} 먹고 내 가축이 됐어요`, 2400); }
       heart(m.p.x, m.p.y + m.T.h * aSize(m) + .2, m.p.z); tone(700, .06, "sine", .03, 0, 900);
     }
     if (!Object.values(T).some(n => n > 0)) { delete S.trough[k]; if (b === 84) edit(x, y, z, 83); }
@@ -3695,7 +3750,7 @@ function animalTick(dt) {
   tickHearts(dt);
   if (S.planet !== "earth" || net.teacher) { if (animals.length || herdLoaded) clearAnimals(); return; }
   if (!herdLoaded) loadHerd();
-  if ((aniT += dt) > 2.5) { aniT = 0; spawnHerd(); }
+  if ((aniT += dt) > (animals.filter(m => !m.own).length < 5 ? 1.2 : 2.5)) { aniT = 0; spawnHerd(); }
   if ((herdSaveT += dt) > 2) { herdSaveT = 0; saveHerd(); }
   const g = G_EARTH, dayK = smooth(-.12, .25, env.e), held = heldId(), viewR = SX > 96 ? VISC_() * 16 + 4 : 999;
   animals = animals.filter(m => {
@@ -3825,7 +3880,7 @@ function attackTick(dt) {
       if (best.hp <= 0) {
         const x = Math.floor(best.p.x), y = Math.floor(best.p.y + .5), z = Math.floor(best.p.z);
         burst(x, y, z, best.type === "sheep" ? 68 : 3); sfx.pop(); scene.remove(best.g); animals = animals.filter(m => m !== best); if (best.own) saveHerd();
-        const got = []; if (!(best.baby > 0)) { best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); }); if (best.type !== "wolf" && best.type !== "cat" && Math.random() < .35) got.push(149); }
+        const got = []; if (!(best.baby > 0)) { best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); }); if (best.type !== "wolf" && best.type !== "cat" && Math.random() < .5) got.push(149); }
         got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
         if (!got.length) toast(`새끼 ${best.T.n}${josa(best.T.n, "은", "는")} 잡아도 얻는 것이 없어요`, 2000); else toast(`${best.T.n}${josa(best.T.n, "을", "를")} 잡았어요! ${got.map(itemName).join(", ")}${S.ate ? "" : " · 화로에서 구워 먹으세요"}`, 2000); renderHotbar();
       }
@@ -4417,7 +4472,7 @@ function frame(now, xf) {
   }
   computeEnv();
   net.tick(dt);
-  if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); cropTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
+  if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); cropTick(dt); saplingTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
   updateCamera(dt); chunkTick(); cineTick(dt); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
