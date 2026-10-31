@@ -2743,7 +2743,7 @@ function tone(f, d = .1, type = "square", v = .05, w = 0, f2) {
     o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
     gn.gain.setValueAtTime(.0001, t); gn.gain.exponentialRampToValueAtTime(v, t + Math.min(.006, d * .2)); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
     let out = o;
-    if (type === "square" || type === "sawtooth") { const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = Math.max(700, Math.min(4200, Math.max(f, f2 || 0) * 4)); lp.Q.value = .5; out = o.connect(lp); }
+    if (type === "square" || type === "sawtooth") { const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = Math.max(600, Math.min(2200, Math.max(f, f2 || 0) * 2.5)); lp.Q.value = .5; out = o.connect(lp); }
     out.connect(gn).connect(master); o.start(t); o.stop(t + d + .02);
   } catch (e) {}
 }
@@ -2760,7 +2760,10 @@ let windSrc = null, windF = null, windG = null, birdT = 3, bugT = 2, flowSndT = 
 function windStart() {
   if (windSrc || !actx) return;
   try {
-    windSrc = actx.createBufferSource(); windSrc.buffer = noiseBuf; windSrc.loop = true;
+    const n = actx.sampleRate * 2, wb = actx.createBuffer(1, n, actx.sampleRate), q = wb.getChannelData(0); let y = 0, pk = 0;
+    for (let i = 0; i < n; i++) { y = y * .985 + (Math.random() * 2 - 1) * .15; q[i] = y; pk = Math.max(pk, Math.abs(y)); }
+    for (let i = 0; i < n; i++) q[i] = q[i] / pk * Math.min(1, i / 2000, (n - i) / 2000);
+    windSrc = actx.createBufferSource(); windSrc.buffer = wb; windSrc.loop = true;
     windF = actx.createBiquadFilter(); windF.type = "bandpass"; windF.frequency.value = 400; windF.Q.value = .7;
     windG = actx.createGain(); windG.gain.value = 0; windSrc.connect(windF).connect(windG).connect(master); windSrc.start();
   } catch (e) { windSrc = null; }
@@ -2791,22 +2794,57 @@ function ambTick(dt) {
     for (let dx = -3; dx <= 3 && !near; dx++) for (let dz = -3; dz <= 3 && !near; dz++) for (let dy = -2; dy <= 1 && !near; dy++) near = isFlowW(get(cx + dx, cy + dy, cz + dz));
     if (near) { tone(r(350, 900), .05, "sine", .01, 0, r(900, 1600)); if (Math.random() < .3) hiss("lowpass", 900, .6, .25, .02); } }
 }
+// 블록·공격 소리 묶음: 처음 쓸 때 재료마다 4가지씩 짧은 소리를 만들어 둬요(마인크래프트처럼 칠 때마다 조금씩 다르게 들려요)
+// 흰 잡음을 그대로 쓰지 않고, 낮게 거른 '알갱이' 소리 + 둥 하는 몸통 소리 + 재료의 울림으로 만들어서 지지직거리지 않아요
+let SB = null;
+function synth(dur, o) {
+  const sr = actx.sampleRate, N = Math.floor(sr * dur), buf = actx.createBuffer(1, N, sr), d = buf.getChannelData(0), Rn = (a, b) => a + Math.random() * (b - a);
+  if (o.th) { const [f0, f1, dk, A] = o.th; let ph = 0; for (let i = 0; i < N; i++) { const t = i / sr, fq = f1 + (f0 - f1) * Math.exp(-t / .025); ph += 2 * Math.PI * fq / sr; d[i] += Math.sin(ph) * A * Math.min(1, t / .002) * Math.exp(-t / dk); } }
+  if (o.modes) o.modes.forEach(([fq, dk, A]) => { const ff = fq * Rn(.94, 1.06), p0 = Math.random() * 6.28; for (let i = 0; i < N; i++) { const t = i / sr; d[i] += Math.sin(p0 + 2 * Math.PI * ff * t) * A * Math.min(1, t / .001) * Math.exp(-t / dk); } });
+  if (o.gr) { const [n, span, fc, g0, g1, A] = o.gr, a = Math.exp(-2 * Math.PI * fc / sr), G = new Float32Array(N); let gp = 0;
+    for (let k = 0; k < n; k++) { const s0 = Math.floor(sr * span * Math.pow(Math.random(), 1.5)), L = Math.floor(sr * Rn(g0, g1)), amp = Rn(.4, 1) * (1 - s0 / (sr * span + 1) * .6); let y = 0, y2 = 0;
+      for (let i = 0; i < L && s0 + i < N; i++) { y = (1 - a) * (Math.random() * 2 - 1) + a * y; y2 = (1 - a) * y + a * y2; G[s0 + i] += y2 * amp * Math.sin(Math.PI * i / L); } }
+    for (let i = 0; i < N; i++) gp = Math.max(gp, Math.abs(G[i])); if (gp) for (let i = 0; i < N; i++) d[i] += G[i] / gp * A; }
+  if (o.vox) { const [f0, f1, F1, F2] = o.vox; let ph = 0;
+    for (let i = 0; i < N; i++) { const t = i / sr, fq = f0 + (f1 - f0) * t / dur; ph += 2 * Math.PI * fq / sr; let v = 0;
+      for (let h = 1; h * fq < 3200; h++) { const hf = h * fq; v += Math.sin(ph * h) * (Math.exp(-(((hf - F1) / 160) ** 2)) + .6 * Math.exp(-(((hf - F2) / 260) ** 2)) + .04) / Math.sqrt(h); }
+      d[i] += v * Math.min(1, t / .015) * Math.exp(-t / (dur * .45)); } }
+  let pk = 0; for (let i = 0; i < N; i++) pk = Math.max(pk, Math.abs(d[i]));
+  const fo = Math.floor(sr * .02), g = pk ? .9 / pk : 0; for (let i = 0; i < N; i++) d[i] *= g * Math.min(1, (N - i) / fo);
+  return buf;
+}
+// [놓기·발소리·캐는 중, 부서질 때]
+const SND = {
+  stone: [{ d: .14, th: [220, 110, .03, .6], modes: [[820, .03, .22], [1350, .02, .12]], gr: [5, .05, 2200, .004, .012, .7] }, { d: .3, th: [180, 90, .05, .6], modes: [[700, .04, .18]], gr: [16, .16, 2000, .005, .02, .8] }],
+  dirt: [{ d: .14, th: [140, 80, .03, .5], gr: [8, .07, 900, .008, .02, 1] }, { d: .3, th: [120, 70, .05, .5], gr: [18, .18, 1000, .008, .025, 1] }],
+  sand: [{ d: .16, gr: [14, .09, 1500, .006, .02, 1] }, { d: .3, th: [100, 70, .04, .25], gr: [24, .2, 1400, .006, .025, 1] }],
+  wood: [{ d: .16, th: [170, 120, .04, .5], modes: [[300, .06, .5], [640, .035, .3], [1150, .02, .12]], gr: [3, .03, 1500, .003, .008, .35] }, { d: .3, th: [150, 100, .05, .5], modes: [[260, .08, .45], [560, .05, .28]], gr: [12, .15, 1600, .004, .015, .8] }],
+  leaf: [{ d: .2, gr: [12, .12, 2400, .01, .03, 1] }, { d: .3, gr: [22, .2, 2200, .01, .035, 1] }],
+  ice: [{ d: .2, th: [260, 160, .02, .3], modes: [[1900, .06, .4], [2800, .04, .25]], gr: [3, .02, 3200, .002, .006, .35] }, { d: .45, modes: [[1700, .12, .3], [2400, .1, .28], [3300, .08, .22], [4100, .06, .16]], gr: [18, .2, 3200, .003, .01, .8] }],
+  metal: [{ d: .3, th: [200, 140, .02, .4], modes: [[520, .15, .4], [1310, .1, .28], [2150, .07, .16]], gr: [2, .01, 2800, .002, .005, .3] }, { d: .5, th: [170, 110, .04, .5], modes: [[480, .22, .4], [1210, .15, .28], [1990, .1, .18]], gr: [10, .15, 2600, .003, .01, .6] }],
+  cloud: [{ d: .25, gr: [10, .15, 500, .03, .07, 1] }, { d: .4, gr: [16, .25, 450, .04, .09, 1] }],
+  atk: [{ d: .2, th: [170, 55, .06, 1], gr: [4, .02, 1300, .004, .012, .55] }],
+  crit: [{ d: .26, th: [200, 50, .08, 1], modes: [[900, .04, .15]], gr: [7, .04, 1600, .004, .014, .7] }],
+  ouch: [{ d: .24, vox: [210, 160, 420, 950], th: [120, 80, .03, .25] }],
+};
+function bank(k) {
+  // 재료마다 처음 쓸 때 만들어요(한꺼번에 만들면 잠깐 멈칫할 수 있어서)
+  SB = SB || {}; if (!SB[k] && SND[k] && actx) { try { SB[k] = SND[k].map(o => [0, 1, 2, 3].map(() => synth(o.d, o))); } catch (e) { return null; } }
+  return SB[k];
+}
+function sPlay(k, i, v, rate = 1, w = 0) {
+  try { ac(); const B = bank(k); if (!B) return; const arr = B[i] || B[0], src = actx.createBufferSource(), g = actx.createGain();
+    src.buffer = arr[Math.floor(Math.random() * arr.length)]; src.playbackRate.value = rate; g.gain.value = v; src.connect(g).connect(master); src.start(actx.currentTime + w); } catch (e) {}
+}
 const MATCAT = {};
 [[1, 4, 9, 11, 12, 16, 19, 20, 21, 24, 29], "stone", [94, 83, 84, 76, 77, 78], "wood", [2, 3, 10, 15, 22], "dirt", [5, 18], "sand", [14, 17, 27, 32], "ice", [7], "wood", [8], "leaf", [25, 26], "cloud", [6, 28], "liquid", [23, 30, 31, 33, 34], "metal"]
   .forEach((v, i, a) => { if (i % 2 === 0) v.forEach(id => MATCAT[id] = a[i + 1]); });
 const r = (a, b) => a + Math.random() * (b - a);
 // big: 부서질 때, 아니면 캐는 중 톡톡·발소리·놓기
 function blockSound(b, vol = 1, big = false) {
-  const c = MATCAT[b] || "stone", v = .22 * vol;
-  if (c === "stone") { hiss("bandpass", r(1200, 1800), 1.3, big ? .16 : .07, v); if (big) { hiss("bandpass", r(500, 700), 1, .22, v * .9, .02); hiss("bandpass", 2400, 2, .05, v * .6, .07); } }
-  else if (c === "dirt") { hiss("lowpass", r(500, 800), .8, big ? .2 : .1, v * 1.2); if (big) tone(r(80, 110), .12, "triangle", v * .4); }
-  else if (c === "sand") { hiss("bandpass", r(2200, 3200), .6, big ? .22 : .12, v * .8); }
-  else if (c === "ice") { hiss("highpass", 3200, .7, .06, v * .7); if (big) for (let i = 0; i < 4; i++) tone(r(1800, 3600), .18, "sine", v * .25, i * .03); else tone(r(1900, 2500), .07, "sine", v * .2); }
-  else if (c === "wood") { hiss("bandpass", r(400, 600), 2.2, big ? .14 : .08, v * 1.1); tone(r(160, 200), .07, "triangle", v * .4); }
-  else if (c === "leaf") { hiss("highpass", 1800, .5, big ? .16 : .1, v * .6); }
-  else if (c === "cloud") { hiss("lowpass", 450, .5, big ? .3 : .18, v * .9, 0, 200); }
-  else if (c === "liquid") { for (let i = 0; i < (big ? 3 : 1); i++) tone(r(250, 400), .09, "sine", v * .5, i * .06, r(600, 900)); }
-  else { tone(r(800, 1000), .05, "square", v * .25); hiss("bandpass", 3000, 3, .05, v * .6); }
+  const c = MATCAT[b] || "metal", v = .22 * vol;
+  if (c === "liquid") { for (let i = 0; i < (big ? 3 : 1); i++) tone(r(250, 400), .09, "sine", v * .5, i * .06, r(600, 900)); return; }
+  sPlay(c, big ? 1 : 0, (big ? .34 : .28) * vol, r(.88, 1.12));
 }
 const sfx = {
   tick: (b) => blockSound(b, .55),
@@ -2814,16 +2852,16 @@ const sfx = {
   place: (b) => blockSound(b || 4, .9),
   step: (b) => blockSound(b, .28),
   pop: () => tone(r(650, 800), .07, "sine", .07, 0, r(1300, 1600)),
-  hurt: () => { tone(230, .16, "square", .06, 0, 130); hiss("lowpass", 600, .7, .1, .15); },
+  hurt: () => sPlay("ouch", 0, .4, r(.93, 1.07)),
   land: (k) => hiss("lowpass", 260, .7, .14, .12 + .25 * k),
   jump: () => tone(300, .18, "sine", .04, 0, 520),
   quest: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .16, "triangle", .08, i * .08)),
   launch: () => tone(70, 2.4, "sawtooth", .08, 0, 500),
-  die: () => tone(400, .8, "sawtooth", .07, 0, 60),
+  die: () => { sPlay("ouch", 0, .45, .8); tone(300, .8, "triangle", .05, .15, 70); },
   fizz: () => tone(2000, .25, "sawtooth", .02, 0, 600),
-  beep: () => { tone(880, .07, "square", .035); tone(620, .09, "square", .035, .09); },
-  hit: () => { hiss("bandpass", 2600, 3, .06, .2); tone(320, .06, "square", .05); },
-  boom: (k = 1) => { hiss("lowpass", 500, .6, .5 * k + .2, .3 * k + .1); tone(90, .45 * k + .1, "sawtooth", .08 * k, 0, 40); },
+  beep: () => { tone(880, .07, "triangle", .05); tone(620, .09, "triangle", .05, .09); },
+  hit: (crit) => sPlay(crit ? "crit" : "atk", 0, crit ? .6 : .5, r(.9, 1.1)),
+  boom: (k = 1) => { hiss("lowpass", 420, .6, .5 * k + .2, .3 * k + .1); tone(90, .45 * k + .1, "sine", .14 * k, 0, 38); },
   alarm: () => [0, .25, .5].forEach(w => tone(980, .16, "square", .04, w, 760)),
 };
 
@@ -3343,7 +3381,7 @@ const LVL = () => { const l = MLV[S.planet] || 1; return { l, hp: 1 + (l - 1) * 
 // 보스 공격은 갑옷을 갖춰도 아프게: 기본 ×1.7에 보스마다 세기(k)를 곱해요
 const BOSS_DMG = 1.7;
 function hurtBy(dmg, kx, kz, kick = 6, isBoss = false) {
-  dmg *= (isBoss ? BOSS_DMG * (boss ? boss.B.k : 1) : LVL().dmg) * (1 - armorK());
+  dmg *= (isBoss ? BOSS_DMG * (boss ? boss.B.k * (boss.dk || 1) : 1) : LVL().dmg) * (1 - armorK());
   S.hp -= dmg; cause = "robot"; hurtT = 1; lastHurt = gameT; sfx.hurt();
   const L = Math.hypot(kx, kz) || 1; P.vel.x += kx / L * kick; P.vel.z += kz / L * kick; P.vel.y = Math.max(P.vel.y, 3);
 }
@@ -3522,6 +3560,17 @@ const BOSS = {
   titan: { n: "메테인 거인", body: "heavy", col: ["#c87a30", "#3a2410"], sc: 2.6, hp: 500, sp: 1.3, w: 1.1, h: 3.8, k: 1.75, core: 138, drop: [[107, 6], [100, 4], [104, 2]], pat: ["rain", "slam"], mini: "drone",
     fact: "타이탄에는 물 대신 액체 메테인이 비로 내리고 호수를 이뤄요. 영하 180 °C에서는 메테인이 액체가 되기 때문이에요. 바닥의 주황 웅덩이를 피하세요." },
 };
+// 보스 단계: 그 천체 보스를 쓰러뜨린 횟수로 정해져요. 1~5번째 싸움은 기본, 6~10번째는 강화, 11번째부터는 각성(새 공격이 더 늘어요)
+const BOSS_TIER = [
+  null,
+  { n: "", hp: 1, dk: 1, sp: 1, idle: 2.6, extra: 0, sum: [.67, .34], per: 2, loot: 1, core: 0, col: null, crown: 0xd070ff, sc: 1 },
+  { n: "강화된 ", hp: 1.6, dk: 1.3, sp: 1.15, idle: 2.0, extra: 1, sum: [.75, .5, .25], per: 2, loot: 1.5, core: 1, col: "#ff4a2a", crown: 0xff7030, sc: 1.06 },
+  { n: "각성한 ", hp: 2.4, dk: 1.6, sp: 1.3, idle: 1.5, extra: 2, sum: [.8, .6, .4, .2], per: 3, loot: 2, core: 2, col: "#9a3aff", crown: 0xff2a6a, sc: 1.14 },
+];
+const bossTier = (pk) => { const w = (S.bossWin && S.bossWin[pk]) || 0; return w >= 10 ? 3 : w >= 5 ? 2 : 1; };
+// 강화·각성 때 더해지는 공격(앞에서부터 하나씩): 십자 땅울림, 연속 충격파, 따라오는 낙하, 네 갈래 회전 광선, 순간이동 내려찍기
+const BOSS_EXTRA = { earth: ["quake", "shock"], moon: ["meteor", "blink"], mars: ["blink", "meteor"], mercury: ["spin", "shock"], europa: ["meteor", "spin"], titan: ["shock", "quake"] };
+const BOSS_ZC = { earth: 0xffa040, moon: 0xff3030, mars: 0xff6a3a, mercury: 0xffd040, europa: 0x60c8ff, titan: 0xff9a30 };
 let boss = null, lair = null;
 const lairBeamGeo = new THREE.CylinderGeometry(.5, .5, 70, 10, 1, true);
 function lairSpot() {
@@ -3538,7 +3587,7 @@ function ensureLair() {
   hideLair(); const q = lairSpot(), B = BOSS[S.planet];
   const beam = new THREE.Mesh(lairBeamGeo, new THREE.MeshBasicMaterial({ color: 0xb050ff, transparent: true, opacity: .28, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
   beam.position.set(q.x + .5, q.y + 34, q.z + .5); scene.add(beam);
-  const tag = nameTag(`보스 · ${B.n}`, "#c060ff"); tag.position.set(q.x + .5, q.y + 4, q.z + .5); tag.scale.set(3.2, .8, 1); scene.add(tag);
+  const T = BOSS_TIER[bossTier(S.planet)], tag = nameTag(`보스 · ${T.n}${B.n}`, T.n ? "#ff6a4a" : "#c060ff"); tag.position.set(q.x + .5, q.y + 4, q.z + .5); tag.scale.set(3.2, .8, 1); scene.add(tag);
   lair = { pk: S.planet, ...q, beam, tag };
 }
 function hideLair() { if (lair) { scene.remove(lair.beam); scene.remove(lair.tag); lair = null; } }
@@ -3549,26 +3598,32 @@ function showBossBar(on) {
   bossBar.hidden = !on;
 }
 function spawnBoss() {
-  const B = BOSS[S.planet], g = buildRobot(B.body), u = g.userData;
-  u.base[0].set(B.col[0]); u.base[1].set(B.col[1]); g.scale.setScalar(B.sc);
-  const crown = new THREE.MeshBasicMaterial({ color: 0xd070ff }); box(.5, .08, .08, crown, 0, 1.5, 0, g); box(.08, .26, .08, crown, -.2, 1.6, 0, g); box(.08, .26, .08, crown, .2, 1.6, 0, g);
+  const B = BOSS[S.planet], tier = bossTier(S.planet), T = BOSS_TIER[tier], g = buildRobot(B.body), u = g.userData;
+  u.base[0].set(B.col[0]); u.base[1].set(B.col[1]); if (T.col) u.base[0].lerp(cB.set(T.col), .3); g.scale.setScalar(B.sc * T.sc);
+  const crown = new THREE.MeshBasicMaterial({ color: T.crown }); box(.5, .08, .08, crown, 0, 1.5, 0, g); box(.08, .26, .08, crown, -.2, 1.6, 0, g); box(.08, .26, .08, crown, .2, 1.6, 0, g);
+  if (tier > 1) box(.08, .36, .08, crown, 0, 1.66, 0, g); if (tier > 2) { box(.08, .3, .08, crown, -.32, 1.58, 0, g); box(.08, .3, .08, crown, .32, 1.58, 0, g); }
   scene.add(g);
-  boss = { B, g, p: new THREE.Vector3(lair.x + .5, lair.y + .2, lair.z + .5), v: new THREE.Vector3(), hp: B.hp, st: "go", stT: 0, next: 0, flash: 0, walk: 0, ground: false, summoned: 0 };
+  const hp = Math.round(B.hp * T.hp), pat = B.pat.concat((BOSS_EXTRA[S.planet] || []).slice(0, T.extra));
+  boss = { B, T, tier, g, p: new THREE.Vector3(lair.x + .5, lair.y + .2, lair.z + .5), v: new THREE.Vector3(), hp, maxHp: hp, dk: T.dk, sp: B.sp * T.sp, idle: T.idle, pat, nm: T.n + B.n, st: "go", stT: 0, next: 0, flash: 0, walk: 0, ground: false, summoned: 0 };
   showBossBar(true); sfx.boom(1); tone(70, 1.6, "sawtooth", .08, 0, 140);
-  S.bossSeen = S.bossSeen || {};
-  if (!S.bossSeen[S.planet]) { S.bossSeen[S.planet] = true; showFact(`보스: ${B.n}`, B.fact); } else toast(`${B.n}${josa(B.n, "이", "가")} 깨어났어요!`, 2200);
+  S.bossSeen = S.bossSeen || {}; const fightNo = ((S.bossWin && S.bossWin[S.planet]) || 0) + 1;
+  if (!S.bossSeen[S.planet]) { S.bossSeen[S.planet] = true; showFact(`보스: ${B.n}`, B.fact); }
+  else if (tier > 1 && !(S.bossTierSeen = S.bossTierSeen || {})[S.planet + tier]) { S.bossTierSeen[S.planet + tier] = true; showFact(`${T.n}${B.n} (${fightNo}번째 싸움)`, `체력 ${T.hp}배, 공격 ${T.dk}배로 더 빠르고 강해졌어요. 새 공격이 ${T.extra}가지 늘었고 부하도 더 자주 불러요. 대신 코어와 재료를 더 많이 떨어뜨려요.`); }
+  else toast(`${b2n(T.n + B.n)} 깨어났어요! (${fightNo}번째)`, 2200);
 }
-function clearBoss() { if (boss) { scene.remove(boss.g); if (boss.beams) boss.beams.forEach(b => scene.remove(b)); boss = null; } showBossBar(false); bossFog = 0; clearZones(); }
+const b2n = (n) => n + josa(n, "이", "가");
+function clearBoss() { if (boss) { scene.remove(boss.g); if (boss.beams) boss.beams.forEach(b => scene.remove(b)); if (boss.beams4) boss.beams4.forEach(b => scene.remove(b)); boss = null; } showBossBar(false); bossFog = 0; clearZones(); }
 function bossDie() {
   const b = boss, B = b.B, x = Math.floor(b.p.x), y = Math.floor(b.p.y + 1), z = Math.floor(b.p.z);
   for (let i = 0; i < 6; i++) burst(x + Math.round(Math.random() * 2 - 1), y + i % 3, z + Math.round(Math.random() * 2 - 1), i % 2 ? 23 : 9); sfx.boom(1);
   const got = {}; const add = (id, n) => { got[id] = (got[id] || 0) + n; S.inv[id] = (S.inv[id] || 0) + n; for (let i = 0; i < Math.min(n, 3); i++) spawnDrop(id, x, y, z); };
-  add(B.core, 2 + (Math.random() < .5 ? 1 : 0)); B.drop.forEach(([id, n]) => add(id, n));
+  const T = b.T || BOSS_TIER[1]; add(B.core, 2 + T.core + (Math.random() < .5 ? 1 : 0)); B.drop.forEach(([id, n]) => add(id, Math.round(n * T.loot)));
   S.bossCD[S.planet] = Date.now() + 5 * 60e3; S.bossWin[S.planet] = (S.bossWin[S.planet] || 0) + 1;
   const list = Object.keys(got).map(id => `${itemName(+id)} ${got[id]}`).join(", ");
-  showFact(`보스를 물리쳤어요: ${B.n}`, `얻은 것: ${list}. ${itemName(B.core)}${josa(itemName(B.core), "은", "는")} 이 천체에서만 얻을 수 있는 재료예요. 5분 뒤 다시 나타나요.`);
+  const w = S.bossWin[S.planet], nxt = w === 5 ? " 다음부터는 강화된 보스가 나와요!" : w === 10 ? " 다음부터는 각성한 보스가 나와요! 새 공격을 조심하세요." : "";
+  showFact(`보스를 물리쳤어요: ${b.nm || B.n}`, `얻은 것: ${list}. ${itemName(B.core)}${josa(itemName(B.core), "은", "는")} 이 천체에서만 얻을 수 있는 재료예요. 5분 뒤 다시 나타나요(지금까지 ${w}번 쓰러뜨림).${nxt}`);
   S.logs.push({ id: "boss" + S.planet + S.bossWin[S.planet], pk: S.planet, t: `보스 처치: ${B.n}`, ev: `${PLANETS[S.planet].name}의 ${B.n}${josa(B.n, "을", "를")} 쓰러뜨리고 ${list}${josa(list, "을", "를")} 얻었어요.`, x: B.fact });
-  clearBoss(); renderHotbar(); save();
+  clearBoss(); hideLair(); renderHotbar(); save();
 }
 function bossBeam(col) { const m = new THREE.Mesh(laserGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .5, depthWrite: false })); scene.add(m); return m; }
 function aimBeam(m, x0, y0, z0, ang, len, w) { m.position.set(x0, y0, z0); m.rotation.set(0, ang, 0); m.translateZ(-len / 2); m.scale.set(w, w, len); }
@@ -3585,13 +3640,15 @@ function bossTick(dt) {
   const hit = (n, kick = 6) => { if (!paused) hurtBy(n, dx, dz, kick, true); };
   b.stT += dt; let wx = 0, wz = 0, face = true, arms = null;
   // 체력이 2/3, 1/3이 되면 졸개를 불러요
-  const ph = b.hp / B.hp; if ((ph < .67 && b.summoned < 1) || (ph < .34 && b.summoned < 2)) { b.summoned++; for (let i = 0; i < 2; i++) { const a = Math.random() * 6.28; mkMob(B.mini, b.p.x + Math.cos(a) * 2.5, b.p.y + 1, b.p.z + Math.sin(a) * 2.5); } toast(`${B.n}${josa(B.n, "이", "가")} 부하를 불렀어요!`, 1600); tone(200, .5, "square", .05, 0, 600); }
-  const home = Math.hypot(b.p.x - L.x - .5, b.p.z - L.z - .5);
+  const T = b.T, ph = b.hp / b.maxHp; if (b.summoned < T.sum.length && ph < T.sum[b.summoned]) { b.summoned++; for (let i = 0; i < T.per; i++) { const a = Math.random() * 6.28; mkMob(B.mini, b.p.x + Math.cos(a) * 2.5, b.p.y + 1, b.p.z + Math.sin(a) * 2.5); } toast(`${b2n(b.nm)} 부하를 불렀어요!`, 1600); tone(200, .5, "square", .05, 0, 600); }
+  // 각성한 보스는 체력이 30% 아래로 내려가면 화가 나서 더 빨라져요
+  if (b.tier === 3 && ph < .3 && !b.rage) { b.rage = true; b.idle *= .65; b.sp *= 1.15; toast(`${b2n(b.nm)} 화가 났어요! 공격이 빨라져요`, 2000); tone(90, 1, "sawtooth", .07, 0, 50); }
+  const home = Math.hypot(b.p.x - L.x - .5, b.p.z - L.z - .5), zc = BOSS_ZC[S.planet] || 0xff3030;
   if (b.st === "go") {
-    if (home > 16) { const hx = L.x + .5 - b.p.x, hz = L.z + .5 - b.p.z, hl = Math.hypot(hx, hz) || 1; wx = hx / hl * B.sp; wz = hz / hl * B.sp; }
-    else if (dist > 2.2) { wx = dx / dist * B.sp; wz = dz / dist * B.sp; }
+    if (home > 16) { const hx = L.x + .5 - b.p.x, hz = L.z + .5 - b.p.z, hl = Math.hypot(hx, hz) || 1; wx = hx / hl * b.sp; wz = hz / hl * b.sp; }
+    else if (dist > 2.2) { wx = dx / dist * b.sp; wz = dz / dist * b.sp; }
     if (dist < 2.4 && Math.abs(dy) < 2 && (b.cd = (b.cd || 0) - dt) <= 0) { b.cd = 1.4; hit(10); }
-    if (b.stT > 2.6) { b.st = B.pat[b.next++ % B.pat.length]; b.stT = 0; b.n = 0; b.fired = false; }
+    if (b.stT > b.idle) { b.st = b.pat[b.next++ % b.pat.length]; b.stT = 0; b.n = 0; b.fired = false; }
   } else if (b.st === "slam" || b.st === "slam2") {
     arms = -2.8 * Math.min(1, b.stT * 1.6); if (b.stT < .9) b.flash = .4 + .3 * Math.sin(b.stT * 20);
     if (b.stT > 1 && !b.fired) { b.fired = true; sfx.boom(quiet ? .2 : 1); for (let i = 0; i < 4; i++) burst(Math.floor(b.p.x) + (i % 2 ? 1 : -1), Math.floor(b.p.y) - 1, Math.floor(b.p.z) + (i > 1 ? 1 : -1), 4);
@@ -3653,6 +3710,43 @@ function bossTick(dt) {
         addZone({ pool: true, x, y: Math.floor(P.pos.y + .01), z, r: 1.6, delay: .9, life: 7, dmg: 8, boss: true, col: 0xff9a30 }); } }
     if (Math.random() < dt * 30) { const m = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true })); m.scale.set(.4, 2, .4); m.position.set(P.pos.x + (Math.random() - .5) * 10, P.pos.y + 7, P.pos.z + (Math.random() - .5) * 10); addFx(m, .8, -9); }
     if (b.stT > 1.6) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "quake") {
+    // 십자 땅울림: 보스에서 네 방향(각성하면 여덟 방향)으로 땅이 차례로 솟아요. 선 사이로 비켜서세요
+    b.v.x *= .7; b.v.z *= .7; arms = -2.6 * Math.min(1, b.stT * 1.5); if (b.stT < .8) b.flash = .4 + .3 * Math.sin(b.stT * 20);
+    if (b.stT > .8 && !b.fired) { b.fired = true; sfx.boom(quiet ? .2 : .8); const a0 = toP, dirs = b.tier > 2 ? 8 : 4;
+      for (let k = 0; k < dirs; k++) { const a = a0 + k * Math.PI * 2 / dirs, fx = -Math.sin(a), fz = -Math.cos(a);
+        for (let d = 2; d <= 14; d += 1.6) { const x = b.p.x + fx * d, z = b.p.z + fz * d; addZone({ x, y: Math.floor(b.p.y + .01), z, r: 1.1, delay: .45 + d * .07, dmg: 14, boss: true, col: zc, fx: (q) => burst(Math.floor(q.x), q.y, Math.floor(q.z), 4) }); } } }
+    if (b.stT > 2.4) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "shock") {
+    // 연속 충격파: 땅을 세 번 내리쳐요. 물결이 발밑에 올 때마다 점프!
+    b.v.x *= .7; b.v.z *= .7; arms = -2.8 * Math.abs(Math.sin(b.stT * 4.5));
+    if (b.n < 3 && b.stT > .7 + b.n * .75) { b.n++; sfx.boom(quiet ? .15 : .6); addZone({ wave: true, x: b.p.x, y: b.p.y, z: b.p.z, max: 13, sp: 7 + b.n, dmg: 13, boss: true, col: zc }); }
+    if (b.stT > 3.4) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "meteor") {
+    // 따라오는 낙하: 내가 서 있던 자리에 차례로 떨어져요. 멈추지 말고 계속 움직이세요
+    b.v.x *= .8; b.v.z *= .8; arms = -2.4; const cnt = b.tier > 2 ? 9 : 6;
+    if (b.n < cnt && b.stT > .5 + b.n * .38) { b.n++; tone(1200 - b.n * 80, .15, "triangle", .03, 0, 500);
+      addZone({ x: P.pos.x + P.vel.x * .3, y: Math.floor(P.pos.y + .01), z: P.pos.z + P.vel.z * .3, r: 1.7, delay: .85, dmg: 14, boss: true, col: zc, fx: (q) => { if (S.planet === "europa") iceSpike(q); else burst(Math.floor(q.x), q.y, Math.floor(q.z), 11); sfx.boom(quiet ? .1 : .35); } }); }
+    if (b.stT > .5 + cnt * .38 + 1) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "spin") {
+    // 네 갈래 회전 광선: 낮게 도는 광선 네 줄. 점프로 넘거나 멀리 떨어지세요
+    b.v.x *= .7; b.v.z *= .7; face = false; b.beams4 = b.beams4 || [0, 1, 2, 3].map(() => bossBeam(zc)); const ey = b.p.y + .55, len = 11, w = b.tier > 2 ? 2.3 : 1.7;
+    if (b.stT < 1) { b.a0 = b.a0 == null ? toP : b.a0; b.beams4.forEach((m, i) => { m.visible = true; aimBeam(m, b.p.x, ey, b.p.z, b.a0 + i * Math.PI / 2, len, 1); m.material.opacity = .2 + .2 * Math.sin(b.stT * 20); }); if (!b.n) { b.n = 1; tone(400, 1, "sine", quiet ? .01 : .04, 0, 1400); } }
+    else { const a = b.a0 + (b.stT - 1) * w; b.g.rotation.y = a;
+      b.beams4.forEach((m, i) => { const ai = a + i * Math.PI / 2; aimBeam(m, b.p.x, ey, b.p.z, ai, len, 4); m.material.opacity = .9;
+        const df = Math.abs(((ai - toP + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI);
+        if (df < .16 && dist < len && P.pos.y < ey + .35 && P.pos.y > ey - 2 && (b.cd = (b.cd || 0) - dt / 4) <= 0) { b.cd = .8; hit(13, 4); } });
+      if (b.stT > 4.2) { b.beams4.forEach(m => { m.visible = false; }); b.a0 = null; b.st = "go"; b.stT = 0; } }
+  } else if (b.st === "blink") {
+    // 순간이동 내려찍기: 사라졌다가 내 뒤에 나타나 바로 내려쳐요. 반짝임이 보이면 옆으로 피하세요
+    b.v.x *= .5; b.v.z *= .5; face = b.stT > .7;
+    if (b.stT < .7) { b.g.visible = Math.sin(b.stT * 40) > 0; }
+    else if (!b.fired) { b.fired = true; b.g.visible = true; const bx = P.pos.x + Math.sin(P.yaw) * 2.4, bz = P.pos.z + Math.cos(P.yaw) * 2.4, by = topY(Math.floor(bx), Math.floor(bz)) + 1;
+      if (Math.abs(by - P.pos.y) < 4 && !mobHits(bx, by, bz, B.w, B.h)) { b.p.set(bx, by, bz); b.v.set(0, 0, 0); }
+      for (let i = 0; i < 4; i++) burst(Math.floor(b.p.x), Math.floor(b.p.y + 1 + i % 2), Math.floor(b.p.z), 23); tone(1500, .2, "sine", .04, 0, 200);
+      addZone({ x: b.p.x, y: Math.floor(b.p.y + .01), z: b.p.z, r: 3, delay: .7, dmg: 16, boss: true, col: zc, fx: (q) => { sfx.boom(quiet ? .2 : .8); for (let i = 0; i < 4; i++) burst(Math.floor(q.x) + (i % 2 ? 1 : -1), q.y, Math.floor(q.z) + (i > 1 ? 1 : -1), 4); } }); }
+    else arms = -2.8 * Math.min(1, (b.stT - .7) * 2);
+    if (b.stT > 1.9) { b.st = "go"; b.stT = 0; }
   }
   // 움직임
   const quick = b.sub === "dash" || b.st === "leap" ? 12 : 6;
@@ -3674,7 +3768,7 @@ function bossTick(dt) {
   const sp = Math.hypot(b.v.x, b.v.z); b.walk += dt * sp * 1.2; const sw = Math.sin(b.walk * 3) * Math.min(1, sp / 2) * .6;
   if (u.legs) { u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw; }
   u.arms.forEach((a, i) => { a.rotation.x = arms != null ? arms : (i ? sw : -sw) - (dist < 4 ? 1 : 0); });
-  $("bossName").textContent = `${B.n} · ${Math.max(0, Math.ceil(b.hp))} / ${B.hp}`; $("bossHp").style.width = Math.max(0, b.hp / B.hp * 100) + "%";
+  $("bossName").textContent = `${b.nm}${b.rage ? " (분노)" : ""} · ${Math.max(0, Math.ceil(b.hp))} / ${b.maxHp}`; $("bossHp").style.width = Math.max(0, b.hp / b.maxHp * 100) + "%";
 }
 
 /* ═════════════ 화로 굽기 ═════════════ */
@@ -4118,12 +4212,12 @@ function attackTick(dt) {
     return true;
   }
   if (best === boss) {
-    if (atkCD <= 0) { atkCD = .45; swing = .001; const crit = boss.st === "stun"; boss.hp -= atkDmg() * (crit ? 2 : 1); boss.flash = 1; sfx.hit(); if (crit) toast("지친 틈에 두 배 피해!", 900); if (boss.hp <= 0) bossDie(); }
+    if (atkCD <= 0) { atkCD = .45; swing = .001; const crit = boss.st === "stun"; boss.hp -= atkDmg() * (crit ? 2 : 1); boss.flash = 1; sfx.hit(crit); if (crit) toast("지친 틈에 두 배 피해!", 900); if (boss.hp <= 0) bossDie(); }
     return true;
   }
   if (best.owner) { if (atkCD <= 0) { atkCD = .45; swing = .001; toast(`친구 ${best.owner}의 가축은 때릴 수 없어요`); } return true; }
   if (best.fishy) {
-    if (atkCD <= 0) { atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; best.flee = 3; tone(700, .08, "sine", .04, 0, 400);
+    if (atkCD <= 0) { atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; best.flee = 3; sfx.hit(); tone(700, .08, "sine", .03, .03, 400);
       if (best.hp <= 0) { const T = best.T, x = Math.floor(best.p.x), y = Math.floor(best.p.y), z = Math.floor(best.p.z); scene.remove(best.g); fishes = fishes.filter(f => f !== best);
         S.inv[T.item] = (S.inv[T.item] || 0) + 1; spawnDrop(T.item, x, y, z); burst(x, y, z, 6); sfx.pop(); renderHotbar();
         toast(`${T.n}${josa(T.n, "을", "를")} 잡았어요!`, 1600);
@@ -4134,7 +4228,7 @@ function attackTick(dt) {
   }
   if (best.g && best.T && ANIMT[best.type]) {
     if (atkCD <= 0) {
-      atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; if (best.type === "wolf" && !best.own) { best.angry = 12; best.st = "idle"; } else { best.st = "flee"; best.stT = 4; } tone(best.type === "chicken" ? 900 : 200, .14, "triangle", .06, 0, best.type === "chicken" ? 1300 : 150);
+      atkCD = .45; swing = .001; best.hp -= atkDmg(); best.flash = 1; if (best.type === "wolf" && !best.own) { best.angry = 12; best.st = "idle"; } else { best.st = "flee"; best.stT = 4; } sfx.hit(); tone(best.type === "chicken" ? 900 : 200, .14, "triangle", .06, 0, best.type === "chicken" ? 1300 : 150);
       best.v.addScaledVector(d, 5); best.v.y = 4;
       // 맞으면 주변 무리도 함께 달아나요
       animals.forEach(o => { if (o !== best && o.type === best.type && o.p.distanceTo(best.p) < 7 && !(o.own && o.T.pet)) { if (o.type === "wolf") o.angry = 10; else { o.st = "flee"; o.stT = 3; } } });
@@ -4152,7 +4246,7 @@ function attackTick(dt) {
     atkCD = .45; swing = .001; const crit = best.st === "stun"; let k = crit ? 2 : 1;
     if (best.type === "shield" && !crit) { const ry = best.g.rotation.y, ax = P.pos.x - best.p.x, az = P.pos.z - best.p.z, L = Math.hypot(ax, az) || 1;
       if ((-Math.sin(ry) * ax - Math.cos(ry) * az) / L > .45) { k = .2; tone(1300, .06, "square", .05); if (!S.shieldHint) { S.shieldHint = true; toast("방패에 막혔어요! 옆이나 뒤로 돌아가서 때리세요", 2600); } } }
-    best.hp -= atkDmg() * k; best.flash = 1; sfx.hit(); if (crit) toast("멈춘 틈에 두 배 피해!", 900);
+    best.hp -= atkDmg() * k; best.flash = 1; sfx.hit(crit); if (crit) toast("멈춘 틈에 두 배 피해!", 900);
     best.v.addScaledVector(d, best.type === "heavy" ? 2 : 7); best.v.y = best.type === "heavy" ? 1 : 3.5;
     if (best.hp <= 0) {
       const x = Math.floor(best.p.x), y = Math.floor(best.p.y + .5), z = Math.floor(best.p.z);
