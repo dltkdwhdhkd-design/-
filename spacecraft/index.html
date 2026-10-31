@@ -1328,9 +1328,54 @@ skyGroup.add(sunSprite);
 let earthSprite = null; const earthDir = new THREE.Vector3(-.25, .75, -.62).normalize();
 const cloudGroup = new THREE.Group(); scene.add(cloudGroup);
 function cloudTex(col, density) {
-  const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d");
-  for (let i = 0; i < 70 * density; i++) { const x = Math.random() * 128, y = Math.random() * 128, r = 6 + Math.random() * 16; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, col); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  // 256칸 그림에 큰 덩어리와 작은 몽글몽글을 겹쳐 그리고, 가장자리를 넘는 덩어리는 반대편에도 그려서 이음매를 없애요
+  const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+  for (let i = 0; i < 150 * density; i++) { const big = i < 30 * density, x0 = Math.random() * 256, y0 = Math.random() * 256, r = big ? 24 + Math.random() * 30 : 6 + Math.random() * 14;
+    for (const [ox, oy] of [[0, 0], [256, 0], [-256, 0], [0, 256], [0, -256]]) { const x = x0 + ox, y = y0 + oy; if (x + r < 0 || y + r < 0 || x - r > 256 || y - r > 256) continue; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, col); gr.addColorStop(.55, col.replace(/[\d.]+\)$/, (a) => (parseFloat(a) * (big ? .35 : .5)).toFixed(3) + ")")); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); } }
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+}
+// 지구 구름: 마인크래프트처럼 납작한 블록 구름. 같은 무늬 3×3장을 내 둘레에 깔아 끝없이 이어지고 바람 따라 천천히 흘러가요.
+// 아침·저녁에는 노을빛, 밤에는 어둡게 물들고, 멀어질수록 하늘에 스며들어요
+const CLD = { cell: 6, n: 48, y: 72, th: 2.6 }, CLD_P = CLD.cell * CLD.n;
+let cldGeo = null, cldMat = null, cldDrift = 0;
+function cloudGeo() {
+  if (cldGeo) return cldGeo;
+  const N = CLD.n, C = CLD.cell, H = CLD.th, sd = 911, hsh = (x, z, k) => { let h = (x * 374761393 + z * 668265263 + k * 1442695041) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  // 이어 붙여도 이음매가 없는 값 잡음(두 겹)
+  const vn = (x, z, p, k) => { const x0 = Math.floor(x), z0 = Math.floor(z), fx = x - x0, fz = z - z0, s = (t) => t * t * (3 - 2 * t), m = (a) => ((a % p) + p) % p, v = (a, b) => hsh(m(a), m(b), k);
+    return lerp(lerp(v(x0, z0), v(x0 + 1, z0), s(fx)), lerp(v(x0, z0 + 1), v(x0 + 1, z0 + 1), s(fx)), s(fz)); };
+  const on = new Uint8Array(N * N);
+  for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) on[x + z * N] = vn(x / 8, z / 8, 6, sd) * .7 + vn(x / 3, z / 3, 16, sd + 1) * .3 > .585 ? 1 : 0;
+  const at = (x, z) => on[((x % N) + N) % N + (((z % N) + N) % N) * N];
+  const p = [], sh = [], idx = [];
+  const quad = (a, b, c, d, k) => { const v = p.length / 3; p.push(...a, ...b, ...c, ...d); sh.push(k, k, k, k); idx.push(v, v + 1, v + 2, v, v + 2, v + 3); };
+  for (let x = 0; x < N; x++) for (let z = 0; z < N; z++) {
+    if (!at(x, z)) continue; const X = x * C, Z = z * C, X1 = X + C, Z1 = Z + C;
+    quad([X, H, Z], [X, H, Z1], [X1, H, Z1], [X1, H, Z], 1);
+    quad([X, 0, Z], [X1, 0, Z], [X1, 0, Z1], [X, 0, Z1], .7);
+    if (!at(x - 1, z)) quad([X, 0, Z], [X, 0, Z1], [X, H, Z1], [X, H, Z], .86);
+    if (!at(x + 1, z)) quad([X1, 0, Z1], [X1, 0, Z], [X1, H, Z], [X1, H, Z1], .86);
+    if (!at(x, z - 1)) quad([X1, 0, Z], [X, 0, Z], [X, H, Z], [X1, H, Z], .8);
+    if (!at(x, z + 1)) quad([X, 0, Z1], [X1, 0, Z1], [X1, H, Z1], [X, H, Z1], .8);
+  }
+  cldGeo = new THREE.BufferGeometry(); cldGeo.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); cldGeo.setAttribute("shade", new THREE.Float32BufferAttribute(sh, 1)); cldGeo.setIndex(idx);
+  cldMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+    uniforms: { col: { value: new THREE.Color(1, 1, 1) }, op: { value: .8 }, r0: { value: 110 }, r1: { value: CLD_P - 10 } },
+    vertexShader: "attribute float shade; varying float vS; varying float vD; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vS = shade; vD = length(w.xz - cameraPosition.xz); gl_Position = projectionMatrix * viewMatrix * w; }",
+    fragmentShader: "uniform vec3 col; uniform float op, r0, r1; varying float vS; varying float vD; void main() { float a = op * (1.0 - smoothstep(r0, r1, vD)); if (a < 0.01) discard; gl_FragColor = vec4(col * vS, a); }" });
+  return cldGeo;
+}
+function addEarthClouds() {
+  const g = cloudGeo();
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const m = new THREE.Mesh(g, cldMat); m.position.set(i * CLD_P, 0, j * CLD_P); m.frustumCulled = false; m.userData.vox = true; cloudGroup.add(m); }
+}
+function cloudTick(dt, e) {
+  if (!cldMat || !cloudGroup.children.some(c => c.userData.vox)) return;
+  cldDrift = (cldDrift + dt * .9) % CLD_P;
+  cloudGroup.position.set(cldDrift + CLD_P * Math.floor((camera.position.x - cldDrift) / CLD_P), CLD.y, CLD_P * Math.floor(camera.position.z / CLD_P));
+  const day = smooth(-.15, .25, e), dusk = Math.max(0, 1 - Math.abs(e) * 5);
+  cldMat.uniforms.col.value.setRGB(lerp(.13, 1, day), lerp(.15, 1, day), lerp(.22, 1, day)).lerp(cB.set("#ffb48a"), dusk * .45);
+  cldMat.uniforms.op.value = lerp(.55, .8, day);
 }
 function bandTex(cols, spot) {
   const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
@@ -1363,17 +1408,14 @@ function setupSky(pk) {
   }
   if (earthSprite) { skyGroup.remove(earthSprite); earthSprite = null; }
   while (cloudGroup.children.length) cloudGroup.remove(cloudGroup.children[0]);
+  cloudGroup.position.set(0, 0, 0);
   const P = PLANETS[pk];
   sunSprite.material.color.set(P.sunCol); sunSprite.scale.set(P.sunSize, P.sunSize, 1);
   if (pk === "moon") {
     earthSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: phaseTex(.57, "#3d7fe0", "#4fa86a"), fog: false, depthWrite: false }));
     earthSprite.position.copy(earthDir).multiplyScalar(480); earthSprite.scale.set(60, 60, 1); skyGroup.add(earthSprite);
   }
-  if (pk === "earth") {
-    const t = cloudTex("rgba(255,255,255,.55)", 1); t.repeat.set(3, 3);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, fog: false }));
-    m.rotation.x = Math.PI / 2; m.position.y = 70; cloudGroup.add(m);
-  }
+  if (pk === "earth") addEarthClouds();
   if (PLANETS[pk].gas || pk === "titan") {
     const cl = { jupiter: ["rgba(230,200,160,.75)", "rgba(150,100,70,.8)"], saturn: ["rgba(240,225,180,.75)", "rgba(190,160,110,.8)"], uranus: ["rgba(190,240,240,.7)", "rgba(110,190,200,.8)"], neptune: ["rgba(120,160,240,.7)", "rgba(40,80,190,.85)"], titan: ["rgba(220,150,70,.6)", "rgba(220,150,70,.6)"] }[pk];
     (pk === "titan" ? [44] : [20, 6, -6]).forEach((y, i) => {
@@ -2601,13 +2643,23 @@ $("bDex").onclick = openDex; $("dexClose").onclick = () => { $("dexOv").hidden =
 
 /* ═════════════ 소리 ═════════════ */
 // 모든 소리는 master → airF(공기 필터)를 거쳐요. 대기가 없는 천체에서는 높은 소리가 걸러져 둔하게 들려요.
-let actx = null, master = null, airF = null, noiseBuf = null;
+let actx = null, master = null, airF = null, noiseBuf = null, comp = null, rvSend = null, airBase = 20000;
+// 소리 길: 소리들 → master(크기) → airF(공기·물속 거르개) → 압축기(갑자기 커지는 소리 다듬기) → 스피커
+// 그리고 잔향(울림) 갈래: 동굴처럼 막힌 곳일수록 크게 울려요. 공기가 없는 곳은 울림이 없어요
 function ac() {
   if (!actx) {
     actx = new (window.AudioContext || window.webkitAudioContext)();
     master = actx.createGain(); airF = actx.createBiquadFilter(); airF.type = "lowpass"; airF.frequency.value = 20000;
-    master.connect(airF).connect(actx.destination);
+    comp = actx.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .004; comp.release.value = .2;
+    master.connect(airF).connect(comp).connect(actx.destination);
     const n = actx.sampleRate; noiseBuf = actx.createBuffer(1, n, n); const d = noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    try {
+      const L = Math.floor(n * 1.8), ir = actx.createBuffer(2, L, n);
+      for (let ch = 0; ch < 2; ch++) { const q = ir.getChannelData(ch); for (let i = 0; i < L; i++) q[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / L, 3.2) * (i < n * .012 ? i / (n * .012) : 1); }
+      const cv = actx.createConvolver(); cv.buffer = ir; rvSend = actx.createGain(); rvSend.gain.value = .12;
+      const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3800;
+      airF.connect(rvSend).connect(lp).connect(cv).connect(comp);
+    } catch (e) { rvSend = null; }
     setAir(S.planet);
   }
   if (actx.state === "suspended") actx.resume();
@@ -2615,15 +2667,19 @@ function ac() {
 }
 function setAir(pk) {
   if (!actx) return; const PL = PLANETS[pk];
-  airF.frequency.value = PL.airless ? 380 : PL.P > 2 || PL.thick ? 6000 : 20000;
+  airBase = PL.airless ? 380 : PL.P > 2 || PL.thick ? 6000 : 20000; airF.frequency.value = airBase;
   master.gain.value = (PL.airless ? .75 : 1) * (typeof SET === "object" ? SET.vol : .8);
+  if (rvSend) rvSend.gain.value = PL.airless ? 0 : .12;
 }
+// 삐 소리: 시작을 아주 짧게 키워서 '딱' 튀는 소리를 없애고, 네모·톱니 파형은 높은 쇳소리를 걸러 부드럽게 해요
 function tone(f, d = .1, type = "square", v = .05, w = 0, f2) {
   try {
     ac(); const t = actx.currentTime + w, o = actx.createOscillator(), gn = actx.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
-    gn.gain.setValueAtTime(v, t); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
-    o.connect(gn).connect(master); o.start(t); o.stop(t + d + .02);
+    gn.gain.setValueAtTime(.0001, t); gn.gain.exponentialRampToValueAtTime(v, t + Math.min(.006, d * .2)); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
+    let out = o;
+    if (type === "square" || type === "sawtooth") { const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = Math.max(700, Math.min(4200, Math.max(f, f2 || 0) * 4)); lp.Q.value = .5; out = o.connect(lp); }
+    out.connect(gn).connect(master); o.start(t); o.stop(t + d + .02);
   } catch (e) {}
 }
 function hiss(type, freq, q, d, v, w = 0, f2) {
@@ -2633,6 +2689,42 @@ function hiss(type, freq, q, d, v, w = 0, f2) {
     gn.gain.setValueAtTime(.0001, t); gn.gain.exponentialRampToValueAtTime(v, t + .004); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
     src.connect(fl).connect(gn).connect(master); src.start(t, Math.random() * .8); src.stop(t + d + .02);
   } catch (e) {}
+}
+// 주변 소리: 바람(천체마다 다름), 지구 낮의 새소리·밤의 귀뚜라미, 흐르는 물 소리, 물속에서는 먹먹하게, 동굴에서는 울리게
+let windSrc = null, windF = null, windG = null, birdT = 3, bugT = 2, flowSndT = 0, windK = 0;
+function windStart() {
+  if (windSrc || !actx) return;
+  try {
+    windSrc = actx.createBufferSource(); windSrc.buffer = noiseBuf; windSrc.loop = true;
+    windF = actx.createBiquadFilter(); windF.type = "bandpass"; windF.frequency.value = 400; windF.Q.value = .7;
+    windG = actx.createGain(); windG.gain.value = 0; windSrc.connect(windF).connect(windG).connect(master); windSrc.start();
+  } catch (e) { windSrc = null; }
+}
+const WINDS = { earth: [.018, 380], mars: [.03, 900], venus: [.035, 260], jupiter: [.06, 200], saturn: [.055, 220], titan: [.025, 300], uranus: [.05, 240], neptune: [.08, 180] }; // [크기, 높이(Hz)]
+function ambTick(dt) {
+  if (!actx || actx.state !== "running") return;
+  windStart();
+  const t = actx.currentTime, pk = S.planet, PL = PLANETS[pk];
+  const cx = Math.floor(camera.position.x), cy = Math.floor(camera.position.y), cz = Math.floor(camera.position.z);
+  const under = LIQ(get(cx, cy, cz)), [sk] = lightAt(cx, Math.max(0, Math.min(SY - 1, cy)), cz), open = sk / 15;
+  // 물속: 먹먹하게 / 동굴(하늘빛이 안 드는 곳): 더 울리게
+  airF.frequency.setTargetAtTime(under ? 650 : airBase, t, .08);
+  if (rvSend) rvSend.gain.setTargetAtTime(PL.airless ? 0 : under ? .05 : .1 + (1 - open) * .45, t, .3);
+  // 바람: 천천히 세졌다 약해졌다 해요. 높이 올라갈수록, 해왕성 같은 곳은 훨씬 세요
+  const W = WINDS[pk] || [0, 300]; windK += (Math.random() - .5) * dt * .8; windK = Math.max(-.6, Math.min(.6, windK * (1 - dt * .15)));
+  const gust = 1 + windK + (pk === "neptune" ? Math.sin(gameT * .55) * .5 : 0), hi = 1 + Math.max(0, camera.position.y - 22) * .02;
+  if (windG) { windG.gain.setTargetAtTime(paused || under ? 0 : W[0] * Math.max(.2, gust) * hi * (.25 + open * .75), t, .5); windF.frequency.setTargetAtTime(W[1] * (1 + windK * .5), t, .5); }
+  if (paused || under) return;
+  if (pk === "earth" && open > .7) {
+    if (env.e > .05 && (birdT -= dt) <= 0) { birdT = 4 + Math.random() * 9; const f0 = 2200 + Math.random() * 1600, n = 2 + Math.floor(Math.random() * 3), sp = .09 + Math.random() * .05;
+      for (let i = 0; i < n; i++) tone(f0 * (1 + (Math.random() - .5) * .15), .08, "sine", .012, i * sp, f0 * (1.25 + Math.random() * .3)); }
+    if (env.e < -.05 && (bugT -= dt) <= 0) { bugT = .8 + Math.random() * 1.6; const f0 = 4200 + Math.random() * 500;
+      for (let i = 0; i < 3; i++) tone(f0, .03, "sine", .006, i * .045); }
+  }
+  // 흐르는 물이 가까우면 졸졸 소리
+  if ((flowSndT -= dt) <= 0) { flowSndT = .12 + Math.random() * .25; let near = false;
+    for (let dx = -3; dx <= 3 && !near; dx++) for (let dz = -3; dz <= 3 && !near; dz++) for (let dy = -2; dy <= 1 && !near; dy++) near = isFlowW(get(cx + dx, cy + dy, cz + dz));
+    if (near) { tone(r(350, 900), .05, "sine", .01, 0, r(900, 1600)); if (Math.random() < .3) hiss("lowpass", 900, .6, .25, .02); } }
 }
 const MATCAT = {};
 [[1, 4, 9, 11, 12, 16, 19, 20, 21, 24, 29], "stone", [2, 3, 10, 15, 22], "dirt", [5, 18], "sand", [14, 17, 27, 32], "ice", [7], "wood", [8], "leaf", [25, 26], "cloud", [6, 28], "liquid", [23, 30, 31, 33, 34], "metal"]
@@ -2653,7 +2745,7 @@ function blockSound(b, vol = 1, big = false) {
 }
 const sfx = {
   tick: (b) => blockSound(b, .55),
-  dig: (b) => { blockSound(b, 1.2, true); if (BLOCKS[b] && BLOCKS[b].ore) tone(1300, .08, "square", .03, .06); },
+  dig: (b) => { blockSound(b, 1.2, true); if (BLOCKS[b] && BLOCKS[b].ore) { tone(1320, .4, "sine", .035, .06); tone(2640, .22, "sine", .012, .06); tone(3960, .12, "sine", .006, .06); } },
   place: (b) => blockSound(b || 4, .9),
   step: (b) => blockSound(b, .28),
   pop: () => tone(r(650, 800), .07, "sine", .07, 0, r(1300, 1600)),
@@ -4574,7 +4666,7 @@ function frame(now, xf) {
     physics(dt / 2); physics(dt / 2);
   }
   computeEnv();
-  net.tick(dt);
+  net.tick(dt); ambTick(dt);
   if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); cropTick(dt); saplingTick(dt); flowTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
@@ -4608,6 +4700,7 @@ function frame(now, xf) {
   hemi.color.copy(skyMat.uniforms.top.value).lerp(cB.set(0xffffff), .5); hemi.groundColor.set(0x3a3330);
   if (earthSprite) { const qi = camera.quaternion.clone().invert(); const s = env.sunDir.clone().applyQuaternion(qi), ed = earthDir.clone().applyQuaternion(qi); earthSprite.material.rotation = Math.atan2(s.y - ed.y, s.x - ed.x); }
   cloudGroup.children.forEach(c => { if (c.material.map) c.material.map.offset.x += (c.userData.spin || .0003) * dt * 10; });
+  cloudTick(dt, e);
   // 조준·채굴
   const h = paused ? null : raycast(6);
   hl.visible = !!h; if (h) hl.position.set(h.x + .5, h.y + .5, h.z + .5);
