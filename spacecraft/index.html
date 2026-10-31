@@ -75,6 +75,24 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 #cross::before, #cross::after { content: ""; position: absolute; background: #fff; mix-blend-mode: difference; }
 #cross::before { left: 10px; top: 0; width: 2px; height: 22px; }
 #cross::after { top: 10px; left: 0; height: 2px; width: 22px; }
+#chat { left: max(10px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 190px); width: min(340px, calc(100vw - 20px)); display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+#chat div { background: rgba(10, 13, 28, .72); border-radius: 8px; padding: .25em .6em; font-size: .9em; line-height: 1.35; overflow-wrap: anywhere; transition: opacity .6s; }
+#chat div b { margin-right: .4em; }
+#chat div.sys { color: var(--ink-dim); font-size: .8em; }
+#chat div.old { opacity: 0; }
+#chat.open div.old { opacity: 1; }
+#chat.open { bottom: calc(env(safe-area-inset-bottom, 0px) + 330px); }
+#chatBox { left: max(10px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 175px); width: min(420px, calc(100vw - 20px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 6; pointer-events: auto; }
+#chatBox[hidden] { display: none; }
+#chatBox .row { display: flex; gap: 6px; }
+#chatIn { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: #0a0d1c; border: 1.5px solid var(--line); border-radius: 8px; padding: .45em .7em; }
+#chatQuick { display: flex; flex-wrap: wrap; gap: 4px; }
+#chatQuick button, #chatBox .row button { font: inherit; font-size: .85em; color: var(--ink); background: #ffffff14; border: 1px solid var(--line); border-radius: 999px; padding: .3em .7em; cursor: pointer; }
+#chatNote { color: var(--ink-dim); font-size: .78em; }
+#tChat { right: max(300px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: 52px; height: 52px; font-size: .8em; }
+.tChatLog { max-height: 180px; overflow-y: auto; background: #0a0d1c; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: .9em; display: flex; flex-direction: column; gap: 2px; }
+.tChatLog div b { margin-right: .4em; }
+@media (max-width: 760px) { #chat, #chat.open { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 42px); left: 50%; transform: translateX(-50%); width: min(300px, calc(100vw - 20px)); } #chat div:nth-last-child(n+4) { display: none; } #chatBox:not([hidden]) ~ #chat { top: calc(env(safe-area-inset-top, 0px) + 140px); } #chatBox { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 10px); } }
 #toast { left: 50%; top: 62%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: .4em 1.1em; font-weight: 700; white-space: nowrap; }
 #jumpMeter { left: 50%; top: 28%; transform: translateX(-50%); text-align: center; font-family: var(--font-display); font-size: clamp(1.4rem, 3vw, 2.3rem); text-shadow: 0 2px 10px #000; }
 #jumpMeter small { display: block; font-family: var(--font-body); font-size: .45em; font-weight: 700; color: var(--ink-dim); }
@@ -125,10 +143,12 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
   #tJump { right: max(16px, env(safe-area-inset-right, 0px)); }
   #tMode { right: max(100px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 60px); }
   #tView { right: max(100px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 130px); }
+  #tChat { right: max(100px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 190px); }
   #tAtk { right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 80px; height: 80px; }
   #tJump { right: max(104px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); width: 64px; height: 64px; }
   #tMode { right: max(104px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 94px); width: 52px; height: 52px; }
   #tView { right: max(164px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 94px); width: 50px; height: 50px; }
+  #tChat { right: max(164px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: 50px; height: 50px; }
 }
 
 @media (max-height: 520px) { .title h1 { font-size: 2.2rem; } .card { gap: 10px; } #env, #mission { font-size: .85em; } }
@@ -296,6 +316,8 @@ td.unk { color: #4e5786; }
 <div class="hud" id="fact" hidden></div>
 <div class="hud" id="cross" hidden></div>
 <div class="hud" id="toast" hidden></div>
+<div class="hud" id="chatBox" hidden><div id="chatQuick"></div><div class="row"><input id="chatIn" maxlength="40" autocomplete="off" placeholder="친구에게 할 말 (Enter 보내기 · Esc 닫기)" aria-label="채팅"><button id="chatSend">보내기</button><button id="chatX">닫기</button></div><small id="chatNote"></small></div>
+<div class="hud" id="chat" hidden></div>
 <div class="hud click" id="pinvite" hidden><span id="pinvTxt"></span><button class="btn" id="pinvYes">수락 (Y)</button><button class="btn ghost" id="pinvNo">거절 (N)</button></div>
 <div class="hud" id="jumpMeter" hidden></div>
 <div class="hud" id="hotName" hidden></div>
@@ -316,6 +338,7 @@ td.unk { color: #4e5786; }
   <button class="tb" id="tJump">점프</button>
   <button class="tb" id="tView">시점</button>
   <button class="tb" id="tAtk">공격</button>
+  <button class="tb" id="tChat" hidden>말</button>
 </div>
 
 <div class="overlay" id="startOv">
@@ -324,8 +347,8 @@ td.unk { color: #4e5786; }
     <h1>스페이스<br><em>크래프트</em></h1>
     <p>지구에서 출발해 달, 화성, 수성, 금성을 지나 목성, 토성, 천왕성, 해왕성과 그 위성까지 개척하세요. 행성마다 <b>중력, 기온, 대기, 햇빛 세기, 하루 길이</b>가 실제처럼 달라요. 그 차이 때문에 산소·전력·우주복 온도가 버티지 못하면 쓰러져요. 그 행성의 특징을 알아내고, 대비할 장비를 만들어야 다음 행성으로 갈 수 있어요.</p>
     <div class="keys">
-      <div><b>컴퓨터</b><br>화면 클릭 → 마우스로 둘러보기<br><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 점프<br>왼쪽 버튼 <b>누르고 있기</b> 캐기 · 오른쪽 클릭 놓기<br><kbd>1</kbd>~<kbd>9</kbd>·휠 블록 고르기 · <kbd>Esc</kbd> 마우스 풀기</div>
-      <div><b>폰·패드</b><br>왼쪽 아래 원을 밀어서 이동<br>화면을 끌어서 둘러보기<br><b>공격</b> 버튼을 누르고 있으면 공격·캐기(다른 손가락으로 조준), 로봇을 톡 쳐도 공격<br>화면을 <b>길게 누르면</b> 캐기<br><b>놓기</b>로 바꾸고 톡 치면 블록 놓기</div>
+      <div><b>컴퓨터</b><br>화면 클릭 → 마우스로 둘러보기<br><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 점프<br>왼쪽 버튼 <b>누르고 있기</b> 캐기 · 오른쪽 클릭 놓기<br><kbd>1</kbd>~<kbd>9</kbd>·휠 블록 고르기 · <kbd>Esc</kbd> 마우스 풀기<br><kbd>Enter</kbd> 친구와 채팅 (같은 방에 있을 때)</div>
+      <div><b>폰·패드</b><br>왼쪽 아래 원을 밀어서 이동<br>화면을 끌어서 둘러보기<br><b>공격</b> 버튼을 누르고 있으면 공격·캐기(다른 손가락으로 조준), 로봇을 톡 쳐도 공격<br>화면을 <b>길게 누르면</b> 캐기<br><b>놓기</b>로 바꾸고 톡 치면 블록 놓기<br>같은 방에서는 <b>말</b> 버튼으로 채팅</div>
     </div>
     <div class="mp">
       <b>친구와 함께하기 (선택)</b>
@@ -395,7 +418,7 @@ td.unk { color: #4e5786; }
     </div>
     <div class="setIn"><b>조작 방식</b><div class="ctabs" id="sInput"></div><small id="sInputNote"></small></div>
     <div class="setIn"><b>보이는 거리 (넓은 지구)</b><div class="ctabs" id="sView"></div><small>화면이 버벅이면 '가까이'를 고르세요. 퀘스트·태블릿은 '가까이'나 '보통'을 추천해요.</small></div>
-    <div class="setIn" id="hostSet" hidden><b>방장 설정 · 플레이어끼리 대결</b><div class="ctabs" id="sPvp"></div><small>방에 있는 모두에게 바로 적용돼요. 기지 코어 6칸 안은 안전 구역이에요.</small></div>
+    <div class="setIn" id="hostSet" hidden><b>방장 설정 · 플레이어끼리 대결</b><div class="ctabs" id="sPvp"></div><small>방에 있는 모두에게 바로 적용돼요. 기지 코어 6칸 안은 안전 구역이에요.</small><b>방장 설정 · 채팅</b><div class="ctabs" id="sChat"></div><small>빠른 말만: 정해진 문장(안녕, 도와줘 등)만 보낼 수 있어요.</small></div>
     <div class="setIn" id="xrSet" hidden><b>VR (퀘스트)</b><div class="ctabs"><button id="sXR">VR로 보기</button></div><small>VR 안에서 끄려면 왼쪽 컨트롤러 X를 3초 동안 길게 누르세요.</small></div>
     <div class="setIn"><b>저장 옮기기 (다른 기기로)</b><div class="ctabs"><button id="svFile">파일로 내보내기</button><button id="svOpen">파일 불러오기</button><button id="svCopy">저장 코드 복사</button><button id="svPaste">코드 붙여넣기</button></div><small id="svNote">내 탐사 기록을 파일이나 코드로 옮겨요. 불러오면 이 기기의 기록은 바뀌어요.</small><input type="file" id="svIn" accept=".txt,.json,text/plain" hidden></div>
     <p>설정은 이 기기에만 저장돼요. 마우스와 손가락으로 화면을 끌 때 모두 적용돼요.</p>
@@ -432,7 +455,8 @@ td.unk { color: #4e5786; }
     <li>이 화면을 닫거나 끄면 방이 닫혀요. 수업이 끝날 때까지 켜 두세요.</li>
   </ol>
   <div class="tPlanets" id="tPlanets"></div>
-  <div class="tNotice"><input id="tMsg" maxlength="60" placeholder="학생 화면에 띄울 말 (예: 5분 남았어요! 기지로 돌아오세요)" aria-label="학생에게 보낼 말"><button class="btn" id="tSend">학생 화면에 띄우기</button><button class="btn ghost" id="tPvp">플레이어 대결: 꺼짐</button></div>
+  <div class="tNotice"><input id="tMsg" maxlength="60" placeholder="학생 화면에 띄울 말 (예: 5분 남았어요! 기지로 돌아오세요)" aria-label="학생에게 보낼 말"><button class="btn" id="tSend">학생 화면에 띄우기</button><button class="btn ghost" id="tPvp">플레이어 대결: 꺼짐</button><button class="btn ghost" id="tChatMode">채팅: 자유</button></div>
+  <div class="tChatLog" id="tChatLog"><div class="gone">학생 채팅이 여기에 보여요.</div></div>
   <div class="tablewrap"><table class="tTable" id="tTable"></table></div>
 </div>
 
@@ -2538,6 +2562,7 @@ addEventListener("keydown", (e) => {
   if (e.code === "KeyO" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("setOv").hidden) $("setClose").click(); else if (!anyOv) openSet(); return; }
   if (e.code === "KeyP" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("rosterOv").hidden) $("rosterClose").click(); else if (!anyOv) { if ($("room").hidden) toast("친구와 같은 방에 들어가면 P로 친구 목록과 파티를 볼 수 있어요", 2400); else $("room").click(); } return; }
   if (e.code === "KeyC" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("lookOv").hidden) $("lookClose").click(); else if (!anyOv) openLook(); return; }
+  if ((e.code === "Enter" || e.code === "KeyT") && $("startOv").hidden && $("logOv").hidden && !anyOv && net.live && !net.teacher) { e.preventDefault(); net.openChat(); return; }
   if (paused) return;
   if (e.code === "KeyV") { toggleView(); return; }
   if (e.code === "KeyQ") { dropHeld(e.shiftKey); return; }
@@ -2570,6 +2595,8 @@ function showHostSet() {
   $("hostSet").hidden = !net.host; if (!net.host) return;
   const box = $("sPvp"); box.innerHTML = "";
   [[false, "끄기"], [true, "켜기"]].forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = net.pvp === v ? "on" : ""; b.onclick = () => { net.setPvp(v); showHostSet(); }; box.appendChild(b); });
+  const cb = $("sChat"); cb.innerHTML = "";
+  Object.entries(net.CHATM).forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = net.chatMode === v ? "on" : ""; b.onclick = () => { net.setChat(v); showHostSet(); }; cb.appendChild(b); });
 }
 function showView() { const box = $("sView"); box.innerHTML = ""; [["near", "가까이 (빠름)"], ["mid", "보통"], ["far", "멀리"]].forEach(([k, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = (SET.view || "mid") === k ? "on" : ""; b.onclick = () => { SET.view = k; saveSet(); showView(); visT = 9; }; box.appendChild(b); }); }
 function showSet() { showInput(); showView(); showHostSet(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
@@ -4007,6 +4034,70 @@ const net = (() => {
   }
   let peer = null, host = false, code = "", conns = [], hostConn = null, sendT = 0, live = false, teacher = false, roomT0 = 0, clockOff = null, clockT = 0;
   let pvp = false; // 방장이 켜고 끄는 플레이어끼리 대결
+  /* ── 채팅 ── 방장이 자유 채팅 · 빠른 말만 · 끄기를 정해요. 모든 말은 방장을 거쳐 퍼지고, 방장은 규칙에 맞지 않는 말을 전하지 않아요 */
+  let chatMode = "free"; const chatLast = {}, chatLog = [];
+  const CHATM = { free: "자유 채팅", quick: "빠른 말만", off: "끄기" };
+  const QUICK = ["안녕!", "도와줘!", "여기로 와!", "고마워!", "같이 가자!", "조심해, 로봇이야!", "잠깐 기다려!", "좋아!", "기지로 돌아가자", "로켓 타러 가자!"];
+  const BAD = ["시발", "씨발", "씨바", "시바", "ㅅㅂ", "ㅆㅂ", "병신", "븅신", "ㅂㅅ", "개새", "새꺄", "좆", "존나", "졸라", "ㅈㄴ", "닥쳐", "꺼져", "미친놈", "미친년", "지랄", "ㅈㄹ", "엠창", "느금", "니애미", "fuck", "shit", "bitch"];
+  const isBad = (t) => { const n = String(t).toLowerCase().replace(/[\s.,!?~^*_\-0-9]/g, ""); return BAD.some(w => n.includes(w)); };
+  const clean = (t) => { t = String(t || "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40); return isBad(t) ? "(고운 말로 바꿔 주세요)" : t; };
+  const chatText = (d) => Number.isInteger(d.q) && QUICK[d.q] ? QUICK[d.q] : clean(d.text);
+  const chatOK = (d) => chatMode !== "off" && (chatMode === "free" || (Number.isInteger(d.q) && !!QUICK[d.q]));
+  function chatLine(id, text, sys) {
+    const name = sys ? "" : id === me.id ? me.name : nameOf(id), col = sys ? "" : id === me.id ? me.color : (others[id] || {}).color || "#ffffff";
+    const mk = () => { const el = document.createElement("div"); if (sys) { el.className = "sys"; el.textContent = text; } else { const b = document.createElement("b"); b.style.color = col; b.textContent = name; el.append(b, document.createTextNode(text)); } return el; };
+    const box = $("chat"), el = mk(); box.appendChild(el); while (box.children.length > 8) box.firstChild.remove();
+    setTimeout(() => el.classList.add("old"), 10000);
+    if (teacher && !sys) { const L = $("tChatLog"), g = L.querySelector(".gone"); if (g) g.remove(); const t = mk(); const tm = new Date(); t.prepend(document.createTextNode(`${tm.getHours()}:${String(tm.getMinutes()).padStart(2, "0")} `)); L.appendChild(t); while (L.children.length > 150) L.firstChild.remove(); L.scrollTop = L.scrollHeight; }
+    if (!sys && id !== me.id) { const o = others[id]; if (o && o.mesh) bubbleOn(o, text); if (xrOn) toast(`${name}: ${text}`, 4000); }
+    chatLog.push({ id, text, sys }); if (chatLog.length > 50) chatLog.shift();
+  }
+  function bubbleOn(o, text) {
+    if (o.bub) { o.mesh.remove(o.bub); o.bub.material.map.dispose(); o.bub.material.dispose(); }
+    const cv = document.createElement("canvas"); cv.width = 512; cv.height = 96; const x = cv.getContext("2d");
+    x.font = "bold 34px sans-serif"; const w = Math.min(500, x.measureText(text).width + 40);
+    x.fillStyle = "rgba(255,255,255,.94)"; x.beginPath(); x.roundRect ? x.roundRect(256 - w / 2, 6, w, 70, 18) : x.rect(256 - w / 2, 6, w, 70); x.fill();
+    x.beginPath(); x.moveTo(244, 76); x.lineTo(268, 76); x.lineTo(256, 92); x.fill();
+    x.fillStyle = "#14182a"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(text, 256, 42, 480);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true }));
+    sp.scale.set(2.4, .45, 1); sp.position.y = 2.95; sp.renderOrder = 6; o.mesh.add(sp); o.bub = sp; o.bubT = performance.now() + 5000;
+  }
+  function say(v) {
+    if (!live || teacher) return;
+    const q = typeof v === "number" ? v : -1;
+    if (chatMode === "off") { chatLine(null, "방장이 채팅을 껐어요", true); return; }
+    if (chatMode === "quick" && q < 0) { chatLine(null, "지금은 빠른 말만 보낼 수 있어요", true); return; }
+    const now = performance.now(); if (now - (chatLast[me.id] || 0) < 1200) { chatLine(null, "조금 천천히 보내 주세요", true); return; }
+    const d = q >= 0 ? { t: "chat", q } : { t: "chat", text: String(v || "").trim().slice(0, 40) };
+    if (q < 0 && !d.text) return;
+    if (q < 0 && isBad(d.text)) { toast("고운 말을 써 주세요. 이 말은 보내지 않았어요", 2600); return; }
+    chatLast[me.id] = now; send(d); chatLine(me.id, chatText(d));
+  }
+  function renderChatBox() {
+    const qb = $("chatQuick"); qb.innerHTML = "";
+    QUICK.forEach((t, i) => { const b = document.createElement("button"); b.textContent = t; b.onclick = () => { say(i); closeChat(); }; qb.appendChild(b); });
+    const off = chatMode === "off", qOnly = chatMode === "quick";
+    $("chatIn").disabled = $("chatSend").disabled = off || qOnly; qb.hidden = off;
+    $("chatIn").placeholder = off ? "방장이 채팅을 껐어요" : qOnly ? "지금은 위의 빠른 말만 보낼 수 있어요" : "친구에게 할 말 (Enter 보내기 · Esc 닫기)";
+    $("chatNote").textContent = `채팅: ${CHATM[chatMode]} · 같은 방 모두에게 보여요. 선생님 화면에도 남아요.`;
+  }
+  function openChat() {
+    if (!live || teacher) return;
+    renderChatBox(); $("chatBox").hidden = false; $("chat").classList.add("open");
+    for (const k in keys) keys[k] = false; stickV = { x: 0, y: 0 };
+    try { document.exitPointerLock(); } catch (e) {}
+    if (!isTouch && chatMode === "free") setTimeout(() => $("chatIn").focus(), 0);
+  }
+  function closeChat() { $("chatBox").hidden = true; $("chat").classList.remove("open"); $("chatIn").blur(); $("chatIn").value = ""; if (!paused && $("startOv").hidden) lockMouse(); }
+  function setChat(v) {
+    if (!CHATM[v]) return; chatMode = v; if (host) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode }); }
+    toast(`채팅: ${CHATM[v]}`, 2000); $("tChatMode").textContent = `채팅: ${CHATM[v]}`; if (!$("chatBox").hidden) renderChatBox();
+  }
+  $("chatSend").onclick = () => { const v = $("chatIn").value; $("chatIn").value = ""; say(v); closeChat(); };
+  $("chatX").onclick = closeChat;
+  $("chatIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); $("chatSend").click(); } else if (e.key === "Escape") { e.preventDefault(); closeChat(); } });
+  $("tChat").addEventListener("click", () => { if ($("chatBox").hidden) openChat(); else closeChat(); });
+  $("tChatMode").onclick = () => setChat(chatMode === "free" ? "quick" : chatMode === "quick" ? "off" : "free");
   const others = {}; // id → { name, color, pk, x, y, z, yaw, done, mesh, seen }
   const PREFIX = "spacecraft-class-";
   const qs = new URLSearchParams(location.search), local = qs.get("peer");
@@ -4123,6 +4214,8 @@ const net = (() => {
   function send(d) { if (!live) return; d.from = me.id; if (host) relay(d, null); else if (mqJoin) pub(mqJoin, d); else if (hostConn && hostConn.open) hostConn.send(d); }
   function onData(d, c) {
     if (!d || typeof d !== "object") return;
+    // 채팅: 방장이 정한 규칙에 맞지 않거나 너무 잦은 말은 전하지도 보이지도 않아요(중계 서버로 바로 받는 경우도 있어서 모두가 확인해요)
+    if (d.t === "chat") { const now = performance.now(); if (!d.from || d.from === me.id || !chatOK(d) || now - (chatLast[d.from] || 0) < 800) return; chatLast[d.from] = now; }
     if (host && d.t !== "welcome") { relay(d, c); if (d.from) c._pid = d.from; }
     if (d.t === "state" && d.from && d.from !== me.id) {
       const o = others[d.from] = others[d.from] || { mesh: null };
@@ -4143,11 +4236,13 @@ const net = (() => {
     if (/^p(inv|no|join|leave|roster)$/.test(d.t)) partyMsg(d);
     if (d.t === "clock" && !host && Number.isFinite(d.c)) {
       clockOff = d.c - performance.now() / 1000;
+      if (typeof d.chat === "string" && CHATM[d.chat] && d.chat !== chatMode) { chatMode = d.chat; chatLine(null, `방장이 채팅을 '${CHATM[chatMode]}'(으)로 바꿨어요`, true); if (!$("chatBox").hidden) renderChatBox(); }
       if (typeof d.pvp === "boolean" && d.pvp !== pvp) { pvp = d.pvp; toast(pvp ? "방장이 플레이어끼리 대결을 켰어요! 기지 코어 6칸 안은 안전 구역이에요" : "방장이 대결을 껐어요", 3200); }
     }
     if (d.t === "hit" && d.to === me.id && pvp && !teacher && !sameParty(d.from)) { const a = others[d.from]; if (a && a.pk === S.planet && Math.hypot(a.x - P.pos.x, a.y - P.pos.y, a.z - P.pos.z) < 7) takeHit(+d.dmg, a.name, a.x, a.z); }
     if (d.t === "pile" && d.p && typeof d.p === "object") { const p = cleanPile(d.p); if (p) addPile(p); }
     if (d.t === "pick" && typeof d.id === "string") removePile(d.id, false);
+    if (d.t === "chat") { const t = chatText(d); if (t) chatLine(d.from, t); }
     if (d.t === "notice" && !teacher) { const n = $("notice"); n.innerHTML = "<small>선생님</small>"; n.appendChild(document.createTextNode(String(d.text || "").slice(0, 60))); n.hidden = false; clearTimeout(n._t); n._t = setTimeout(() => { n.hidden = true; }, 8000); sfx.quest(); }
   }
   function dropBy(c) { if (c._pid) { removeOther(c._pid); relay({ t: "bye", from: c._pid }, null); } }
@@ -4158,9 +4253,10 @@ const net = (() => {
   function tick(dt) {
     if (!live) return;
     sendT += dt;
-    if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp }); }
+    if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode }); }
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
     if (teacher) { tickOthers(dt); return; }
+    $("chat").hidden = !hudOn; $("tChat").hidden = false;
     if (me.pid && (psyncT += dt) > 3) { psyncT = 0; send({ t: "psync", party: me.pid, name: me.name, done: Object.keys(S.done) }); rosterMsg();
       // 파티장이 방을 떠났으면 파티가 풀려요. 파티장은 떠난 파티원을 지워요
       if (!isLeader() && !others[me.plead]) leftParty("파티장이 방을 나가서 파티가 풀렸어요");
@@ -4189,6 +4285,7 @@ const net = (() => {
         const u = g.userData, f = o.rf; u.flame.visible = u.core.visible = f; if (f) { const k = .8 + Math.random() * .4; u.flame.scale.set(k, 1 + Math.random() * .5, k); if (Math.random() < .4 && g.position.y - o.rk[1] < 8) puff(g.position.x, g.position.y + .2, g.position.z, 1.2); }
       } else if (o.rkG) o.rkG.visible = false;
       herdView(o, dt, here);
+      if (o.bub && now > o.bubT) { if (o.bub.parent) o.bub.parent.remove(o.bub); o.bub.material.map.dispose(); o.bub.material.dispose(); o.bub = null; }
       if (o.mesh) {
         o.mesh.visible = here && !(spec.id === id && spec.view === 0);
         const px = o.mesh.position.x, pz = o.mesh.position.z;
@@ -4279,7 +4376,7 @@ const net = (() => {
     $("rosterOv").hidden = false;
   }
   function setPvp(v) {
-    pvp = !!v; if (host) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp }); }
+    pvp = !!v; if (host) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode }); }
     toast(pvp ? "플레이어끼리 대결을 켰어요. 기지 코어 6칸 안은 안전 구역이에요" : "대결을 껐어요", 2600);
     $("tPvp").textContent = `플레이어 대결: ${pvp ? "켜짐" : "꺼짐"}`; $("tPvp").classList.toggle("on", pvp);
   }
@@ -4293,7 +4390,7 @@ const net = (() => {
   });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { herdList, send, tick, partyDone, setPvp, sameParty, invitePl, kickPl, leaveParty, get party() { return { pid: me.pid, lead: me.plead, members: me.members.slice() }; }, get invite() { return invite; }, answerInvite, get host() { return live && host; }, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
+  return { say, openChat, closeChat, setChat, QUICK, CHATM, get chatMode() { return chatMode; }, get chatLog() { return chatLog; }, herdList, send, tick, partyDone, setPvp, sameParty, invitePl, kickPl, leaveParty, get party() { return { pid: me.pid, lead: me.plead, members: me.members.slice() }; }, get invite() { return invite; }, answerInvite, get host() { return live && host; }, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
@@ -4472,9 +4569,11 @@ function xrItems() {
     { t: "제작", sub: nearTable() ? "제작대 근처예요" : "제작대 근처에서 더 많이 만들 수 있어요", ok: true, go: () => { xrMenu = { pg: "craft", i: 0 }; } },
     { t: "가방 (손에 들 것 고르기)", sub: `지금 ${sel + 1}번 칸: ${S.hot[sel] ? itemName(S.hot[sel]) : "비어 있음"}`, ok: true, go: () => { xrMenu = { pg: "bag", i: 0 }; } },
     { t: "우주 지도", sub: "로켓 옆에서 다른 천체로 떠나요", ok: true, go: () => { xrMenu = { pg: "map", i: 0 }; } },
+    ...(net.live && !net.teacher ? [{ t: "빠른 말", sub: net.chatMode === "off" ? "방장이 채팅을 껐어요" : "친구에게 짧은 말 보내기", ok: net.chatMode !== "off", go: () => { if (net.chatMode !== "off") xrMenu = { pg: "say", i: 0 }; } }] : []),
     { t: "조작법", sub: "VR 컨트롤러 버튼", ok: true, go: () => { xrMenu = { pg: "help", i: 0 }; } },
     { t: "닫기", sub: "", ok: true, go: () => { xrMenu = null; } }];
   if (m.pg === "help") return XR_HELP.map(t => ({ t, sub: "", ok: false }));
+  if (m.pg === "say") return net.QUICK.map((t, i) => ({ t, sub: "", ok: true, go: () => { net.say(i); xrMenu = null; } }));
   if (m.pg === "craft") {
     const rank = (r) => owned(r) ? 3 : canMake(r) ? 0 : hasAll(r) ? 1 : 2;
     return RECIPES.map((r, i) => [r, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([r]) => {
