@@ -4317,7 +4317,7 @@ const net = (() => {
     const q = typeof v === "number" ? v : -1;
     if (chatMode === "off") { chatLine(null, "방장이 채팅을 껐어요", true); return; }
     if (chatMode === "quick" && q < 0) { chatLine(null, "지금은 빠른 말만 보낼 수 있어요", true); return; }
-    const now = performance.now(); if (now - (chatLast[me.id] || 0) < 1200) { chatLine(null, "조금 천천히 보내 주세요", true); return; }
+    const now = performance.now(); if (now - (chatLast[me.id] || 0) < 400) { chatLine(null, "조금 천천히 보내 주세요", true); return; }
     const d = q >= 0 ? { t: "chat", q } : { t: "chat", text: String(v || "").trim().slice(0, 40) };
     if (q < 0 && !d.text) return;
     if (q < 0 && isBad(d.text)) { toast("고운 말을 써 주세요. 이 말은 보내지 않았어요", 2600); return; }
@@ -4465,7 +4465,7 @@ const net = (() => {
   function onData(d, c) {
     if (!d || typeof d !== "object") return;
     // 채팅: 방장이 정한 규칙에 맞지 않거나 너무 잦은 말은 전하지도 보이지도 않아요(중계 서버로 바로 받는 경우도 있어서 모두가 확인해요)
-    if (d.t === "chat") { const now = performance.now(); if (!d.from || d.from === me.id || !chatOK(d) || now - (chatLast[d.from] || 0) < 800) return; chatLast[d.from] = now; }
+    if (d.t === "chat") { const now = performance.now(); if (!d.from || d.from === me.id || !chatOK(d) || now - (chatLast[d.from] || 0) < 200) return; chatLast[d.from] = now; }
     if (host && d.t !== "welcome") { relay(d, c); if (d.from) c._pid = d.from; }
     if (d.t === "state" && d.from && d.from !== me.id) {
       const o = others[d.from] = others[d.from] || { mesh: null };
