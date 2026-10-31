@@ -112,8 +112,8 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 .bag.hot { background: #ffffff08; border-radius: 10px; padding: 6px; }
 .bag.hot .slot { width: 52px; height: 52px; }
 .bag.hot .slot canvas { left: 9px; top: 8px; }
-#invOv h3 { margin: 10px 0 0; font-size: 1em; }
-#invOv h3 small, #invOv .hint { color: var(--ink-dim); font-weight: 400; font-size: .85em; }
+#invOv h3, #chestOv h3 { margin: 10px 0 0; font-size: 1em; }
+#invOv h3 small, #invOv .hint, #chestOv h3 small, #chestOv h2 small, #chestOv .hint { color: var(--ink-dim); font-weight: 400; font-size: .85em; }
 .equip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .equip div { background: #ffffff08; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; display: grid; }
 .equip small { color: var(--ink-dim); font-size: .8em; }
@@ -394,6 +394,16 @@ td.unk { color: #4e5786; }
   </div>
 </div>
 
+<div class="overlay" id="chestOv" hidden>
+  <div class="card wide">
+    <h2>상자 <small id="chestCnt"></small></h2>
+    <div class="ctabs" id="chestMode"></div>
+    <h3>상자 안 <small>(누르면 가방으로)</small></h3><div class="bag" id="chestIn"></div>
+    <h3>내 가방 <small>(누르면 상자로)</small></h3><div class="bag" id="chestBag"></div>
+    <p class="hint">상자 안 물건은 내 기록에 저장돼요. 같은 방 친구가 같은 상자를 열면 친구 자신의 물건이 보여요. 상자를 캐면 안의 물건은 가방으로 돌아와요.</p>
+    <div class="row"><button class="btn ghost" id="chestAll">블록·재료 모두 넣기</button><button class="btn" id="chestClose">닫기 <kbd>E</kbd></button></div>
+  </div>
+</div>
 <div class="overlay" id="invOv" hidden>
   <div class="card wide">
     <h2>가방과 장비</h2>
@@ -568,6 +578,8 @@ const BLOCKS = {
   81: { n: "랜턴", c: ["#2e3038", "#ffd870", "#ff9a3a"], h: .2, light: 15, lantern: true, soft: true, shape: [.3, .3, .3, .7, .92, .7], drop: 80 },
   // 흐르는 물: 86~92는 샘물(6)에서 1~7칸 흘러간 물(멀수록 얕아요), 93은 아래로 떨어지는 물. 캘 수 없고 조준도 통과해요
   85: { n: "묘목", c: ["#4f9a3a", "#76c050", "#6e5233"], h: .05, thin: true, plant: true, sapling: true },
+  // 보관 상자: 열어서 물건을 넣고 빼요(안의 물건은 내 기록에 저장돼요)
+  94: { n: "상자", c: ["#8a5a2a", "#b07a3e", "#5a3a1a"], top: ["#9a6a36", "#c08a4a", "#6a4422"], h: .6, chest: true, shape: [.06, 0, .06, .94, .88, .94] },
   83: { n: "먹이통", c: ["#7a4e26", "#a8743c", "#5a3a1a"], top: ["#2a1a0c", "#3e2814", "#1e1208"], h: .6, trough: true },
   84: { n: "먹이통", c: ["#7a4e26", "#a8743c", "#5a3a1a"], top: ["#c8a23a", "#f0d870", "#a8862a"], h: .6, trough: true, drop: 83 },
   82: { n: "조명 블록", c: ["#e8f4ff", "#ffffff", "#bcdcff"], h: .3, light: 15, lamp: true, glowc: ["#9cc4ee", "#c8e2ff", "#e8f4ff", "#ffffff"] },
@@ -741,6 +753,9 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
       if (!top && row === 0) { g.fillStyle = "#c7c9d1"; g.fillRect(ox + 3, oy + 3, 4, 2); g.fillStyle = "#6e4622"; g.fillRect(ox + 4, oy + 5, 2, 7); g.fillStyle = "#8f9198"; g.fillRect(ox + 9, oy + 4, 3, 3); g.fillStyle = "#6e4622"; g.fillRect(ox + 10, oy + 7, 1, 6); }
       g.fillStyle = "#4a2c14"; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16); }
     if (b.thin && !b.plant && !b.door && !b.fence) { g.clearRect(ox, oy, 16, 16); g.fillStyle = c[0]; g.fillRect(ox, oy + 5, 16, 11); g.fillStyle = c[2]; g.fillRect(ox, oy + 2, 16, 4); g.fillStyle = c[1]; g.fillRect(ox, oy, 16, 3); g.fillRect(ox + 5, oy + 2, 6, 3); }
+    if (b.chest) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, (y % 5 === 4) ? P[2] : pick(P, .3 + R() * .5));
+      g.fillStyle = "#3e2610"; g.fillRect(ox, oy, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox, oy, 1, 16); g.fillRect(ox + 15, oy, 1, 16);
+      if (!top) { g.fillStyle = "#3e2610"; g.fillRect(ox, oy + 5, 16, 1); g.fillStyle = "#c7c9d1"; g.fillRect(ox + 6, oy + 4, 4, 5); g.fillStyle = "#6b6d75"; g.fillRect(ox + 7, oy + 6, 2, 2); } }
     if (b.trough) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, pick(P, .25 + R() * .55));
       g.fillStyle = top ? "#8a5a2e" : "#4a2c14"; if (top) { g.fillRect(ox, oy, 16, 2); g.fillRect(ox, oy + 14, 16, 2); g.fillRect(ox, oy, 2, 16); g.fillRect(ox + 14, oy, 2, 16); } else { g.fillRect(ox, oy + 5, 16, 1); g.fillRect(ox, oy + 15, 16, 1); g.fillRect(ox + 2, oy, 1, 16); g.fillRect(ox + 13, oy, 1, 16); } }
     if (b.lantern) { g.clearRect(ox, oy, 16, 16); g.fillStyle = "#2e3038"; g.fillRect(ox, oy, 16, 16); g.fillStyle = "#ffd870"; g.fillRect(ox + 3, oy + 3, 10, 10); g.fillStyle = "#fff4c0"; g.fillRect(ox + 6, oy + 5, 4, 6); g.fillStyle = "#ff9a3a"; g.fillRect(ox + 3, oy + 11, 10, 2); g.fillStyle = "#2e3038"; g.fillRect(ox + 7, oy + 3, 2, 10); }
@@ -799,7 +814,7 @@ function iconCanvas(id) {
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 const PLANETS = {
-  earth: { size: 304, name: "지구", type: "지구형 행성", g: 1, P: 1, solar: 1, au: 1, dayReal: "24시간", dayMin: 6, dir: 1, breath: true, airless: false, wrap: false,
+  earth: { size: 608, name: "지구", type: "지구형 행성", g: 1, P: 1, solar: 1, au: 1, dayReal: "24시간", dayMin: 6, dir: 1, breath: true, airless: false, wrap: false,
     sky: { dt: "#3b7fd8", dh: "#a8d0f2", nt: "#03050e", nh: "#0d1733", sun: "#ff9a4a" }, sunCol: 0xfff3dd, sunSize: 60, fog: [45, 95], amb: [.18, .62],
     T: (e) => lerp(9, 27, smooth(-.2, .6, e)), skyText: "파란 하늘", ground: "흙·암석, 액체 물, 생명", order: 3 },
   moon: { name: "달", type: "지구의 위성", g: .166, P: 0, solar: 1, au: 1, dayReal: "약 29.5일", dayMin: 20, dir: 1, breath: false, airless: true, wrap: false,
@@ -839,7 +854,7 @@ const VENUS_SURF = 12, VENUS_BASE = 36;
 
 /* ═════════════ 세계 ═════════════ */
 // 천체마다 땅 넓이가 달라요(지구는 304칸: 예전 96칸의 10배 넓이). 배열은 가장 큰 크기로 한 번만 만들어요
-let SX = 96, SZ = 96; const SY = 52, CH = 16, MAXS = 304;
+let SX = 96, SZ = 96; const SY = 52, CH = 16, MAXS = 608;
 const W = new Uint8Array(MAXS * SY * MAXS), SH = new Uint8Array(MAXS * MAXS);
 let wrapX = false, base = { x: 32, y: 12, z: 32 };
 const I = (x, y, z) => x + SX * (z + SZ * y);
@@ -850,12 +865,12 @@ function get(x, y, z) {
   return W[I(x, y, z)];
 }
 // 빛: 하늘빛(SKL)과 횃불·전등 빛(LT), 0~15. 한 칸 지날 때마다 1씩 약해져요
-const LT = new Uint8Array(MAXS * SY * MAXS), SKL = new Uint8Array(MAXS * SY * MAXS), lightQ = new Int32Array(MAXS * SY * MAXS * 2);
+const LT = new Uint8Array(MAXS * SY * MAXS), SKL = new Uint8Array(MAXS * SY * MAXS), lightQ = new Int32Array(1 << 22), QM = (1 << 22) - 1; // 빛 퍼뜨리기 대기줄(돌려 쓰는 고리)
 const passLight = (b) => b === 0 || b === 8 || b === 32 || (BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin || BLOCKS[b].fence || BLOCKS[b].shape));
 function spreadLight(L, n) {
   let h = 0; const A = SX * SZ;
   while (h < n) {
-    const i = lightQ[h++], l = L[i] - 1; if (l <= 0) continue;
+    const i = lightQ[h++ & QM], l = L[i] - 1; if (l <= 0) continue;
     const x = i % SX, z = Math.floor(i / SX) % SZ, y = Math.floor(i / A);
     for (let k = 0; k < 6; k++) {
       let nx = x, ny = y, nz = z;
@@ -863,15 +878,22 @@ function spreadLight(L, n) {
       if (wrapX) nx = (nx + SX) % SX; else if (nx < 0 || nx >= SX) continue;
       if (ny < 0 || ny >= SY || nz < 0 || nz >= SZ) continue;
       const j = nx + SX * (nz + SZ * ny);
-      if (L[j] < l && passLight(W[j]) && n < lightQ.length) { L[j] = l; lightQ[n++] = j; }
+      if (L[j] < l && passLight(W[j]) && n - h < QM) { L[j] = l; lightQ[n++ & QM] = j; }
     }
   }
 }
+// 하늘빛: 위에서 내려오며 15로 채우고, 옆 기둥이 더 깊이 막혀 있는 칸(벼랑·동굴 입구)만 퍼뜨리기 시작점으로 넣어요(넓은 지구에서도 대기줄이 넘치지 않게)
+const skyTop = new Int16Array(MAXS * MAXS);
 function computeLight() {
   SKL.fill(0); LT.fill(0); let n = 0;
-  for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) for (let y = SY - 1; y >= 0; y--) { const i = I(x, y, z); if (!passLight(W[i])) break; SKL[i] = 15; lightQ[n++] = i; }
+  for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) { let y = SY - 1; for (; y >= 0; y--) { const i = I(x, y, z); if (!passLight(W[i])) break; SKL[i] = 15; } skyTop[x + SX * z] = y + 1; }
+  for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
+    const t = skyTop[x + SX * z]; let m = t;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { let nx = x + dx; const nz = z + dz; if (wrapX) nx = (nx + SX) % SX; else if (nx < 0 || nx >= SX) continue; if (nz < 0 || nz >= SZ) continue; m = Math.max(m, skyTop[nx + SX * nz]); }
+    for (let y = t; y < m; y++) lightQ[n++ & QM] = I(x, y, z);
+  }
   spreadLight(SKL, n); n = 0;
-  for (let i = 0; i < W.length; i++) { const B = W[i] && BLOCKS[W[i]]; if (B && B.light) { LT[i] = B.light; lightQ[n++] = i; } }
+  for (let i = 0, N = SX * SY * SZ; i < N; i++) { const B = W[i] && BLOCKS[W[i]]; if (B && B.light) { LT[i] = B.light; lightQ[n++ & QM] = i; } }
   spreadLight(LT, n);
 }
 function lightAt(x, y, z) { if (y >= SY) return [15, 0]; if (y < 0) return [0, 0]; if (wrapX) x = ((x % SX) + SX) % SX; else if (x < 0 || x >= SX) return [15, 0]; if (z < 0 || z >= SZ) return [15, 0]; const i = I(x, y, z); return [SKL[i], LT[i]]; }
@@ -888,7 +910,9 @@ function topY(x, z) { for (let y = SY - 1; y >= 0; y--) if (SOLID(get(x, y, z)))
 function col(x, z, h, topB, topN, mid, midN, deep) {
   for (let y = 0; y <= h; y++) set(x, y, z, y === 0 ? 1 : y > h - topN ? topB : y > h - topN - midN ? mid : deep);
 }
-function ores(x, z, h, id, p, seed, minY = 2, maxY = 99) { for (let y = minY; y < Math.min(h - 1, maxY + 1); y++) if (W[I(x, y, z)] && W[I(x, y, z)] !== 1 && hash(x * 7 + y, z * 13 - y, seed) < p) set(x, y, z, id); }
+// GO: 지구 지형을 만들 때 무늬(잡음)를 가로세로 GO칸 밀어서 읽어요. 지구를 넓혀도 가운데는 예전 지형 그대로예요
+let GO = 0;
+function ores(x, z, h, id, p, seed, minY = 2, maxY = 99) { for (let y = minY; y < Math.min(h - 1, maxY + 1); y++) if (W[I(x, y, z)] && W[I(x, y, z)] !== 1 && hash((x - GO) * 7 + y, (z - GO) * 13 - y, seed) < p) set(x, y, z, id); }
 // 3차원 값 잡음과 동굴: 두 잡음 면이 겹치는 가는 띠를 파내면 구불구불한 굴이 생겨요
 const hash3 = (x, y, z, s) => hash(x + y * 131, z - y * 71, s);
 function noise3(x, y, z, s) {
@@ -899,9 +923,9 @@ function noise3(x, y, z, s) {
 }
 function caves(x, z, h, seed) {
   if (Math.hypot(x - base.x, z - base.z) < 11) return;
-  const open = noise(x / 11, z / 11, seed + 3) > .74; // 군데군데 땅 위로 뚫린 입구
+  const X = x - GO, Z = z - GO, open = noise(X / 11, Z / 11, seed + 3) > .74; // 군데군데 땅 위로 뚫린 입구
   for (let y = 2; y <= (open ? h : h - 3); y++) {
-    const a = noise3(x / 8, y / 5, z / 8, seed), b = noise3(x / 8, y / 5, z / 8, seed + 50);
+    const a = noise3(X / 8, y / 5, Z / 8, seed), b = noise3(X / 8, y / 5, Z / 8, seed + 50);
     if (Math.abs(a - .5) < .075 && Math.abs(b - .5) < .085) set(x, y, z, 0);
   }
 }
@@ -922,11 +946,12 @@ function placeLander(lv, floor) {
 const GEN = {
   earth() {
     // 넓은 섬(바다 수면 16칸): 가운데 기지, 곳곳에 언덕·바위산·호수·숲. 땅속이 깊어서 아래로 갈수록 귀한 광석
-    const C = SX / 2, RR = C - 3; base = { x: C - 2, z: C + 2 };
+    // 608칸으로 넓힐 때 예전 304칸 지구가 가운데에 그대로 오도록 무늬를 152칸 밀어 읽어요(X, Z)
+    const C = SX / 2, RR = C - 3; base = { x: C - 2, z: C + 2 }; GO = SX > 304 ? (SX - 304) / 2 : 0;
     for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
-      const d = Math.hypot(x - C, z - C) / RR;
-      let h = 17 + fbm(x / 20, z / 20, 1) * 11 - Math.max(0, d - (SX > 96 ? .8 : .62)) * (SX > 96 ? 60 : 30);
-      if (SX > 96) h += Math.max(0, noise(x / 38, z / 38, 77) - .6) * 60 - Math.max(0, noise(x / 30, z / 30, 61) - .72) * 55;
+      const d = Math.hypot(x - C, z - C) / RR, X = x - GO, Z = z - GO;
+      let h = 17 + fbm(X / 20, Z / 20, 1) * 11 - Math.max(0, d - (SX > 96 ? .8 : .62)) * (SX > 96 ? 60 : 30);
+      if (SX > 96) h += Math.max(0, noise(X / 38, Z / 38, 77) - .6) * 60 - Math.max(0, noise(X / 30, Z / 30, 61) - .72) * 55;
       h = flatten(h, x, z, base.x, base.z, 21);
       h = Math.max(2, Math.min(SY - 10, Math.round(h)));
       const beach = h <= 17, rocky = h >= 31;
@@ -935,13 +960,13 @@ const GEN = {
       if (h > 17) caves(x, z, h, 201);
       ores(x, z, h - 2, 38, .045, 5, 8); ores(x, z, h - 2, 9, .034, 3); ores(x, z, h - 2, 39, .022, 7);
       ores(x, z, h - 2, 40, .016, 8, 1, 9); ores(x, z, h - 2, 41, .011, 9, 1, 5);
-      const forest = SX > 96 ? .006 + .055 * smooth(.52, .74, noise(x / 22, z / 22, 88)) : .02 + .06 * smooth(.5, .72, noise(x / 14, z / 14, 88));
-      if (h >= 19 && !rocky && hash(x, z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) { tree(x, h + 1, z); treeSpots.push([x, h + 1, z]); }
-      else if (h >= 18 && get(x, h, z) === 2 && !get(x, h + 1, z) && hash(x, z, 91) < .014 && Math.hypot(x - base.x, z - base.z) > 5) set(x, h + 1, z, 53 + Math.floor(noise(x / 9, z / 9, 93) * 2.99) * 4);
+      const forest = SX > 96 ? .006 + .055 * smooth(.52, .74, noise(X / 22, Z / 22, 88)) : .02 + .06 * smooth(.5, .72, noise(X / 14, Z / 14, 88));
+      if (h >= 19 && !rocky && hash(X, Z, 77) < forest && Math.hypot(x - base.x, z - base.z) > 6) { tree(x, h + 1, z); treeSpots.push([x, h + 1, z]); }
+      else if (h >= 18 && get(x, h, z) === 2 && !get(x, h + 1, z) && hash(X, Z, 91) < .014 && Math.hypot(x - base.x, z - base.z) > 5) set(x, h + 1, z, 53 + Math.floor(noise(X / 9, Z / 9, 93) * 2.99) * 4);
     }
     // 바위 절벽에 드러난 철광석·석탄
     for (let i = 0, n = Math.round(60 * SX * SZ / 9216); i < n; i++) { const x = Math.floor(hash(i, 5, 9) * SX), z = Math.floor(hash(i, 6, 9) * SZ), h = topY(x, z); if (h > 18 && (get(x, h, z) === 2 || get(x, h, z) === 4)) set(x, h, z, i % 3 ? 9 : 38); }
-    placeLander(21, 23);
+    placeLander(21, 23); GO = 0;
   },
   moon() {
     base = { x: 32, z: 33 };
@@ -1072,7 +1097,7 @@ Object.assign(GEN, {
 });
 let treeSpots = []; // 처음 숲에 나무가 서 있던 자리: 베어 내면 시간이 지나 묘목이 다시 돋아요
 function tree(x, y, z) {
-  const h = 4 + Math.floor(hash(x, z, 5) * 2);
+  const h = 4 + Math.floor(hash(x - GO, z - GO, 5) * 2);
   for (let i = 0; i < h; i++) set(x, y + i, z, 7);
   for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = h - 2; dy <= h; dy++) {
     if (Math.abs(dx) + Math.abs(dz) + (dy === h ? 1 : 0) > 3) continue;
@@ -1277,7 +1302,9 @@ function chunkTick() {
     if (!best || bd > VISC_() + 1) break; chunkQ.delete(best); const i = best.indexOf(","); buildChunk(+best.slice(0, i), +best.slice(i + 1));
   }
   if (++visT % 10) return;
-  for (const k in chunks) { const i = k.indexOf(","), v = Math.hypot(+k.slice(0, i) + .5 - pcx, +k.slice(i + 1) + .5 - pcz) < VISC_() + .8; chunks[k].forEach(m => { m.visible = v; }); }
+  for (const k in chunks) { const i = k.indexOf(","), dd = Math.hypot(+k.slice(0, i) + .5 - pcx, +k.slice(i + 1) + .5 - pcz), v = dd < VISC_() + .8; chunks[k].forEach(m => { m.visible = v; });
+    // 넓은 지구에서 멀리 떠나온 조각은 지워서 메모리를 아껴요(다시 가까이 가면 새로 만들어요)
+    if (dd > VISC_() + 4) { chunks[k].forEach(m => { scene.remove(m); m.geometry.dispose(); }); delete chunks[k]; chunkQ.add(k); } }
 }
 function rebuildAt(x, z, extra) {
   if (wrapX) x = ((x % SX) + SX) % SX;
@@ -1470,7 +1497,7 @@ const SUITS = {
 const DEF = () => ({
   planet: "earth", inv: { 33: 0 }, mined: {}, gear: { rocket: false, insul: false, pressure: false, batt: 0, rtg: false },
   done: {}, logs: [], dex: {}, seen: {}, edits: {}, visited: { earth: true }, best: {}, time: {},
-  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {}, hot: [0, 0, 0, 0, 0, 0, 0, 0, 0], piles: [], food: 20, crops: {}, spawn: {}, rocketAt: null, worldV: 2, herd: [], herdN: 0, cook: [], armor: { head: 0, body: 0, legs: 0, feet: 0 }, bossCD: {}, bossWin: {},
+  hp: 100, o2: 100, pw: 100, st: 20, earthLook: 0, stormDone: false, venusTrack: null, summit: false, tool: 0, facts: {}, hot: [0, 0, 0, 0, 0, 0, 0, 0, 0], piles: [], food: 20, crops: {}, spawn: {}, rocketAt: null, worldV: 3, herd: [], herdN: 0, cook: [], armor: { head: 0, body: 0, legs: 0, feet: 0 }, bossCD: {}, bossWin: {},
 });
 // 곡괭이: 단계가 높을수록 빨리 캐고, 더 단단한 광석을 캘 수 있어요
 const PICKS = [
@@ -1527,12 +1554,12 @@ function relight(x0, x1, z0, z1) {
   let n = 0, m = 0; const src = [];
   forBox(ax, bx, az, bz, (x, z) => {
     let sky = true;
-    for (let y = SY - 1; y >= 0; y--) { const i = I(x, y, z); SKL[i] = 0; LT[i] = 0; if (sky && passLight(W[i])) { SKL[i] = 15; lightQ[n++] = i; } else sky = false; const B = W[i] && BLOCKS[W[i]]; if (B && B.light) { LT[i] = B.light; src.push(i); } }
+    for (let y = SY - 1; y >= 0; y--) { const i = I(x, y, z); SKL[i] = 0; LT[i] = 0; if (sky && passLight(W[i])) { SKL[i] = 15; lightQ[n++ & QM] = i; } else sky = false; const B = W[i] && BLOCKS[W[i]]; if (B && B.light) { LT[i] = B.light; src.push(i); } }
   });
   const ring = [];
   forBox(ax - 1, bx + 1, az - 1, bz + 1, (x, z) => { if (!inBox(x, z)) for (let y = 0; y < SY; y++) ring.push(I(x, y, z)); });
-  ring.forEach(i => { if (SKL[i] > 1) lightQ[n++] = i; }); spreadLight(SKL, n);
-  src.forEach(i => { lightQ[m++] = i; }); ring.forEach(i => { if (LT[i] > 1) lightQ[m++] = i; }); spreadLight(LT, m);
+  ring.forEach(i => { if (SKL[i] > 1) lightQ[n++ & QM] = i; }); spreadLight(SKL, n);
+  src.forEach(i => { lightQ[m++ & QM] = i; }); ring.forEach(i => { if (LT[i] > 1) lightQ[m++ & QM] = i; }); spreadLight(LT, m);
   const nC = SX / CH, dirty = new Set();
   forBox(ax - 16, bx + 16, az - 16, bz + 16, (x, z) => { for (let y = 0; y < SY; y++) { const i = I(x, y, z); if (SKL[i] === prevSKL[i] && LT[i] === prevLT[i]) continue;
     const cx = Math.floor(x / CH), cz = Math.floor(z / CH), n = nC;
@@ -1551,6 +1578,7 @@ function editMany(L) {
 }
 function edit(x, y, z, b, remote) {
   if (wrapX) x = ((x % SX) + SX) % SX;
+  if (b !== 94 && get(x, y, z) === 94) chestBreak(x, y, z);
   set(x, y, z, b); const dirty = relight(x, x, z, z); rebuildAt(x, z, dirty); updateWrapClones();
   (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b;
   flowWake(x, y, z);
@@ -1862,6 +1890,7 @@ function useBlock(h) {
     if (b === 78) { set(h.x, h.y, h.z, 77); const bad = hits(P.pos.x, P.pos.y, P.pos.z); set(h.x, h.y, h.z, 78); if (bad) { toast("울타리 문 사이에 서 있어서 닫을 수 없어요"); return true; } }
     edit(h.x, h.y, h.z, b === 77 ? 78 : 77); tone(b === 77 ? 160 : 220, .08, "triangle", .06); swing = .001; return true;
   }
+  if (b === 94) { openChest(h.x, h.y, h.z); swing = .001; return true; }
   if (b === 83 || b === 84) {
     const k = troughKey(h.x, h.y, h.z), T = (S.trough = S.trough || {})[k] || {}, id = heldId(), tot = Object.values(T).reduce((a, n) => a + n, 0);
     if (Object.values(BREED).includes(id) && S.inv[id] > 0) {
@@ -2059,6 +2088,7 @@ const RECIPES = [
   { id: 43, n: "나무 판자 ×4", need: { 7: 1 }, out: 43, count: 4, cat: "build", hand: true, use: "통나무를 켜서 만든 판자. 집 벽과 바닥, 문·침대 재료예요." },
   { id: 44, n: "화로", need: { 4: 8 }, out: 44, cat: "build", hand: true, use: "4칸 안에서 석탄으로 고기·빵·벽돌을 구워요. 화로를 누르면 바로 음식 만들기가 열려요. 불은 산소가 있어야 타서 지구에서만 써요." },
   { id: 69, n: "문", need: { 43: 6 }, out: 69, cat: "build", use: "두 칸 높이 나무 문. 놓기(오른쪽 클릭)로 열고 닫아요. 열면 지나갈 수 있어요." },
+  { id: 94, n: "상자", need: { 43: 8 }, out: 94, cat: "build", hand: true, use: "물건을 넣어 두는 보관함이에요. 놓은 뒤 누르면(오른쪽 클릭) 열려요. 물건 27가지까지, 개수는 얼마든지 넣을 수 있어요. 상자를 캐면 안의 물건은 가방으로 돌아와요." },
   { id: 83, n: "먹이통", need: { 43: 5 }, out: 83, cat: "build", hand: true, use: "밀·옥수수·보리를 넣어 두면 근처(12칸) 동물이 다가와 알아서 먹어요. 새끼는 빨리 자라고, 어른은 짝을 찾고, 야생 동물은 내 가축이 돼요." },
   { id: 76, n: "울타리 ×3", need: { 43: 4, 7: 1 }, out: 76, count: 3, cat: "build", hand: true, use: "가축우리를 만들어요. 한 칸이지만 높아서 동물도 사람도 뛰어넘지 못해요. 옆 울타리·블록과 저절로 이어져요." },
   { id: 77, n: "울타리 문", need: { 43: 2, 7: 2 }, out: 77, cat: "build", hand: true, use: "울타리 사이에 놓고 누르면(놓기·오른쪽 클릭) 열리고 닫혀요. 동물은 문을 열지 못해요." },
@@ -2609,6 +2639,41 @@ function renderInv() {
 }
 let bagMode = "put";
 function openInv() { bagMode = "put"; pause(true); renderInv(); $("invOv").hidden = false; }
+/* 보관 상자 */
+const CHEST_KINDS = 27, chestKey = (x, y, z) => S.planet + ":" + x + "," + y + "," + z;
+let chestAt = null, chestMode = "one";
+function openChest(x, y, z) {
+  if (xrOn) { toast("상자는 VR을 끄고 열어요 (X 3초)", 2200); return; }
+  chestAt = [x, y, z]; chestMode = "one"; pause(true); renderChest(); $("chestOv").hidden = false; sfx.place(94);
+}
+function chestMove(id, toChest) {
+  const C = (S.chest = S.chest || {})[chestKey(...chestAt)] = (S.chest || {})[chestKey(...chestAt)] || {}, src = toChest ? S.inv : C, dst = toChest ? C : S.inv;
+  if (!(src[id] > 0)) return;
+  if (toChest && !(C[id] > 0) && Object.values(C).filter(n => n > 0).length >= CHEST_KINDS) { toast(`상자에는 물건을 ${CHEST_KINDS}가지까지 넣을 수 있어요`, 1800); return; }
+  const n = chestMode === "all" ? src[id] : 1; src[id] -= n; dst[id] = (dst[id] || 0) + n;
+  if (!(C[id] > 0)) delete C[id]; if (!Object.keys(C).length) delete S.chest[chestKey(...chestAt)];
+  tone(toChest ? 520 : 700, .05, "sine", .04); renderHotbar(); renderChest(); save();
+}
+function renderChest() {
+  const C = (S.chest || {})[chestKey(...chestAt)] || {}, inC = Object.keys(C).map(Number).filter(i => C[i] > 0), bag = Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0);
+  $("chestCnt").textContent = `${inC.length} / ${CHEST_KINDS}가지`;
+  const fill = (el, list, cnt, toChest, empty) => { el.innerHTML = ""; if (!list.length) el.innerHTML = `<small>${empty}</small>`;
+    list.forEach(id => { const b = document.createElement("button"); b.className = "slot"; b.title = itemName(id); b.appendChild(iconCanvas(id)); b.insertAdjacentHTML("beforeend", `<span>${cnt[id]}</span><label>${itemName(id)}</label>`); b.onclick = () => chestMove(id, toChest); el.appendChild(b); }); };
+  fill($("chestIn"), inC, C, false, "비어 있어요. 아래 가방에서 물건을 눌러 넣으세요");
+  fill($("chestBag"), bag, S.inv, true, "가방이 비었어요");
+  const bm = $("chestMode"); bm.innerHTML = "";
+  [["one", "1개씩 옮기기"], ["all", "전부 옮기기"]].forEach(([k, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = chestMode === k ? "on" : ""; b.onclick = () => { chestMode = k; renderChest(); }; bm.appendChild(b); });
+}
+function closeChest() { $("chestOv").hidden = true; chestAt = null; resume(); }
+$("chestClose").onclick = closeChest;
+$("chestAll").onclick = () => { const was = chestMode; chestMode = "all"; Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0 && !TOOLS[i] && !S.hot.includes(i) && (MATS[i] || (i < 100 && BLOCKS[i]))).forEach(i => chestMove(i, true)); chestMode = was; renderChest(); };
+// 상자가 부서지면(내가 캐거나 친구가 캐도) 안의 물건은 내 가방으로 돌아와요
+function chestBreak(x, y, z) {
+  const k = chestKey(x, y, z), C = S.chest && S.chest[k]; if (!C) return;
+  let n = 0; for (const id in C) if (C[id] > 0) { S.inv[id] = (S.inv[id] || 0) + C[id]; n += C[id]; }
+  delete S.chest[k]; if (chestAt && chestAt.join(",") === [x, y, z].join(",")) closeChest();
+  if (n) toast(`상자가 부서져서 안에 있던 물건 ${n}개를 가방에 넣었어요`, 2600); renderHotbar(); save();
+}
 let toastT = 0;
 function toast(t, ms = 1300) { const el = $("toast"); el.textContent = t; el.hidden = false; toastT = performance.now() + ms; }
 function showFact(t, x) { const el = $("fact"); el.innerHTML = "<b></b><span></span>"; el.querySelector("b").textContent = t; el.querySelector("span").textContent = x; el.hidden = false; clearTimeout(el._t); el._t = setTimeout(() => { el.hidden = true; }, 9000); sfx.quest(); }
@@ -2727,7 +2792,7 @@ function ambTick(dt) {
     if (near) { tone(r(350, 900), .05, "sine", .01, 0, r(900, 1600)); if (Math.random() < .3) hiss("lowpass", 900, .6, .25, .02); } }
 }
 const MATCAT = {};
-[[1, 4, 9, 11, 12, 16, 19, 20, 21, 24, 29], "stone", [2, 3, 10, 15, 22], "dirt", [5, 18], "sand", [14, 17, 27, 32], "ice", [7], "wood", [8], "leaf", [25, 26], "cloud", [6, 28], "liquid", [23, 30, 31, 33, 34], "metal"]
+[[1, 4, 9, 11, 12, 16, 19, 20, 21, 24, 29], "stone", [94, 83, 84, 76, 77, 78], "wood", [2, 3, 10, 15, 22], "dirt", [5, 18], "sand", [14, 17, 27, 32], "ice", [7], "wood", [8], "leaf", [25, 26], "cloud", [6, 28], "liquid", [23, 30, 31, 33, 34], "metal"]
   .forEach((v, i, a) => { if (i % 2 === 0) v.forEach(id => MATCAT[id] = a[i + 1]); });
 const r = (a, b) => a + Math.random() * (b - a);
 // big: 부서질 때, 아니면 캐는 중 톡톡·발소리·놓기
@@ -2767,6 +2832,7 @@ let locked = false, isTouch = false;
 function pause(p) { paused = p; wantMine = false; atkHeld = false; tapHit = 0; $("tAtk").classList.remove("on"); if (p) { try { document.exitPointerLock(); } catch (e) {} for (const k in keys) keys[k] = false; stickV = { x: 0, y: 0 }; touchJump = false; recall = 0; } }
 addEventListener("keydown", (e) => {
   if (e.target && e.target.tagName === "INPUT") return;
+  if (!$("chestOv").hidden) { if (e.code === "KeyE" || e.code === "Escape" || e.code === "KeyI") closeChest(); return; }
   const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden || !$("setOv").hidden || !$("invOv").hidden;
   if (e.code === "KeyE" && $("startOv").hidden && $("logOv").hidden) { if (!$("craftOv").hidden) $("craftClose").click(); else if (!anyOv) openCraft(); return; }
   if (e.code === "KeyI" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("invOv").hidden) $("invClose").click(); else if (!anyOv) openInv(); return; }
@@ -5010,6 +5076,17 @@ function start(fresh) {
       if (S.rocketPk === "earth") S.rocketAt = null;
       (S.piles || []).forEach(p => { if (p.pk === "earth") { p.x += dx; p.z += dz; } });
       S.worldV = 2;
+    }
+    if (S.worldV < 3) { // 지구가 608칸으로 넓어지면서 가운데가 (152,152)칸 옮겨졌어요. 지은 것·밭·가축·화로 등도 같이 옮겨요
+      const dx = 152, dz = 152, mv = (o) => { const n = {}; for (const k in o) { const [x, y, z] = k.split(",").map(Number); n[(x + dx) + "," + y + "," + (z + dz)] = o[k]; } return n; };
+      if (S.edits.earth) S.edits.earth = mv(S.edits.earth); if (S.crops && S.crops.earth) S.crops.earth = mv(S.crops.earth); if (S.sapl && S.sapl.earth) S.sapl.earth = mv(S.sapl.earth);
+      if (S.trough) { const n = {}; for (const k in S.trough) { if (k.startsWith("earth:")) { const [x, y, z] = k.slice(6).split(",").map(Number); n["earth:" + (x + dx) + "," + y + "," + (z + dz)] = S.trough[k]; } else n[k] = S.trough[k]; } S.trough = n; }
+      if (S.spawn && S.spawn.earth) { S.spawn.earth[0] += dx; S.spawn.earth[2] += dz; }
+      if (S.rocketPk === "earth") S.rocketAt = null;
+      (S.piles || []).forEach(p => { if (p.pk === "earth") { p.x += dx; p.z += dz; } });
+      (S.cook || []).forEach(j => { if (j.pk === "earth") { j.x += dx; j.z += dz; } });
+      (S.herd || []).forEach(m => { m.x += dx; m.z += dz; });
+      S.worldV = 3;
     }
     if (!Array.isArray(saved.hot) && S.tool && !Object.keys(TOOLS).some(t => S.inv[t] > 0)) S.inv[TOOL_OF[S.tool]] = 1; }
   loadPlanet(S.planet);
