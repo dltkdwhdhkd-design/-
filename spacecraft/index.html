@@ -2737,7 +2737,7 @@ function ac() {
 function setAir(pk) {
   if (!actx) return; const PL = PLANETS[pk];
   airBase = PL.airless ? 380 : PL.P > 2 || PL.thick ? 6000 : 20000; airF.frequency.value = airBase;
-  master.gain.value = (PL.airless ? .75 : 1) * (typeof SET === "object" ? SET.vol : .8);
+  master.gain.value = (PL.airless ? .75 : 1) * (typeof SET === "object" ? SET.vol : .8) * .75; // 전체 기본 크기를 조금 낮춰요
   if (rvSend) rvSend.gain.value = PL.airless ? 0 : .12;
 }
 // 삐 소리: 시작을 아주 짧게 키워서 '딱' 튀는 소리를 없애고, 네모·톱니 파형은 높은 쇳소리를 걸러 부드럽게 해요
@@ -2791,7 +2791,7 @@ function ambTick(dt) {
   // 흐르는 물이 가까우면 졸졸 소리
   if ((flowSndT -= dt) <= 0) { flowSndT = .12 + Math.random() * .25; let near = false;
     for (let dx = -3; dx <= 3 && !near; dx++) for (let dz = -3; dz <= 3 && !near; dz++) for (let dy = -2; dy <= 1 && !near; dy++) near = isFlowW(get(cx + dx, cy + dy, cz + dz));
-    if (near) { if (!fPlay("water_step", .04, r(.7, .9), 0)) sPlay("bubble", 0, .07, r(.8, 1.2)); else flowSndT = r(1.2, 2); if (Math.random() < .3) fPlay("drip", .05, r(.8, 1.2)); } }
+    if (near) { if (!fPlay("water_step", U * MIX.flow, r(.7, .9), 0, 0, 1)) sPlay("bubble", 0, .07, r(.8, 1.2)); else flowSndT = r(1.2, 2); if (Math.random() < .3) fPlay("drip", U * MIX.drip, r(.8, 1.2)); } }
 }
 // ── 소리 만들기(합성) ──
 // 녹음 파일 없이, 진짜 소리가 생기는 방식을 흉내 내서 소리를 만들어요.
@@ -2934,10 +2934,12 @@ function bank(k) {
   if (!SB[k] && SND[k] && actx) { try { SB[k] = SND[k].map(f => [0, 1, 2, 3].map(() => f())); } catch (e) { return null; } }
   return SB[k];
 }
-function playBuf(buf, v, rate = 1, w = 0, pan = 0) {
-  const src = actx.createBufferSource(), g = actx.createGain(); src.buffer = buf; src.playbackRate.value = rate; g.gain.value = v;
+// dur: 꼬리가 긴 소리(풀 발소리 등)는 그 시간 뒤에 부드럽게 줄여 끊어요(겹쳐서 웅웅거리지 않게)
+function playBuf(buf, v, rate = 1, w = 0, pan = 0, dur = 0) {
+  const src = actx.createBufferSource(), g = actx.createGain(), t = actx.currentTime + w; src.buffer = buf; src.playbackRate.value = rate; g.gain.value = v;
   let o = src.connect(g); if (pan && actx.createStereoPanner) { const p = actx.createStereoPanner(); p.pan.value = Math.max(-.85, Math.min(.85, pan)); o = o.connect(p); }
-  o.connect(master); src.start(actx.currentTime + w);
+  o.connect(master); src.start(t);
+  if (dur && dur < buf.duration / rate) { g.gain.setValueAtTime(v, t + dur * .6); g.gain.linearRampToValueAtTime(0, t + dur); src.stop(t + dur + .02); }
 }
 function sPlay(k, i, v, rate = 1, w = 0, pan = 0) {
   try { ac(); const B = bank(k); if (!B || v <= .001) return; const arr = B[i] || B[0]; playBuf(arr[Math.floor(Math.random() * arr.length)], v, rate, w, pan); } catch (e) {}
@@ -2955,7 +2957,7 @@ const SFILES = {
   dug: ["default_dug_node.1", "default_dug_node.2"], break_glass: ["default_break_glass.1", "default_break_glass.2", "default_break_glass.3"], dug_metal: ["default_dug_metal.1", "default_dug_metal.2"],
   water_dug: ["mcl_sounds_dug_water"], water_place: ["mcl_sounds_place_node_water"], water_step: ["default_water_footstep.1", "default_water_footstep.2", "default_water_footstep.3"], drip: ["drippingwater_drip.1", "drippingwater_drip.2", "drippingwater_drip.3"],
   cow: ["mobs_mc_cow"], cow_hurt: ["mobs_mc_cow_hurt"], pig: ["mobs_pig"], pig_hurt: ["mobs_pig_angry"], chicken: ["mobs_chicken"], sheep: ["mobs_sheep"], cat: ["mobs_mc_cat_idle.1", "mobs_mc_cat_idle.2"], cat_hurt: ["mobs_mc_ocelot_hurt"],
-  hurt: ["player_damage"], fall: ["player_falling_damage"], punch: ["default_punch"], pickup: ["item_drop_pickup.1", "item_drop_pickup.2", "item_drop_pickup.3", "item_drop_pickup.4"], bite: ["mcl_hunger_bite.1", "mcl_hunger_bite.2"],
+  hurt: ["player_damage"], punch: ["default_punch"], pickup: ["item_drop_pickup.1", "item_drop_pickup.2", "item_drop_pickup.3", "item_drop_pickup.4"], bite: ["mcl_hunger_bite.1", "mcl_hunger_bite.2"],
   door_open: ["doors_door_open"], door_close: ["doors_door_close"], gate_open: ["doors_fencegate_open"], gate_close: ["doors_fencegate_close"], fire: ["fire_fire.1", "fire_fire.2", "fire_fire.3"], explode: ["tnt_explode"],
 };
 let FB = {}, fbStarted = false;
@@ -2968,10 +2970,13 @@ function loadSoundFiles() {
       const g = Math.min(.95 / (pk || 1), .2 / (Math.sqrt(sum / (cnt || 1)) || 1)); for (let c = 0; c < b.numberOfChannels; c++) { const d = b.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] *= g; }
       (FB[k] = FB[k] || []).push(b); }).catch(() => {}));
 }
-function fPlay(k, v, rate = 1, w = 0, pan = 0) {
+function fPlay(k, v, rate = 1, w = 0, pan = 0, dur = 0) {
   const B = FB[k]; if (!B || !B.length) return false; if (v <= .001) return true;
-  try { ac(); playBuf(B[Math.floor(Math.random() * B.length)], v, rate, w, pan); } catch (e) {} return true;
+  try { ac(); playBuf(B[Math.floor(Math.random() * B.length)], v, rate, w, pan, dur); } catch (e) {} return true;
 }
+// 소리 크기 표(마인크래프트 비율을 따라요): 블록 놓기·부수기를 1로 두고, 발소리는 아주 작게, 캐는 중 톡톡은 작게
+const U = .26, MIX = { step: .2, jump: .14, land: .4, dig: .32, place: 1, brk: 1, pickup: .55, hurt: 1.3, hit: .5, crit: .7, bite: .4, door: .5,
+  splash: .8, swim: 1, flow: .12, drip: .15, animal: .9, fire: .5, boom: .9, robot: .7 };
 // 자리에서 나는 소리: 멀수록 작게, 왼쪽·오른쪽에서 들리게
 const _fw = new THREE.Vector3();
 function posMix(x, y, z, maxD) {
@@ -2999,7 +3004,7 @@ function aniVoice(m, hurt) {
   if (m.type === "wolf" && !hurt) { if (m.angry > 0) { k = "growl"; i = 0; } else if (env.e < -.05 && !m.own && Math.random() < .25) { k = "howl"; v *= 1.1; } }
   const AF = { cow: ["cow", "cow_hurt"], pig: ["pig", "pig_hurt"], chicken: ["chicken", "chicken"], sheep: ["sheep", "sheep"], cat: ["cat", "cat_hurt"] }[k];
   const hr = hurt && (k === "chicken" || k === "sheep") ? 1.25 : 1; // 닭·양은 맞을 때 같은 소리를 높게
-  sPlayAt(k, i, v * (AF ? 1.6 : 1), (m.baby > 0 ? 1.35 : 1) * hr * Rn(.94, 1.06), m.p.x, m.p.y + m.T.h * .7, m.p.z, k === "howl" ? 60 : 26, AF && AF[i]);
+  sPlayAt(k, i, (AF ? .36 * ({ pig: .7, chicken: 1.5, sheep: .45, cat: .8 }[k] || 1) * (hurt ? 1.2 : 1) : v) * MIX.animal / .9, (m.baby > 0 ? 1.35 : 1) * hr * Rn(.94, 1.06), m.p.x, m.p.y + m.T.h * .7, m.p.z, k === "howl" ? 60 : 26, AF && AF[i]);
 }
 const MATCAT = {};
 [[1, 4, 9, 11, 12, 16, 19, 20, 21, 24, 29, 33, 38, 39, 40, 41, 42, 44, 47, 48, 66, 67, 79], "stone", [10, 18], "gravel", [3, 15, 45], "dirt", [2], "grass", [5, 22, 74], "sand", [17], "snow", [14, 27], "ice",
@@ -3013,14 +3018,14 @@ const DIGF = { grass: "dig_crumbly", dirt: "dig_crumbly", gravel: "dig_crumbly",
 const PLACEF = { stone: "place_hard", ice: "place_hard", glass: "place_hard", wood: "place_hard", metal: "place_metal", liquid: "water_place" };
 const BREAKF = { glass: "break_glass", ice: "break_glass", metal: "dug_metal", liquid: "water_dug" };
 function blockSound(b, vol = 1, kind = "step", rate = 1) {
-  const c = matOf(b), rr = r(.9, 1.1) * rate;
-  if (kind === "step" && fPlay(STEPF[c], .3 * vol, rr)) return;
-  if (kind === "dig" && fPlay(DIGF[c], .32 * vol, rr)) return;
-  if (kind === "place" && fPlay(PLACEF[c] || "place", .42 * vol, rr)) return;
-  if (kind === "break") { const bf = BREAKF[c]; if (bf ? fPlay(bf, .45 * vol, rr) : fPlay("dug", .4 * vol, rr) && (fPlay(STEPF[c], .4 * vol, rr * .9) || true)) return; }
+  const c = matOf(b), rr = r(.9, 1.1) * rate, k = kind === "break" ? "brk" : kind, v = U * MIX[k] * vol;
+  if (kind === "step" && fPlay(STEPF[c], v, rr, 0, 0, .32)) return;
+  if (kind === "dig" && fPlay(DIGF[c], v, rr, 0, 0, .3)) return;
+  if (kind === "place" && fPlay(PLACEF[c] || "place", v, rr, 0, 0, .45)) return;
+  if (kind === "break") { const bf = BREAKF[c]; if (bf ? fPlay(bf, v, rr) : fPlay("dug", v * .8, rr) && (fPlay(STEPF[c], v * .5, rr * .9, 0, 0, .4) || true)) return; }
   const big = kind === "break";
-  if (c === "liquid") { sPlay(big ? "splash" : "bubble", 0, (big ? .3 : .25) * vol, r(.9, 1.1)); return; }
-  sPlay(c, big ? 1 : 0, (big ? .34 : .28) * vol, r(.88, 1.12) * rate);
+  if (c === "liquid") { sPlay(big ? "splash" : "bubble", 0, v, r(.9, 1.1)); return; }
+  sPlay(c, big ? 1 : 0, v, r(.88, 1.12) * rate);
 }
 const feetB = () => get(Math.floor(P.pos.x), Math.floor(P.pos.y - .1), Math.floor(P.pos.z));
 const sfx = {
@@ -3028,24 +3033,27 @@ const sfx = {
   dig: (b) => { blockSound(b, 1.1, "break"); if (BLOCKS[b] && BLOCKS[b].ore) { tone(1320, .4, "sine", .03, .06); tone(2640, .22, "sine", .01, .06); } },
   place: (b) => blockSound(b || 4, 1, "place"),
   step: (b) => blockSound(b, 1, "step"),
-  pop: () => fPlay("pickup", .3, r(.9, 1.2)) || sPlay("pop", 0, .3, r(.95, 1.1)),
-  hurt: () => fPlay("hurt", .5, r(.95, 1.05)) || sPlay("ouch", 0, .4, r(.93, 1.07)),
-  land: (k) => { blockSound(feetB(), 1.2 + k, "step", .85); if (k > .3) fPlay("fall", .3 + .3 * k); },
-  jump: () => blockSound(feetB(), .7, "step"),
+  pop: () => fPlay("pickup", U * MIX.pickup, r(.9, 1.2)) || sPlay("pop", 0, U * MIX.pickup, r(.95, 1.1)),
+  hurt: () => fPlay("hurt", U * MIX.hurt, r(.95, 1.05)) || sPlay("ouch", 0, U * MIX.hurt, r(.93, 1.07)),
+  land: (k) => blockSound(feetB(), (MIX.land + MIX.land * k) / MIX.step, "step", .85), // 떨어져도 다치지 않으니 '아야' 소리는 안 내요
+  jump: () => blockSound(feetB(), MIX.jump / MIX.step, "step"),
   quest: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .16, "triangle", .08, i * .08)),
-  launch: () => { sPlay("boom", 0, .5, .6); tone(70, 2.4, "triangle", .1, 0, 500); },
-  die: () => { if (!fPlay("hurt", .55, .8)) sPlay("ouch", 0, .45, .8); tone(300, .8, "triangle", .05, .15, 70); },
-  fizz: () => fPlay("water_dug", .25, 1.4) || sPlay("splash", 0, .2, 1.6),
+  launch: () => { sPlay("boom", 0, U * 1.2, .6); tone(70, 2.4, "triangle", .07, 0, 500); },
+  die: () => { if (!fPlay("hurt", U * MIX.hurt, .8)) sPlay("ouch", 0, U * MIX.hurt, .8); tone(300, .8, "triangle", .04, .15, 70); },
+  fizz: () => fPlay("water_dug", U * .6, 1.4) || sPlay("splash", 0, U * .6, 1.6),
   beep: () => { tone(880, .07, "triangle", .05); tone(620, .09, "triangle", .05, .09); },
-  hit: (crit) => fPlay("punch", crit ? .55 : .42, (crit ? .8 : 1) * r(.92, 1.08)) || sPlay(crit ? "crit" : "atk", 0, crit ? .6 : .5, r(.9, 1.1)),
-  boom: (k = 1) => fPlay("explode", .25 + .45 * k, r(.9, 1.1) * (k < .5 ? 1.3 : 1)) || sPlay("boom", 0, .25 + .45 * k, r(.85, 1.1) * (k < .5 ? 1.3 : 1)),
+  hit: (crit) => { const v = U * (crit ? MIX.crit : MIX.hit); fPlay("punch", v, (crit ? .8 : 1) * r(.92, 1.08), 0, 0, .35) || sPlay(crit ? "crit" : "atk", 0, v, r(.9, 1.1)); },
+  // 폭발: k가 작을수록(먼 곳·작은 충격) 작고 짧게
+  boom: (k = 1) => { const v = U * MIX.boom * (.25 + .75 * k), rt = r(.9, 1.1) * (k < .5 ? 1.25 : 1); fPlay("explode", v, rt, 0, 0, k < .5 ? .6 : 0) || sPlay("boom", 0, v, rt); },
+  // 로봇이 부서질 때: 큰 폭발 대신 쇠붙이가 부서지는 소리 + 작은 펑
+  robot: () => { fPlay("dug_metal", U * MIX.robot, r(.85, 1)) || sPlay("metal", 1, U * MIX.robot, .9); fPlay("explode", U * .35, r(1.5, 1.7), .02, 0, .35) || sPlay("boom", 0, U * .35, 1.5, .02); },
   alarm: () => [0, .25, .5].forEach(w => tone(980, .16, "triangle", .06, w, 760)),
-  eat: () => { if (!FB.bite) return sPlay("eat", 0, .32, r(.92, 1.08)); for (let i = 0; i < 3; i++) fPlay("bite", .35, r(.9, 1.15), i * .2); },
-  door: (open) => fPlay(open ? "door_open" : "door_close", .4, r(.95, 1.05)) || sPlay("door", open ? 0 : 1, .32, r(.92, 1.08)),
-  gate: (open) => fPlay(open ? "gate_open" : "gate_close", .4, r(.95, 1.05)) || sPlay("door", open ? 0 : 1, .32, r(.92, 1.08)),
-  chest: (open) => fPlay(open ? "door_open" : "door_close", .38, open ? .78 : .85) || sPlay("chest", open ? 0 : 1, .32, r(.95, 1.05)),
-  splash: (k = 1) => fPlay("water_place", .2 + .3 * k, r(.9, 1.1)) || sPlay("splash", 0, .15 + .3 * k, r(.9, 1.1)),
-  swim: () => fPlay("water_step", .22, r(.9, 1.1)) || sPlay("swim", 0, .18, r(.85, 1.15)),
+  eat: () => { if (!FB.bite) return sPlay("eat", 0, U * MIX.bite, r(.92, 1.08)); for (let i = 0; i < 3; i++) fPlay("bite", U * MIX.bite, r(.9, 1.15), i * .2); },
+  door: (open) => fPlay(open ? "door_open" : "door_close", U * MIX.door, r(.95, 1.05)) || sPlay("door", open ? 0 : 1, U * MIX.door, r(.92, 1.08)),
+  gate: (open) => fPlay(open ? "gate_open" : "gate_close", U * MIX.door, r(.95, 1.05)) || sPlay("door", open ? 0 : 1, U * MIX.door, r(.92, 1.08)),
+  chest: (open) => fPlay(open ? "door_open" : "door_close", U * MIX.door, open ? .78 : .85) || sPlay("chest", open ? 0 : 1, U * MIX.door, r(.95, 1.05)),
+  splash: (k = 1) => fPlay("water_place", U * MIX.splash * (.4 + .6 * k), r(.9, 1.1), 0, 0, 1.2) || sPlay("splash", 0, U * MIX.splash * (.4 + .6 * k), r(.9, 1.1)),
+  swim: () => fPlay("water_step", U * MIX.swim, r(.9, 1.1), 0, 0, .7) || sPlay("swim", 0, U * MIX.swim, r(.85, 1.15)),
 };
 
 /* ═════════════ 입력 ═════════════ */
@@ -3975,7 +3983,7 @@ function cookTick(dt) {
   // 굽는 화로 가까이 가면 지글지글·타닥타닥
   let nj = null, nd = 1e9; for (const key in seen) { const j = seen[key]; if (j.gone) continue; const dd = Math.hypot(j.x + .5 - P.pos.x, j.y + .5 - P.pos.y, j.z + .5 - P.pos.z); if (dd < nd) { nd = dd; nj = j; } }
   if (nj) { const x = nj.x + .5, y = nj.y + .5, z = nj.z + .5; loopSet("sizzle", FB.fire ? .08 : .18, x, y, z);
-    if (FB.fire) { loopSet("fire", 0); if ((cookSndT -= dt) <= 0) { cookSndT = 3.9; if (!paused) sPlayAt("bubble", 0, .45, r(.95, 1.05), x, y, z, 14, "fire"); } } else loopSet("fire", .14, x, y, z); }
+    if (FB.fire) { loopSet("fire", 0); if ((cookSndT -= dt) <= 0) { cookSndT = 3.9; if (!paused) sPlayAt("bubble", 0, U * MIX.fire, r(.95, 1.05), x, y, z, 14, "fire"); } } else loopSet("fire", .14, x, y, z); }
   else { loopSet("sizzle", 0); loopSet("fire", 0); cookSndT = 0; }
   // 불꽃·연기·남은 시간
   for (const key in cookFx) if (!seen[key] || seen[key].gone) { scene.remove(cookFx[key].g); delete cookFx[key]; }
@@ -4176,7 +4184,7 @@ function petBite(m, tg) {
   const dmg = 4 + (MLV[S.planet] || 1) * 1.5; tone(200, .1, "sawtooth", .05, 0, 120);
   if (tg === boss) { boss.hp -= dmg * .5; boss.flash = 1; if (boss.hp <= 0) bossDie(); }
   else { tg.hp -= dmg; tg.flash = 1; if (tg.hp <= 0) { const x = Math.floor(tg.p.x), y = Math.floor(tg.p.y + .5), z = Math.floor(tg.p.z);
-      burst(x, y, z, 23); sfx.boom(.4); scene.remove(tg.g); if (tg.beam) scene.remove(tg.beam); mobs = mobs.filter(o => o !== tg);
+      burst(x, y, z, 23); sfx.robot(); scene.remove(tg.g); if (tg.beam) scene.remove(tg.beam); mobs = mobs.filter(o => o !== tg);
       const got = []; tg.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); }); got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
       S.kills = (S.kills || 0) + 1; toast(`늑대가 ${tg.T.n}${josa(tg.T.n, "을", "를")} 멈췄어요!${got.length ? " 부품: " + got.map(itemName).join(", ") : ""}`, 1800); renderHotbar(); } }
   // 로봇과 붙어 싸우면 늑대도 다쳐요. 쓰러지면 기지로 돌아가 쉬어요
@@ -4440,7 +4448,7 @@ function attackTick(dt) {
     best.v.addScaledVector(d, best.type === "heavy" ? 2 : 7); best.v.y = best.type === "heavy" ? 1 : 3.5;
     if (best.hp <= 0) {
       const x = Math.floor(best.p.x), y = Math.floor(best.p.y + .5), z = Math.floor(best.p.z);
-      burst(x, y, z, 23); burst(x, y, z, 9); sfx.boom(.5); scene.remove(best.g); if (best.beam) scene.remove(best.beam); mobs = mobs.filter(m => m !== best);
+      burst(x, y, z, 23); burst(x, y, z, 9); sfx.robot(); scene.remove(best.g); if (best.beam) scene.remove(best.beam); mobs = mobs.filter(m => m !== best);
       const got = []; best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); });
       got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
       if (best.type === "splitter") for (const s2 of [-1, 1]) { const m2 = mkMob("mini", best.p.x + s2 * .5, best.p.y + .2, best.p.z + s2 * .3); m2.v.set(s2 * 3, 4, -s2 * 2); }

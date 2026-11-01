@@ -22,7 +22,6 @@ The sound files in this folder are **not** Minecraft (Mojang) sounds. They are u
 | default_dig_snappy | blukotek — https://www.freesound.org/people/blukotek/sounds/251660/ | CC0 |
 | player_damage | sonictechtonic — https://www.freesound.org/people/sonictechtonic/sounds/241872/ | CC BY 3.0 |
 | mcl_sounds_place_node_water, mcl_sounds_dug_water | Voxelands project (sdzen, darkrose, sapier, Tom Peter, Telaron, juskiddink) | CC BY-SA 3.0 |
-| player_falling_damage | Adam_N — https://www.freesound.org/people/Adam_N/sounds/346692/ | CC0 |
 | mcl_sounds_cloth.1–4 | Alecia Shepherd — SnowSong sound and music pack, https://opengameart.org/content/snowsong-sound-and-music-pack | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | pedology_snow_soft_footstep.1–4 | 작가 미상 (Unknown) | WTFPL |
 
