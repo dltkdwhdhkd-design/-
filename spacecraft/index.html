@@ -62,6 +62,7 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 #compassStrip span.c { color: var(--ink); }
 #compassSun { position: absolute; top: 3px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: radial-gradient(#fff6c8, #ffb347 60%, transparent 70%); }
 #compassLair { position: absolute; top: 2px; margin-left: -30px; width: 60px; text-align: center; font: 700 11px sans-serif; color: #e0a0ff; text-shadow: 0 0 4px #000; white-space: nowrap; opacity: 0; }
+#compassProbe { position: absolute; top: 2px; margin-left: -34px; width: 68px; text-align: center; font: 700 11px sans-serif; color: #7ff0ff; text-shadow: 0 0 4px #000; white-space: nowrap; opacity: 0; }
 #compass::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: var(--ore); }
 #gauges { left: max(10px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 7px; }
 .g { display: grid; grid-template-columns: 4.2em 1fr 3.3em; gap: 8px; align-items: center; font-size: .85em; font-weight: 700; }
@@ -131,6 +132,7 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 #tView { right: max(220px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: 52px; height: 52px; font-size: .8em; }
 #tAtk { right: max(140px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 112px); width: 80px; height: 80px; font-size: 1.05em; background: #ff5a4a33; border-color: #ff8a7acc; }
 #tAtk.on { background: #ff5a4a88; }
+#tDrop { right: max(292px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); width: 52px; height: 52px; font-size: .75em; }
 #tMode.place { background: color-mix(in srgb, var(--ore) 35%, transparent); border-color: var(--ore); }
 @media (max-width: 760px) {
   #env { width: 170px; font-size: .9em; }
@@ -149,6 +151,7 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
   #tMode { right: max(104px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 94px); width: 52px; height: 52px; }
   #tView { right: max(164px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 94px); width: 50px; height: 50px; }
   #tChat { right: max(164px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: 50px; height: 50px; }
+  #tDrop { right: max(104px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); width: 50px; height: 50px; }
 }
 
 @media (max-height: 520px) { .title h1 { font-size: 2.2rem; } .card { gap: 10px; } #env, #mission { font-size: .85em; } }
@@ -291,7 +294,7 @@ td.unk { color: #4e5786; }
   <span class="d" id="mDesc"></span>
   <div class="bar"><i id="mBar"></i></div>
 </div>
-<div class="hud" id="compass" hidden><div id="compassStrip"></div><div id="compassSun"></div><div id="compassLair"></div></div>
+<div class="hud" id="compass" hidden><div id="compassStrip"></div><div id="compassSun"></div><div id="compassLair"></div><div id="compassProbe"></div></div>
 <div class="hud" id="env" hidden>
   <div class="pn"><b id="pName"></b><span id="pType"></span></div>
   <dl>
@@ -327,6 +330,7 @@ td.unk { color: #4e5786; }
   <button class="btn ghost click" id="bInv">가방·장비 <kbd>I</kbd></button>
   <button class="btn ghost click" id="bDex">도감·일지 <kbd>J</kbd></button>
   <button class="btn ghost click" id="bMap">우주 지도 <kbd>M</kbd></button>
+  <button class="btn ghost click" id="bDrop">든 것 버리기 <kbd>Q</kbd> · 전부 <kbd>Shift+Q</kbd></button>
   <button class="btn ghost click" id="bLook">꾸미기 <kbd>C</kbd> · 시점 <kbd>V</kbd></button>
   <button class="btn ghost click" id="bSet">설정 <kbd>O</kbd></button>
   <button class="btn ghost click" id="bXR" hidden>VR로 보기 (퀘스트)</button>
@@ -337,6 +341,7 @@ td.unk { color: #4e5786; }
   <button class="tb" id="tMode">캐기</button>
   <button class="tb" id="tJump">점프</button>
   <button class="tb" id="tView">시점</button>
+  <button class="tb" id="tDrop">버리기</button>
   <button class="tb" id="tAtk">공격</button>
   <button class="tb" id="tChat" hidden>말</button>
 </div>
@@ -1531,7 +1536,7 @@ function loadPlanet(pk, spawnAtBase = true) {
   S.planet = pk; S.visited[pk] = true;
   SX = SZ = PLANETS[pk].size || 96;
   W.fill(0); SH.fill(0); wrapX = PLANETS[pk].wrap; placedTimes = {};
-  treeSpots = []; GEN[pk]();
+  treeSpots = []; GEN[pk](); buildProbe(pk); findVents(pk);
   const ed = S.edits[pk] || {};
   flowQ.clear();
   for (const k in ed) { const [x, y, z] = k.split(",").map(Number); set(x, y, z, ed[k]); if (ed[k] && pk === "venus") placedTimes[k] = gameT; flowQ.add(fKey(x, y, z)); } // 저장된 곳 둘레의 물은 다시 흐름을 살펴봐요
@@ -2455,6 +2460,8 @@ const MISSION_BY_ID = {}; for (const pk in MISSIONS) MISSIONS[pk].forEach(m => {
 function curMission() { const L = MISSIONS[S.planet]; return L.find(m => !S.done[m.id]); }
 function renderMission() {
   const L = MISSIONS[S.planet], m = curMission();
+  const BT = !m && bountyText();
+  if (BT) { $("mNo").textContent = `${PLANETS[S.planet].name} 임무 완료 · 탐사 의뢰${(S.bdone || {})[S.planet] ? ` (${S.bdone[S.planet]}번 해냄)` : ""}`; $("mTitle").textContent = BT.q.t; $("mDesc").textContent = BT.line + (S.planet === "neptune" ? "" : " · 다음 천체는 우주 지도(M)"); return; }
   if (!m) { $("mNo").textContent = `${PLANETS[S.planet].name} 임무 완료`; $("mTitle").textContent = S.planet === "neptune" ? "태양계 탐사 완료!" : "우주 지도(M)로 다음 천체로"; $("mDesc").textContent = S.planet === "neptune" ? "도감(J)에서 지구형 행성과 목성형 행성을 비교해 보세요." : ""; $("mBar").style.width = "100%"; return; }
   $("mNo").textContent = `${PLANETS[S.planet].name} 임무 ${L.indexOf(m) + 1} / ${L.length}`;
   $("mTitle").textContent = m.t; $("mDesc").textContent = m.d;
@@ -2467,7 +2474,7 @@ function missionTick(dt) {
   const lookAt = (key, pk, dir) => { if (S.planet !== pk) return; const d = new THREE.Vector3(); camera.getWorldDirection(d); S.look = S.look || {}; if (d.angleTo(dir) < .3) S.look[key] = (S.look[key] || 0) + dt; };
   lookAt("grs", "jupiter", GRS_DIR); lookAt("ring", "saturn", RING_DIR);
   if (S.planet === "mars" && P.pos.y >= 40 && Math.hypot(P.pos.x - 50, P.pos.z - 46) < 5) S.summit = true;
-  const m = curMission(); if (!m) return;
+  const m = curMission(); if (!m) { bountyTick(); return; }
   const p = Math.max(0, Math.min(1, m.p()));
   $("mBar").style.width = (p * 100) + "%";
   if (p >= 1) {
@@ -2500,12 +2507,13 @@ const metMat = new THREE.MeshLambertMaterial({ color: 0x4a4038 }), ringMat = new
 const FLARE_ON = { moon: "태양 폭풍", mercury: "태양 폭풍", mars: "태양 폭풍", europa: "목성 방사선 폭풍" };
 function resetHazards() {
   if (met) { scene.remove(met.rock); scene.remove(met.ring); met = null; }
-  metNext = gameT + 40 + Math.random() * 30; flare = { st: 0, t: 0 }; flareNext = gameT + 100 + Math.random() * 60;
+  clearWonders(); metNext = gameT + 40 + Math.random() * 30; flare = { st: 0, t: 0 }; flareNext = gameT + 100 + Math.random() * 60;
 }
 function covered() { const x = Math.floor(P.pos.x), z = Math.floor(P.pos.z); for (let y = Math.floor(P.pos.y + PH) + 1; y < SY; y++) if (SOLID(get(x, y, z)) && get(x, y, z) !== 32) return true; return false; }
 function firstLog(key, L) { S.seenHaz = S.seenHaz || {}; if (S.seenHaz[key]) return; S.seenHaz[key] = true; S.logs.push({ id: key, pk: S.planet, ...L }); showLog({ no: `탐사 일지 · ${PLANETS[S.planet].name}`, ...L }); }
 function hazards2(dt) {
   const pk = S.planet, PL = PLANETS[pk]; radNow = false;
+  wonderTick(dt);
   // 운석: 대기가 없는 달·수성
   if (pk === "moon" || pk === "mercury") {
     if (!met && gameT > metNext) {
@@ -2534,6 +2542,7 @@ function hazards2(dt) {
         if (SOLID(get(met.x, met.y - 3, met.z)) && BLOCKS[get(met.x, met.y - 3, met.z)].h < 1e6) L.push([met.x, met.y - 3, met.z, 9]); // 운석 속 철
         editMany(L); burst(met.x, met.y, met.z, 12); burst(met.x, met.y, met.z, 9); sfx.boom(1); hurtT = Math.max(hurtT, .6);
         const pd = Math.hypot(P.pos.x - met.x - .5, P.pos.z - met.z - .5, (P.pos.y - met.y) * .7);
+        if (pd < 15) evBump("meteor");
         if (pd < 3.5) { S.hp -= 8 + 30 * (1 - pd / 3.5); cause = "meteor"; hurtT = 1; sfx.hurt(); P.vel.y = 5; if (S.hp <= 0) die(); }
         scene.remove(met.rock); scene.remove(met.ring); met = null; metNext = gameT + 45 + Math.random() * 40;
         firstLog("met-" + pk, { t: "대기가 없는 곳의 운석", ev: "운석이 타지 않고 그대로 떨어져 구덩이(크레이터)를 만들었어요. 바닥에 철광석이 박혔어요.", x: `지구에서는 우주에서 들어온 작은 암석 대부분이 대기와 부딪히며 타 버려 별똥별로 보여요. ${PL.name}에는 대기가 없어서 운석이 타지 않고 표면까지 그대로 떨어져요. 그래서 ${PL.name} 표면에는 크레이터가 아주 많아요. 운석에는 철이 많이 들어 있기도 해요.` });
@@ -2565,6 +2574,315 @@ function hazards2(dt) {
   } else if (shoot) { skyGroup.remove(shoot.ln); shoot = null; }
 }
 
+/* ═════════════ 천체마다 할 거리: 탐사선 흔적 · 천체 현상 · 탐사 의뢰 ═════════════ */
+// 천체마다 따로 세는 횟수(로봇·보스·운석·물기둥·떨어진 것 줍기·잠수). 탐사 의뢰가 이 값으로 진행도를 재요
+const evCnt = (k, pk = S.planet) => (((S.cnt || {})[pk] || {})[k]) || 0;
+function evBump(k, n = 1) { const c = S.cnt = S.cnt || {}, o = c[S.planet] = c[S.planet] || {}; o[k] = (o[k] || 0) + n; }
+const evPiles = () => (S.piles || []).filter(q => q.pk === S.planet && q.kind === "ev").length;
+const rndI = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const hdx = (x) => { let dx = x - P.pos.x; if (wrapX) dx = ((dx + SX / 2) % SX + SX) % SX - SX / 2; return dx; };
+
+// ── 1. 탐사선 흔적: 실제로 그 천체에 갔던 탐사선을 찾아가면 이야기 카드와 보급품을 받아요
+const PROBES = {
+  moon: { n: "아폴로 11호 착륙선", yr: "1969", kind: "apollo", loot: { 112: 4, 111: 2 },
+    ev: "1969년 7월 20일, 사람이 처음 달에 내린 곳이에요.", x: "닐 암스트롱과 버즈 올드린이 고요의 바다에 내렸어요. 달에는 공기가 없어 바람도 비도 없어요. 그래서 그때 찍힌 발자국이 지금도 거의 그대로 남아 있을 거예요." },
+  mars: { n: "큐리오시티 로버", yr: "2012", kind: "rover", loot: { 104: 3, 112: 3 },
+    ev: "2012년 게일 충돌구에 내린 자동차만 한 탐사 로봇이에요.", x: "큐리오시티는 태양광 대신 원자력 전지(RTG)로 움직여서 먼지 폭풍에도 멈추지 않아요. 옛날 화성에 물이 고인 호수가 있었다는 증거를 찾았어요." },
+  mercury: { n: "메신저 호 충돌 자국", yr: "2015", kind: "crash", loot: { 110: 4, 102: 4 },
+    ev: "메신저 호가 연료를 다 쓰고 수성 표면에 떨어진 자리예요.", x: "메신저 호는 4년 동안 수성 둘레를 돌며 표면 전체를 찍었어요. 햇빛이 들지 않는 극지방 구덩이 속에 얼음이 있다는 것도 확인했어요." },
+  venus: { n: "베네라 13호", yr: "1982", kind: "venera", loot: { 104: 4, 110: 3 },
+    ev: "1982년 금성 표면에 내린 옛 소련의 착륙선이에요.", x: "베네라 13호는 금성 표면의 첫 컬러 사진을 보냈어요. 약 460 °C의 열과 90기압이 넘는 압력 때문에 127분 만에 멈췄어요." },
+  jupiter: { n: "갈릴레오 진입선 기념 신호기", yr: "1995", kind: "chute", loot: { 105: 8, 111: 2 },
+    ev: "1995년 목성 대기로 뛰어든 갈릴레오 진입선을 기리는 신호기예요.", x: "진입선은 낙하산을 펴고 목성 구름 속으로 내려가며 58분 동안 바람과 기온을 쟀어요. 그 뒤 높은 압력과 열에 부서졌어요. 목성에는 내려앉을 땅이 없어요." },
+  europa: { n: "유로파 클리퍼 기념 신호기", yr: "2030", kind: "dish", loot: { 106: 4, 111: 2 },
+    ev: "2024년에 떠나 2030년에 도착할 탐사선 유로파 클리퍼를 기다리는 신호기예요.", x: "유로파 클리퍼는 유로파 곁을 수십 번 지나가며 얼음 껍질의 두께와 그 아래 바다를 조사할 거예요. 생물이 살 수 있는 곳인지 알아보는 것이 목표예요." },
+  saturn: { n: "카시니 호 기념 신호기", yr: "2017", kind: "dish", loot: { 105: 8, 110: 4 },
+    ev: "13년 동안 토성을 돌며 조사한 카시니 호를 기리는 신호기예요.", x: "카시니 호는 2017년 연료가 떨어지자 생물이 있을지 모르는 위성들을 오염시키지 않으려고 일부러 토성 대기로 뛰어들어 마지막 자료를 보내고 타 버렸어요." },
+  titan: { n: "하위헌스 착륙선", yr: "2005", kind: "huygens", loot: { 107: 6, 111: 3 },
+    ev: "2005년 타이탄에 내려앉은 착륙선이에요.", x: "하위헌스는 지금까지 바깥 태양계 천체의 표면에 내린 유일한 탐사선이에요. 둥글게 닳은 얼음 자갈 사진을 보냈어요. 액체가 흘렀다는 증거예요." },
+  uranus: { n: "보이저 2호 기념 신호기", yr: "1986", kind: "dish", loot: { 111: 4, 110: 3 },
+    ev: "1986년 천왕성 곁을 지나간 보이저 2호를 기리는 신호기예요.", x: "지금까지 천왕성에 간 탐사선은 보이저 2호 하나뿐이에요. 곁을 지나가며 새 위성 10개와 고리 2개를 찾았어요." },
+  neptune: { n: "보이저 2호 기념 신호기", yr: "1989", kind: "dish", loot: { 111: 6, 139: 1 },
+    ev: "1989년 해왕성 곁을 지나간 보이저 2호를 기리는 신호기예요.", x: "보이저 2호는 해왕성의 거대한 폭풍(대흑점)과 위성 트리톤에서 뿜어 나오는 질소 기둥을 찾았어요. 그 뒤 태양계를 벗어나 지금도 지구로 신호를 보내요." },
+};
+const PROBE_ORDER = ["moon", "mars", "mercury", "venus", "jupiter", "europa", "saturn", "titan", "uranus", "neptune"];
+let probeAt = null, probeV = null;
+// 땅 모양이 같으면 늘 같은 자리에 생겨요(친구 화면과 같아요). 월드를 만든 직후 기본 지형에 지어요
+function probeSpot(pk) {
+  const PL = PLANETS[pk], flat = (x, z, y0, lo, hi) => { for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const y = topY(x + dx, z + dz); if (y < y0 - lo || y > y0 + hi || LIQ(get(x + dx, y + 1, z + dz))) return false; } return true; };
+  if (PL.gas) { // 기지에서 먼 구름 섬
+    let best = null, bd = 0;
+    for (let x = 4; x < SX - 4; x++) for (let z = 4; z < SZ - 4; z++) {
+      const d = Math.hypot(x - base.x, z - base.z); if (d < 12 || d > 30 || d <= bd) continue;
+      if (topY(x, z) === GAS_TOP && flat(x, z, GAS_TOP, 0, 1)) { best = { x, z }; bd = d; }
+    }
+    return best && { ...best, y: GAS_TOP + 1 };
+  }
+  const a = ({ moon: 2.3, mars: 3.7, mercury: 5.1, europa: 1.3, titan: 4.3 }[pk] || .4) + Math.PI, dd = pk === "venus" ? 14 : 27;
+  for (let r = 0; r < 18; r++) for (let k = 0; k < 8; k++) {
+    const x = Math.max(6, Math.min(SX - 7, Math.round(base.x + Math.cos(a) * dd + Math.cos(k * .785) * r))), z = Math.max(6, Math.min(SZ - 7, Math.round(base.z + Math.sin(a) * dd + Math.sin(k * .785) * r)));
+    const y = topY(x, z); if (Math.hypot(x - base.x, z - base.z) < (pk === "venus" ? 8 : 14) || y < 3 || y > SY - 9) continue;
+    if (pk === "venus" && y > VENUS_BASE - 8) continue;
+    if (flat(x, z, y, 1, 1)) return { x, y: y + 1, z };
+  }
+  return null;
+}
+function buildProbe(pk) {
+  probeAt = null; const P0 = PROBES[pk]; if (!P0) return;
+  const q = probeSpot(pk); if (!q) return; probeAt = { pk, ...q };
+  const { x, y, z } = q, gb = get(x, y - 1, z) || 4, S_ = (dx, dy, dz, b) => set(x + dx, y + dy, z + dz, b);
+  // 둘레를 고르게: 위는 비우고 아래 빈 곳은 메워요
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { for (let dy = 0; dy <= 6; dy++) S_(dx, dy, dz, 0); if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2 && !SOLID(get(x + dx, y - 1, z + dz))) S_(dx, -1, dz, gb); }
+  const K = P0.kind;
+  if (K === "apollo") { // 금박 하강단 + 다리 넷 + 깃발
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => S_(a * 2, 0, b * 2, 49));
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) S_(a, 1, b, 63);
+    S_(0, 2, 0, 49); S_(0, 2, 1, 32);
+    S_(3, 0, -2, 76); S_(3, 1, -2, 76); S_(3, 2, -2, 76); S_(3, 2, -1, 68);
+  } else if (K === "rover") { // 바퀴 여섯 + 몸통 + 카메라 기둥 + 원자력 전지
+    for (let a = -1; a <= 1; a++) { S_(a, 0, -1, 66); S_(a, 0, 1, 66); for (let b = -1; b <= 1; b++) S_(a, 1, b, 49); }
+    S_(1, 2, 0, 49); S_(1, 3, 0, 49); S_(1, 4, 0, 32); S_(-2, 1, 0, 37);
+  } else if (K === "crash") { // 얕은 구덩이와 흩어진 조각
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) { const r = Math.hypot(dx, dz); if (r < 2.6) { S_(dx, -1, dz, 0); if (r < 1.5) S_(dx, -2, dz, gb === 14 ? 19 : gb); } }
+    S_(0, -2, 0, 49); S_(1, -1, 0, 30); S_(-1, -1, 1, 63); S_(3, 0, 2, 30); S_(-3, 0, -1, 49); S_(2, 0, -3, 63);
+  } else if (K === "venera") { // 둥근 받침 위 공 모양 몸통
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) S_(a, 0, b, 49);
+    [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => S_(a, 1, b, 63)); S_(0, 2, 0, 63); S_(0, 3, 0, 49);
+  } else if (K === "huygens") { // 납작한 원반 + 바닥에 펼쳐진 낙하산
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) S_(a, 0, b, a || b ? 49 : 63); S_(0, 1, 0, 63);
+    for (let a = 2; a <= 3; a++) for (let b = 1; b <= 2; b++) S_(a, 0, b, 68);
+  } else if (K === "chute") { // 진입선 + 위로 펼친 낙하산
+    S_(0, 0, 0, 63); S_(0, 1, 0, 49); for (let k = 2; k <= 4; k++) S_(0, k, 0, 76);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) S_(a, 5, b, (a + b) % 2 ? 62 : 68); // 줄무늬 낙하산
+  } else { // 기념 신호기: 기둥 + 접시 안테나 + 금 레코드
+    for (let k = 0; k <= 2; k++) S_(0, k, 0, 49);
+    [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => S_(a, 3, b, 74)); S_(0, 4, 0, 49); S_(1, 1, 0, 63); S_(0, 0, 1, 37);
+  }
+}
+function probeTick() {
+  const pk = S.planet, P0 = PROBES[pk];
+  if (probeV && probeV.pk !== pk) { scene.remove(probeV.beam); scene.remove(probeV.tag); probeV = null; }
+  if (!P0 || !probeAt || probeAt.pk !== pk) return;
+  const got = (S.probe || {})[pk];
+  if (!probeV || probeV.got !== !!got) {
+    if (probeV) { scene.remove(probeV.beam); scene.remove(probeV.tag); }
+    const beam = new THREE.Mesh(lairBeamGeo, new THREE.MeshBasicMaterial({ color: 0x40e0ff, transparent: true, opacity: .22, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    beam.position.set(probeAt.x + .5, probeAt.y + 36, probeAt.z + .5); beam.scale.set(.5, 1, .5); beam.visible = !got; scene.add(beam);
+    const tag = nameTag(got ? `${P0.n} (${P0.yr})` : "탐사선 흔적 ?", got ? "#5fe0c8" : "#40e0ff"); tag.position.set(probeAt.x + .5, probeAt.y + 6.5, probeAt.z + .5); tag.scale.set(3.4, .85, 1); scene.add(tag);
+    probeV = { pk, beam, tag, got: !!got, t0: probeV && probeV.pk === pk ? probeV.t0 : gameT };
+  }
+  if (got) return;
+  const S2 = S.probeHint = S.probeHint || {};
+  if (!S2[pk] && gameT - probeV.t0 > 7) { S2[pk] = true; toast("이 천체 어딘가에 옛 탐사선의 흔적이 있어요. 나침반의 ◇와 하늘색 빛기둥을 따라가 보세요", 4200); }
+  const dx = hdx(probeAt.x + .5), dz = probeAt.z + .5 - P.pos.z;
+  if (Math.hypot(dx, dz) < 4.5 && Math.abs(P.pos.y - probeAt.y) < 5) {
+    (S.probe = S.probe || {})[pk] = Date.now();
+    const got2 = Object.entries(P0.loot).map(([id, n]) => { S.inv[id] = (S.inv[id] || 0) + n; return `${itemName(+id)} ${n}`; }).join(", ");
+    const nF = PROBE_ORDER.filter(k => S.probe[k]).length;
+    const L = { id: "probe-" + pk, pk, t: `탐사선 발견: ${P0.n}`, ev: `${P0.ev} 보급품 ${got2}${josa(got2, "을", "를")} 찾았어요.`, x: P0.x };
+    S.logs.push(L); showLog({ no: `탐사선 흔적 ${nF} / ${PROBE_ORDER.length} · ${PLANETS[pk].name}`, ...L });
+    sfx.quest(); renderHotbar(); save();
+  }
+}
+
+// ── 2. 천체 현상: 떨어지는 것을 줍고, 물기둥을 타고 날아요
+// 목성형 행성: 구름 섬 근처에 무언가 떨어져요. 빛나는 원으로 가서 주워요
+const FALLS = {
+  jupiter: { n: "머시볼(암모니아 우박)", col: 0xf2e6c8, burst: 26, dmg: 0, items: () => ({ 103: rndI(1, 2), 105: rndI(1, 3) }),
+    log: { t: "머시볼: 목성의 질척한 우박", ev: "구름 속에서 암모니아와 물이 섞인 질척한 우박이 떨어졌어요. 녹이면 물과 수소를 얻었어요.", x: "주노 탐사선은 목성 구름 속에서 암모니아와 물이 섞인 우박 '머시볼'이 만들어진다는 것을 알아냈어요. 이 우박이 생길 때 번개도 쳐요." } },
+  saturn: { n: "고리 얼음 조각", col: 0xe8f2ff, burst: 14, dmg: 6, items: () => Object.assign({ 14: rndI(2, 3) }, Math.random() < .35 ? { 100: 1 } : {}),
+    log: { t: "고리에서 떨어지는 얼음", ev: "하늘의 고리 쪽에서 얼음 조각이 떨어졌어요. 얼음 사이에 작은 돌 알갱이도 섞여 있었어요.", x: "토성의 고리는 대부분 얼음 알갱이예요. 카시니 호는 고리의 얼음이 토성으로 조금씩 떨어지고 있다는 것(고리 비)을 알아냈어요. 그래서 고리는 아주 먼 미래에 사라질 수도 있어요." } },
+  uranus: { n: "다이아몬드 우박", col: 0x8ff4ff, burst: 64, dmg: 10, items: () => ({ 111: Math.random() < .35 ? 2 : 1 }),
+    log: { t: "다이아몬드 비", ev: "하늘에서 반짝이는 다이아몬드 알갱이가 떨어졌어요.", x: "천왕성과 해왕성 깊은 곳은 압력과 온도가 아주 높아요. 과학자들은 그곳에서 메테인 속 탄소가 다이아몬드가 되어 비처럼 가라앉을 거라고 생각해요. 실제로는 구름 위가 아니라 아주 깊은 곳에서 일어나는 일이에요." } },
+};
+FALLS.neptune = FALLS.uranus;
+let fallEv = null, fallNext = 0, vents = [], ventMs = [];
+const fallRing = new THREE.MeshBasicMaterial({ color: 0x60f0ff, transparent: true, opacity: .6, side: THREE.DoubleSide, depthWrite: false });
+function dropFall() { if (!fallEv) return; [fallEv.rock, fallEv.ring].forEach(m => { scene.remove(m); m.geometry.dispose(); }); fallEv.rock.material.dispose(); fallEv = null; }
+function clearWonders() {
+  dropFall();
+  fallNext = gameT + 25 + Math.random() * 20;
+  ventMs.forEach(m => [m.col, m.ring].forEach(o => { scene.remove(o); o.geometry.dispose(); o.material.dispose(); })); ventMs = [];
+}
+function fallTick(dt) {
+  const pk = S.planet, F = FALLS[pk]; if (!F) return;
+  if (!fallEv && gameT > fallNext) {
+    fallNext = gameT + 5;
+    if (P.pos.y < GAS_TOP - 3 || evPiles() >= 4) return;
+    for (let t = 0; t < 14; t++) {
+      const a = Math.random() * Math.PI * 2, d = 4 + Math.random() * 9, x = Math.floor(P.pos.x + Math.cos(a) * d), z = Math.floor(P.pos.z + Math.sin(a) * d);
+      if (x < 2 || z < 2 || x > SX - 3 || z > SZ - 3) continue;
+      const y = topY(x, z); if (y < GAS_TOP - 2 || y > GAS_TOP + 2 || SOLID(get(x, y + 1, z)) || Math.hypot(x - base.x, z - base.z) < 5) continue;
+      const ring = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.5, 28), fallRing); ring.rotation.x = -Math.PI / 2; ring.position.set(x + .5, y + 1.06, z + .5); scene.add(ring);
+      const rock = new THREE.Mesh(new THREE.OctahedronGeometry(.42), new THREE.MeshLambertMaterial({ color: F.col, emissive: F.col, emissiveIntensity: .45 })); scene.add(rock);
+      fallEv = { x, y: y + 1, z, t: 0, T: 3.6, ring, rock, from: new THREE.Vector3(x + 14, y + 62, z - 9) };
+      toast(`${F.n}${josa(F.n, "이", "가")} 떨어져요! 빛나는 원 쪽으로 가서 주우세요`, 2600); sfx.beep(); return;
+    }
+    return;
+  }
+  if (!fallEv) return;
+  const e = fallEv; e.t += dt; const k = Math.min(1, e.t / e.T);
+  e.rock.position.lerpVectors(e.from, new THREE.Vector3(e.x + .5, e.y + .3, e.z + .5), k * k); e.rock.rotation.x += dt * 4; e.rock.rotation.y += dt * 3;
+  fallRing.opacity = .35 + .35 * Math.abs(Math.sin(e.t * 7));
+  if (k < 1) return;
+  burst(e.x, e.y - 1, e.z, F.burst); burst(e.x, e.y, e.z, F.burst);
+  const pd = Math.hypot(hdx(e.x + .5), P.pos.z - e.z - .5, (P.pos.y - e.y) * .7);
+  if (F.dmg && pd < 1.2) { S.hp -= F.dmg * (1 - armorK()); cause = "meteor"; hurtT = 1; sfx.hurt(); toast("머리 위로 떨어졌어요! 원 바로 가운데는 피하세요"); if (S.hp <= 0) die(); }
+  if (pd < 22) sfx.place(F.burst);
+  makePile(F.items(), e.x + .5, e.y + .2, e.z + .5, "ev");
+  dropFall(); fallNext = gameT + 28 + Math.random() * 22;
+  if (pd < 22) firstLog("fall-" + pk, F.log);
+}
+// 유로파: 갈색 줄무늬(얼음 틈)에서 물기둥이 솟아요. 위에 서 있으면 높이 날아올라요
+function findVents(pk) {
+  vents = []; if (pk !== "europa") return;
+  for (let z = 4; z < SZ - 4 && vents.length < 4; z += 3) {
+    const x = Math.round(10 + z * .6); if (x < 4 || x > SX - 5) continue;
+    const y = topY(x, z), d = Math.hypot(x - base.x, z - base.z);
+    if (get(x, y, z) !== 27 || d < 9 || d > 40 || vents.some(v => Math.hypot(v.x - x, v.z - z) < 11)) continue;
+    vents.push({ x, y: y + 1, z, off: vents.length * 7.3 });
+  }
+}
+const VENT_P = 26;
+function ventTick(dt) {
+  if (S.planet !== "europa" || !vents.length) return;
+  if (!ventMs.length) vents.forEach(v => {
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(.55, 1.3, 1, 14, 1, true), new THREE.MeshBasicMaterial({ color: 0xe8f8ff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    col.position.set(v.x + .5, v.y, v.z + .5); scene.add(col);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.7, 1.05, 24), new THREE.MeshBasicMaterial({ color: 0x9fd8f0, transparent: true, opacity: .55, side: THREE.DoubleSide, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(v.x + .5, v.y + .04, v.z + .5); scene.add(ring);
+    ventMs.push({ col, ring });
+  });
+  vents.forEach((v, i) => {
+    const M = ventMs[i], ph = (gameT + v.off) % VENT_P, dx = hdx(v.x + .5), dz = v.z + .5 - P.pos.z, hd = Math.hypot(dx, dz);
+    let h = 0, op = 0;
+    if (ph < 3) { h = 1 + Math.random() * .8; op = .25 + .2 * Math.sin(ph * 12); v.rode = false; v.fired = false; if (hd < 10 && Math.random() < dt * 2) burst(v.x, v.y - 1, v.z, 14); }
+    else if (ph < 8.5) { const u = ph - 3; h = Math.min(1, u / .5) * 34 * (u > 4.5 ? Math.max(0, (5.5 - u)) : 1); op = .55 * (u > 4.5 ? Math.max(0, 5.5 - u) : 1);
+      if (!v.fired) { v.fired = true; if (hd < 24) { sfx.splash(1); if (hd < 14 && evPiles() < 3) { const a = Math.random() * 6.28; makePile(Object.assign({ 106: rndI(1, 2) }, Math.random() < .5 ? { 14: 1 } : {}), v.x + .5 + Math.cos(a) * 2.2, v.y + .2, v.z + .5 + Math.sin(a) * 2.2, "ev"); } } }
+      if (u < 4.5 && hd < 1.5 && P.pos.y < v.y + 5 && P.pos.y > v.y - 1.5) {
+        P.vel.y = Math.max(P.vel.y, 15); P.ground = false;
+        if (!v.rode) { v.rode = true; evBump("geyser"); toast("물기둥을 타고 날아올라요!", 1800);
+          firstLog("geyser", { t: "얼음 틈에서 솟는 물기둥", ev: "얼음 틈에서 물과 얼음 알갱이가 높이 솟아올랐어요. 주변에 소금이 떨어졌어요.", x: "허블 우주 망원경은 유로파 남쪽에서 물기둥으로 보이는 흔적을 찾았어요. 얼음 아래 바다의 물이 틈으로 뿜어져 나오는 것일 수 있어요. 2030년에 도착할 유로파 클리퍼가 자세히 살펴볼 거예요." }); }
+      }
+    }
+    M.col.scale.set(1, Math.max(.01, h), 1); M.col.position.y = v.y + h / 2; M.col.material.opacity = op; M.col.visible = h > .05;
+    M.ring.material.opacity = ph < 3 ? .5 + .4 * Math.abs(Math.sin(ph * 6)) : .4;
+  });
+}
+let diveIn = false;
+function wonderTick(dt) {
+  probeTick(); fallTick(dt); ventTick(dt);
+  // 목성형 행성 잠수: 구름 아래(높이 16)까지 내려갔다가 구름 섬 위로 무사히 돌아오면 한 번
+  if (PLANETS[S.planet].gas) { if (P.pos.y < 16) diveIn = true; else if (diveIn && P.pos.y > GAS_TOP - 1) { diveIn = false; evBump("dive"); } } else diveIn = false;
+}
+
+// ── 3. 탐사 의뢰: 그 천체 임무를 다 끝내면 반복해서 할 수 있는 의뢰가 나와요
+// mine: 그 블록 캐기 · ev: 횟수(kill 로봇, boss 보스, meteor 운석 지켜보기, catch 떨어진 것 줍기, geyser 물기둥, dive 잠수) · at: 그 자리에 가기
+const BOUNTY = {
+  moon: [
+    { t: "현무암 표본", d: "달의 바다(어두운 평원)에서 현무암 8개 캐기", mine: 11, n: 8, x: "달의 바다는 옛날 용암이 넓게 흘러 굳은 낮은 땅이라 어둡게 보여요." },
+    { t: "극지 얼음 채취", d: "북서쪽 그늘진 구덩이 바닥에서 얼음 5개 캐기", mine: 14, n: 5, x: "달 극지방 그늘 속 얼음은 미래 달 기지의 마실 물과 로켓 연료가 될 수 있어요." },
+    { t: "티타늄 찾기", d: "달의 바다 현무암 사이 보랏빛 점(티타늄 광석) 3개 캐기. 철 곡괭이가 필요해요", mine: 42, n: 3, x: "달의 현무암에는 티타늄이 든 광물(일메나이트)이 지구 현무암보다 많아요." },
+    { t: "고장 난 로봇 정리", d: "어두운 곳에서 생기는 고장 난 로봇 4대 멈추기", ev: "kill", n: 4 },
+    { t: "운석 낙하 관측", d: "운석 2개가 떨어지는 것을 15칸 안에서 지켜보기. 붉은 원 안은 피하세요", ev: "meteor", n: 2, x: "달에는 공기가 없어서 운석이 타지 않고 그대로 떨어져 크레이터를 만들어요." },
+    { t: "보스 퇴치", d: "크레이터 거미를 한 번 쓰러뜨리기", ev: "boss", n: 1 },
+  ],
+  mars: [
+    { t: "붉은 흙 표본", d: "붉은 흙 10개 캐기", mine: 15, n: 10, x: "화성의 흙이 붉은 까닭은 흙 속 철이 녹슬어 산화 철이 되었기 때문이에요." },
+    { t: "물의 흔적", d: "서쪽 골짜기 바닥에서 둥근 자갈 4개 캐기", mine: 18, n: 4, x: "자갈이 둥글게 닳으려면 물에 오래 굴러야 해요. 옛날 화성에 물이 흘렀다는 증거예요." },
+    { t: "극관 얼음 채취", d: "북쪽 하얀 극관에서 극관 얼음 6개 캐기", mine: 17, n: 6, x: "화성 극관은 물 얼음 위에 겨울마다 드라이아이스(얼어붙은 이산화 탄소)가 덮였다가 여름에 줄어들어요." },
+    { t: "원자력 전지 재료", d: "땅속 깊은 곳의 토륨 광석(초록 점) 2개 캐기", mine: 24, n: 2, x: "햇빛이 약하고 먼지 폭풍이 잦은 화성에서는 큐리오시티처럼 원자력 전지를 쓰면 멈추지 않아요." },
+    { t: "고장 난 로봇 정리", d: "고장 난 로봇 5대 멈추기", ev: "kill", n: 5 },
+    { t: "보스 퇴치", d: "모래폭풍 기사를 한 번 쓰러뜨리기", ev: "boss", n: 1 },
+  ],
+  mercury: [
+    { t: "황 표본", d: "황 광석(노란 점) 6개 캐기. 새벽 띠를 따라 움직이세요", mine: 20, n: 6, x: "메신저 호는 수성 표면에 황 같은 잘 날아가는 물질이 생각보다 많다는 것을 알아냈어요." },
+    { t: "철 핵 조사", d: "철광석 8개 캐기", mine: 9, n: 8, x: "수성은 크기에 비해 철로 된 핵이 아주 커요. 그래서 크기는 작아도 밀도가 커요." },
+    { t: "그늘 속 얼음", d: "북쪽 그늘진 구덩이 바닥에서 얼음 4개 캐기", mine: 14, n: 4, x: "태양에 가장 가까운 행성이지만 햇빛이 들지 않는 구덩이 바닥은 영하 170 °C 아래예요." },
+    { t: "운석 낙하 관측", d: "운석 2개가 떨어지는 것을 15칸 안에서 지켜보기", ev: "meteor", n: 2, x: "수성도 대기가 거의 없어서 운석 구덩이가 달처럼 빽빽해요." },
+    { t: "고장 난 로봇 정리", d: "고장 난 로봇 5대 멈추기", ev: "kill", n: 5 },
+    { t: "보스 퇴치", d: "태양로 수호자를 한 번 쓰러뜨리기", ev: "boss", n: 1 },
+  ],
+  venus: [
+    { t: "표면 암석 표본", d: "내압 냉각복을 입고 구름 아래 표면에서 금성 현무암 4개 캐기", mine: 21, n: 4, x: "금성 표면은 대부분 용암이 굳은 현무암 평원이에요." },
+    { t: "토륨 채굴", d: "금성 표면의 토륨 광석(초록 점) 3개 캐기", mine: 24, n: 3 },
+    { t: "화산 황", d: "금성 표면의 황 광석(노란 점) 3개 캐기", mine: 20, n: 3, x: "금성 구름 속 황산은 화산에서 뿜어져 나온 황 기체로 만들어졌다고 생각해요." },
+    { t: "화산 꼭대기", d: "기지 북서쪽 표면의 큰 화산 꼭대기에 서기", at: [14, 18], r: 3, x: "금성에는 화산이 아주 많아요. 마젤란 탐사선이 레이더로 두꺼운 구름 아래 화산을 찍었어요." },
+  ],
+  jupiter: [
+    { t: "머시볼 모으기", d: "떨어지는 머시볼(암모니아 우박) 3개 줍기. 빛나는 원으로 가세요", ev: "catch", n: 3 },
+    { t: "구름 표본", d: "암모니아 구름 12개 캐기", mine: 26, n: 12, x: "목성 구름의 맨 위층은 암모니아가 얼어 생긴 하얀 구름이에요." },
+    { t: "구름 아래 잠수", d: "내압 냉각복을 입고 구름 아래(높이 16)까지 내려갔다가 구름 섬으로 돌아오기 2번", ev: "dive", n: 2, x: "목성형 행성은 깊이 들어갈수록 기압과 기온이 계속 올라가요. 단단한 땅은 없어요." },
+  ],
+  europa: [
+    { t: "물기둥 타기", d: "갈색 줄무늬에서 솟는 물기둥을 타고 날아오르기 2번. 하늘색 고리가 물기둥 자리예요", ev: "geyser", n: 2 },
+    { t: "줄무늬 얼음 표본", d: "갈색 줄무늬 얼음 4개 캐기", mine: 27, n: 4, x: "줄무늬의 갈색은 얼음 아래 바다에서 올라온 소금이 목성 방사선을 받아 변한 색이라고 생각해요." },
+    { t: "바다 물 표본", d: "얼음을 깊이 파 내려가 액체 물 3개 캐기", mine: 6, n: 3, x: "유로파 얼음 아래 바다에는 지구 바다를 모두 합친 것보다 물이 더 많을 수 있어요." },
+    { t: "고장 난 로봇 정리", d: "고장 난 로봇 5대 멈추기", ev: "kill", n: 5 },
+    { t: "보스 퇴치", d: "얼음 바다 감시자를 한 번 쓰러뜨리기", ev: "boss", n: 1 },
+  ],
+  saturn: [
+    { t: "고리 조각 모으기", d: "하늘에서 떨어지는 고리 얼음 조각 3개 줍기", ev: "catch", n: 3 },
+    { t: "구름 표본", d: "암모니아 구름 12개 캐기", mine: 26, n: 12, x: "토성은 목성보다 추워서 구름층이 더 깊은 곳에 있어요. 그래서 줄무늬가 흐릿하게 보여요." },
+    { t: "구름 아래 잠수", d: "구름 아래(높이 16)까지 내려갔다가 구름 섬으로 돌아오기 2번", ev: "dive", n: 2 },
+  ],
+  titan: [
+    { t: "메테인 표본", d: "호수와 강에서 메테인 6개 떠 오기", mine: 28, n: 6, x: "타이탄에서는 메테인이 비가 되어 내리고 강과 호수를 이뤄요. 지구의 물 순환과 비슷해요." },
+    { t: "모래 언덕 표본", d: "타이탄 모래 10개 캐기", mine: 22, n: 10, x: "타이탄의 모래는 규소가 아니라 탄소와 수소로 된 유기물 알갱이라고 생각해요." },
+    { t: "얼음 바위 표본", d: "얼음 바위 6개 캐기", mine: 29, n: 6, x: "타이탄은 너무 추워서 얼음이 바위처럼 단단해요. 하위헌스가 찍은 둥근 돌도 얼음이었어요." },
+    { t: "고장 난 로봇 정리", d: "고장 난 로봇 5대 멈추기", ev: "kill", n: 5 },
+    { t: "보스 퇴치", d: "메테인 거인을 한 번 쓰러뜨리기", ev: "boss", n: 1 },
+  ],
+  uranus: [
+    { t: "다이아몬드 비", d: "떨어지는 다이아몬드 우박 3개 줍기. 원 바로 가운데는 아파요", ev: "catch", n: 3 },
+    { t: "메테인 구름 표본", d: "메테인 구름 12개 캐기", mine: 25, n: 12, x: "천왕성의 청록색은 대기의 메테인이 붉은빛을 흡수하고 푸른빛을 되돌려 보내서 생겨요." },
+    { t: "구름 아래 잠수", d: "구름 아래(높이 16)까지 내려갔다가 구름 섬으로 돌아오기 2번", ev: "dive", n: 2 },
+  ],
+  neptune: [
+    { t: "다이아몬드 비", d: "떨어지는 다이아몬드 우박 3개 줍기. 원 바로 가운데는 아파요", ev: "catch", n: 3 },
+    { t: "메테인 구름 표본", d: "메테인 구름 12개 캐기", mine: 25, n: 12 },
+    { t: "바람의 섬", d: "돌풍을 뚫고 서쪽 끝 구름 섬에 다시 가기", at: [5, 32], r: 4, x: "해왕성의 바람은 시속 2000 km가 넘어요. 태양에서 가장 먼데도 바람은 가장 세요." },
+    { t: "구름 아래 잠수", d: "구름 아래(높이 16)까지 내려갔다가 구름 섬으로 돌아오기 2번", ev: "dive", n: 2 },
+  ],
+};
+const B_REWARD = {
+  moon: [[112, 2, 4], [100, 3, 6], [111, 1, 2], [14, 3, 5]], mars: [[104, 1, 3], [100, 3, 6], [112, 2, 3], [111, 1, 2]],
+  mercury: [[110, 2, 4], [102, 3, 5], [100, 4, 6], [111, 1, 2]], venus: [[104, 2, 4], [102, 3, 5], [110, 2, 3], [111, 1, 2]],
+  jupiter: [[105, 4, 8], [103, 3, 5], [111, 1, 2], [104, 1, 2]], europa: [[106, 3, 5], [14, 4, 8], [111, 1, 2], [112, 2, 3]],
+  saturn: [[105, 4, 8], [14, 4, 6], [110, 2, 4], [111, 1, 2]], titan: [[107, 4, 8], [104, 1, 3], [111, 1, 3], [112, 2, 3]],
+  uranus: [[105, 4, 8], [111, 2, 3], [110, 2, 4]], neptune: [[105, 4, 8], [111, 2, 4], [110, 2, 4]],
+};
+const bVal = (q) => q.mine ? minedOn(S.planet, q.mine) : q.ev ? evCnt(q.ev) : 0;
+function newBounty(pk) {
+  const L = BOUNTY[pk], last = ((S.bty || {})[pk] || {}).i;
+  const ok = L.map((q, i) => i).filter(i => i !== last && !(L[i].ev === "boss" && (S.bossCD || {})[pk] > Date.now() + 60e3));
+  const i = ok[Math.floor(Math.random() * ok.length)], q = L[i];
+  return { i, s: bVal(q) };
+}
+let bShown = "";
+function bountyText() {
+  const pk = S.planet, L = BOUNTY[pk], b = L && (S.bty || {})[pk]; if (!b || !L[b.i]) return null;
+  const q = L[b.i], have = q.at ? (b.ok ? 1 : 0) : Math.min(q.n, Math.max(0, bVal(q) - b.s));
+  return { q, b, have, line: q.at ? q.d : `${q.d} (${have} / ${q.n})` };
+}
+function bountyTick() {
+  const pk = S.planet, L = BOUNTY[pk]; if (!L) return;
+  S.bty = S.bty || {};
+  if (!S.bty[pk] || !L[S.bty[pk].i]) { S.bty[pk] = newBounty(pk); bShown = ""; }
+  const T = bountyText(), { q, b } = T;
+  if (q.at && !b.ok && Math.hypot(hdx(q.at[0] + .5), q.at[1] + .5 - P.pos.z) < q.r && P.ground && P.pos.y >= topY(q.at[0], q.at[1]) - 1.5) b.ok = true;
+  const p = q.at ? (b.ok ? 1 : 0) : T.have / q.n;
+  $("mBar").style.width = (p * 100) + "%";
+  if (T.line !== bShown) { bShown = T.line; renderMission(); }
+  if (p < 1) return;
+  const D = S.bdone = S.bdone || {}; D[pk] = (D[pk] || 0) + 1;
+  const R = B_REWARD[pk].slice().sort(() => Math.random() - .5).slice(0, 2).map(([id, a, c]) => [id, rndI(a, c)]);
+  if (D[pk] % 5 === 0) R.push([111, 3]);
+  const list = R.map(([id, n]) => { S.inv[id] = (S.inv[id] || 0) + n; return `${itemName(id)} ${n}`; }).join(", ");
+  showFact(`탐사 의뢰 완료: ${q.t}`, `보상: ${list}.${D[pk] % 5 === 0 ? ` ${PLANETS[pk].name} 의뢰 ${D[pk]}번 달성 보너스로 다이아몬드 3개를 더 받았어요!` : ""}${q.x ? " " + q.x : ""}`);
+  S.bty[pk] = newBounty(pk); bShown = ""; renderHotbar(); save();
+}
+
 /* ═════════════ 화면 정보 ═════════════ */
 const josa = (w, a, b) => ((w.charCodeAt(w.length - 1) - 0xAC00) % 28 ? a : b);
 const fmtSun = (v) => v === 0 ? "0" : v < .01 ? v.toFixed(4) : v < .1 ? v.toFixed(3) : v.toFixed(2);
@@ -2593,6 +2911,12 @@ function renderHud() {
     const cd = (S.bossCD || {})[S.planet] > Date.now();
     cl.textContent = `◆ 보스 ${Math.round(Math.hypot(dx, dz))}칸${cd ? " (쉬는 중)" : ""}`; cl.style.left = (cw / 2 + Math.max(-150, Math.min(150, lr / 360 * wpx))) + "px"; cl.style.opacity = 1;
   } else cl.style.opacity = 0;
+  // 아직 못 찾은 탐사선 흔적: 레이더 없이도 방향과 거리를 알려 줘요
+  const cp = $("compassProbe");
+  if (probeAt && probeAt.pk === S.planet && PROBES[S.planet] && !(S.probe || {})[S.planet]) {
+    const dx = hdx(probeAt.x + .5), dz = probeAt.z + .5 - P.pos.z, pa = (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360, pr = ((pa - hd + 540) % 360) - 180;
+    cp.textContent = `◇ 탐사선 ${Math.round(Math.hypot(dx, dz))}칸`; cp.style.left = (cw / 2 + Math.max(-150, Math.min(150, pr / 360 * wpx))) + "px"; cp.style.opacity = 1;
+  } else cp.style.opacity = 0;
 }
 function renderGauges() {
   const set1 = (id, v, max, txt, danger) => { const el = $(id); el.querySelector("i").style.width = Math.max(0, Math.min(100, v / max * 100)) + "%"; el.querySelector(".v").textContent = txt; el.classList.toggle("danger", danger); };
@@ -2705,6 +3029,9 @@ function openDex() {
       const done = S.done[m.id], cur = pk === S.planet && curMission() === m, L = S.logs.find(l => l.id === m.id);
       ul.insertAdjacentHTML("beforeend", `<li class="${done ? "done" : cur ? "cur" : ""}"><span class="m">${done ? "✓" : cur ? "▶" : "·"}</span><span>${m.t}${L ? `<small>${L.ev}</small>` : cur ? `<small>${m.d}</small>` : ""}</span></li>`);
     });
+    const PB = PROBES[pk], fd = PB && (S.probe || {})[pk], nb = (S.bdone || {})[pk] || 0;
+    if (PB) ul.insertAdjacentHTML("beforeend", `<li class="${fd ? "done" : ""}"><span class="m">${fd ? "◆" : "◇"}</span><span>탐사선 흔적: ${fd ? `${PB.n} (${PB.yr})<small>${PB.x}</small>` : "아직 못 찾았어요<small>나침반의 ◇와 하늘색 빛기둥을 따라가 보세요.</small>"}</span></li>`);
+    if (nb) ul.insertAdjacentHTML("beforeend", `<li class="done"><span class="m">★</span><span>탐사 의뢰 ${nb}번 해냄</span></li>`);
   });
   $("dexOv").hidden = false;
 }
@@ -3169,7 +3496,7 @@ function recallTick(dt) {
 let hudOn = false;
 // 터치 버튼 ↔ 마우스 시점. 터치되는 노트북은 마우스를 쓰면 다시 마우스로 돌아와요
 function useTouch(t) {
-  if (isTouch === t) return; isTouch = t; $("touch").hidden = !(hudOn && t);
+  if (isTouch === t) return; isTouch = t; $("touch").hidden = !(hudOn && t); $("bDrop").hidden = t; // 폰은 화면의 버리기 버튼을 써요
   if (t) { try { document.exitPointerLock(); } catch (e) {} } else { noLock = !canvas.requestPointerLock; lockFails = 0; }
   if (!$("setOv").hidden) showInput();
 }
@@ -3319,7 +3646,7 @@ function pileTick(dt) {
   if (S.piles && S.piles.some(q => now - q.t > PILE_LIFE)) S.piles = S.piles.filter(q => now - q.t <= PILE_LIFE);
   if (!take) return;
   let n = 0; for (const id in take.items) { S.inv[id] = (S.inv[id] || 0) + take.items[id]; n += take.items[id]; }
-  removePile(take.id, true); sfx.pop();
+  removePile(take.id, true); sfx.pop(); if (take.kind === "ev") evBump("catch");
   toast(take.kind === "death" ? `떨어뜨린 물건 ${n}개를 주웠어요` : `${Object.keys(take.items).map(Number).map(itemName).join(", ")} ${n}개를 주웠어요`, 1600);
   renderHotbar(); save();
 }
@@ -3809,7 +4136,7 @@ function bossDie() {
   for (let i = 0; i < 6; i++) burst(x + Math.round(Math.random() * 2 - 1), y + i % 3, z + Math.round(Math.random() * 2 - 1), i % 2 ? 23 : 9); sfx.boom(1);
   const got = {}; const add = (id, n) => { got[id] = (got[id] || 0) + n; S.inv[id] = (S.inv[id] || 0) + n; for (let i = 0; i < Math.min(n, 3); i++) spawnDrop(id, x, y, z); };
   const T = b.T || BOSS_TIER[1]; add(B.core, 2 + T.core + (Math.random() < .5 ? 1 : 0)); B.drop.forEach(([id, n]) => add(id, Math.round(n * T.loot)));
-  S.bossCD[S.planet] = Date.now() + 5 * 60e3; S.bossWin[S.planet] = (S.bossWin[S.planet] || 0) + 1;
+  S.bossCD[S.planet] = Date.now() + 5 * 60e3; S.bossWin[S.planet] = (S.bossWin[S.planet] || 0) + 1; evBump("boss");
   const list = Object.keys(got).map(id => `${itemName(+id)} ${got[id]}`).join(", ");
   const w = S.bossWin[S.planet], nxt = w === 5 ? " 다음부터는 강화된 보스가 나와요!" : w === 10 ? " 다음부터는 각성한 보스가 나와요! 새 공격을 조심하세요." : "";
   showFact(`보스를 물리쳤어요: ${b.nm || B.n}`, `얻은 것: ${list}. ${itemName(B.core)}${josa(itemName(B.core), "은", "는")} 이 천체에서만 얻을 수 있는 재료예요. 5분 뒤 다시 나타나요(지금까지 ${w}번 쓰러뜨림).${nxt}`);
@@ -4186,7 +4513,7 @@ function petBite(m, tg) {
   else { tg.hp -= dmg; tg.flash = 1; if (tg.hp <= 0) { const x = Math.floor(tg.p.x), y = Math.floor(tg.p.y + .5), z = Math.floor(tg.p.z);
       burst(x, y, z, 23); sfx.robot(); scene.remove(tg.g); if (tg.beam) scene.remove(tg.beam); mobs = mobs.filter(o => o !== tg);
       const got = []; tg.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); }); got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
-      S.kills = (S.kills || 0) + 1; toast(`늑대가 ${tg.T.n}${josa(tg.T.n, "을", "를")} 멈췄어요!${got.length ? " 부품: " + got.map(itemName).join(", ") : ""}`, 1800); renderHotbar(); } }
+      S.kills = (S.kills || 0) + 1; evBump("kill"); toast(`늑대가 ${tg.T.n}${josa(tg.T.n, "을", "를")} 멈췄어요!${got.length ? " 부품: " + got.map(itemName).join(", ") : ""}`, 1800); renderHotbar(); } }
   // 로봇과 붙어 싸우면 늑대도 다쳐요. 쓰러지면 기지로 돌아가 쉬어요
   m.hp -= 1.2 + (MLV[S.planet] || 1) * .6; m.flash = 1;
   if (m.hp <= 0) { m.hp = m.T.hp * .5; m.rest = 40; m.p.set(base.x + 1.5, topY(base.x + 1, base.z + 2) + 1.2, base.z + 2.5); m.v.set(0, 0, 0); toast("늑대가 많이 다쳐서 기지로 돌아가 쉬어요(40초)", 2400); }
@@ -4452,7 +4779,7 @@ function attackTick(dt) {
       const got = []; best.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); });
       got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
       if (best.type === "splitter") for (const s2 of [-1, 1]) { const m2 = mkMob("mini", best.p.x + s2 * .5, best.p.y + .2, best.p.z + s2 * .3); m2.v.set(s2 * 3, 4, -s2 * 2); }
-      S.kills = (S.kills || 0) + 1; toast(`${best.T.n}${josa(best.T.n, "을", "를")} 멈췄어요! 부품에서 ${got.map(itemName).join(", ")}`, 1800); renderHotbar();
+      S.kills = (S.kills || 0) + 1; evBump("kill"); toast(`${best.T.n}${josa(best.T.n, "을", "를")} 멈췄어요! 부품에서 ${got.map(itemName).join(", ")}`, 1800); renderHotbar();
     }
   }
   return true;
@@ -4575,6 +4902,12 @@ $("bLook").onclick = openLook;
 $("lookClose").onclick = () => { $("lookOv").hidden = true; lookOpen = false; if ($("startOv").hidden && $("teachOv").hidden) resume(); };
 function toggleView() { third = !third; toast(third ? "3인칭 시점" : "1인칭 시점"); }
 $("tView").addEventListener("click", toggleView);
+// 버리기 버튼: 짧게 누르면 1개, 0.6초 길게 누르면 그 칸 전부
+$("bDrop").addEventListener("click", (e) => dropHeld(e.shiftKey));
+{ let dT = 0, dLong = false; const tD = $("tDrop");
+  tD.addEventListener("pointerdown", (e) => { e.preventDefault(); dLong = false; clearTimeout(dT); dT = setTimeout(() => { dLong = true; dropHeld(true); }, 600); });
+  const up = () => { clearTimeout(dT); if (!dLong) dropHeld(false); dLong = true; };
+  tD.addEventListener("pointerup", up); tD.addEventListener("pointercancel", () => { clearTimeout(dT); dLong = true; }); }
 // 선생님이 학생 시점으로 보기
 const spec = { id: null, view: 0 };
 
