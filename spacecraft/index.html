@@ -272,6 +272,10 @@ td.unk { color: #4e5786; }
 .set .chk { grid-template-columns: auto 1fr; }
 .set .chk input { width: 20px; height: 20px; accent-color: var(--ore); }
 .setIn { display: grid; gap: 6px; margin-top: 16px; }
+.keyGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 10px; }
+.keyGrid button { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #ffffff0a; border: 1px solid var(--line); color: inherit; border-radius: 8px; padding: 4px 8px; font: inherit; font-size: .9em; cursor: pointer; text-align: left; }
+.keyGrid button.on { border-color: var(--ore); background: color-mix(in srgb, var(--ore) 25%, transparent); }
+.keyGrid kbd { white-space: nowrap; }
 .setIn small, #pvpBox small { color: var(--ink-dim); }
 #pvpBox { margin-top: 10px; }
 .ctabs button:disabled { opacity: .5; }
@@ -326,15 +330,15 @@ td.unk { color: #4e5786; }
 <div class="hud" id="hotName" hidden></div>
 <div class="hud click" id="hotbar" hidden></div>
 <div class="hud" id="tools" hidden>
-  <button class="btn click" id="bCraft">제작 <kbd>E</kbd></button>
-  <button class="btn ghost click" id="bInv">가방·장비 <kbd>I</kbd></button>
-  <button class="btn ghost click" id="bDex">도감·일지 <kbd>J</kbd></button>
-  <button class="btn ghost click" id="bMap">우주 지도 <kbd>M</kbd></button>
-  <button class="btn ghost click" id="bDrop">든 것 버리기 <kbd>Q</kbd> · 전부 <kbd>Shift+Q</kbd></button>
-  <button class="btn ghost click" id="bLook">꾸미기 <kbd>C</kbd> · 시점 <kbd>V</kbd></button>
-  <button class="btn ghost click" id="bSet">설정 <kbd>O</kbd></button>
+  <button class="btn click" id="bCraft">제작 <kbd data-k="craft">E</kbd></button>
+  <button class="btn ghost click" id="bInv">가방·장비 <kbd data-k="inv">I</kbd></button>
+  <button class="btn ghost click" id="bDex">도감·일지 <kbd data-k="dex">J</kbd></button>
+  <button class="btn ghost click" id="bMap">우주 지도 <kbd data-k="map">M</kbd></button>
+  <button class="btn ghost click" id="bDrop">든 것 버리기 <kbd data-k="drop">Q</kbd> · 전부 <kbd data-k="drop" data-pre="Shift+">Shift+Q</kbd></button>
+  <button class="btn ghost click" id="bLook">꾸미기 <kbd data-k="look">C</kbd> · 시점 <kbd data-k="view">V</kbd></button>
+  <button class="btn ghost click" id="bSet">설정·단축키 <kbd data-k="set">O</kbd></button>
   <button class="btn ghost click" id="bXR" hidden>VR로 보기 (퀘스트)</button>
-  <button class="btn ghost click" id="bRecall" style="position:relative;overflow:hidden">기지로 귀환 <kbd>R</kbd><span id="recallBar"></span></button>
+  <button class="btn ghost click" id="bRecall" style="position:relative;overflow:hidden">기지로 귀환 <kbd data-k="recall">R</kbd><span id="recallBar"></span></button>
 </div>
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
@@ -352,7 +356,7 @@ td.unk { color: #4e5786; }
     <h1>스페이스<br><em>크래프트</em></h1>
     <p>지구에서 출발해 달, 화성, 수성, 금성을 지나 목성, 토성, 천왕성, 해왕성과 그 위성까지 개척하세요. 행성마다 <b>중력, 기온, 대기, 햇빛 세기, 하루 길이</b>가 실제처럼 달라요. 그 차이 때문에 산소·전력·우주복 온도가 버티지 못하면 쓰러져요. 그 행성의 특징을 알아내고, 대비할 장비를 만들어야 다음 행성으로 갈 수 있어요.</p>
     <div class="keys">
-      <div><b>컴퓨터</b><br>화면 클릭 → 마우스로 둘러보기<br><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Space</kbd> 점프<br>왼쪽 버튼 <b>누르고 있기</b> 캐기 · 오른쪽 클릭 놓기<br><kbd>1</kbd>~<kbd>9</kbd>·휠 블록 고르기 · <kbd>Esc</kbd> 마우스 풀기<br><kbd>Enter</kbd> 친구와 채팅 (같은 방에 있을 때)</div>
+      <div><b>컴퓨터</b><br>화면 클릭 → 마우스로 둘러보기<br><kbd data-k="fwd">W</kbd><kbd data-k="left">A</kbd><kbd data-k="back">S</kbd><kbd data-k="right">D</kbd> 이동 · <kbd data-k="jump">Space</kbd> 점프<br>왼쪽 버튼 <b>누르고 있기</b> 캐기 · 오른쪽 클릭 놓기<br><kbd>1</kbd>~<kbd>9</kbd>·휠 블록 고르기 · <kbd>Esc</kbd> 마우스 풀기<br><kbd>Enter</kbd> 친구와 채팅 (같은 방에 있을 때)<br>모든 단축키는 <b>설정</b>(<kbd data-k="set">O</kbd>)에서 보고 바꿀 수 있어요</div>
       <div><b>폰·패드</b><br>왼쪽 아래 원을 밀어서 이동<br>화면을 끌어서 둘러보기<br><b>공격</b> 버튼을 누르고 있으면 공격·캐기(다른 손가락으로 조준), 로봇을 톡 쳐도 공격<br>화면을 <b>길게 누르면</b> 캐기<br><b>놓기</b>로 바꾸고 톡 치면 블록 놓기<br>같은 방에서는 <b>말</b> 버튼으로 채팅</div>
     </div>
     <div class="mp">
@@ -384,7 +388,7 @@ td.unk { color: #4e5786; }
     <div class="inv" id="invList"></div>
     <div class="ctabs" id="ctabs"></div>
     <div class="recipes" id="recipes"></div>
-    <div class="row"><button class="btn ghost" id="craftClose">닫기 <kbd>E</kbd></button></div>
+    <div class="row"><button class="btn ghost" id="craftClose">닫기 <kbd data-k="craft">E</kbd></button></div>
   </div>
 </div>
 
@@ -395,7 +399,7 @@ td.unk { color: #4e5786; }
     <div class="tablewrap"><table id="dexTable"></table></div>
     <h2 style="font-size:1.4em">탐사 일지</h2>
     <ul class="jlist" id="jList"></ul>
-    <div class="row"><button class="btn ghost" id="dexClose">닫기 <kbd>J</kbd></button></div>
+    <div class="row"><button class="btn ghost" id="dexClose">닫기 <kbd data-k="dex">J</kbd></button></div>
   </div>
 </div>
 
@@ -406,7 +410,7 @@ td.unk { color: #4e5786; }
     <h3>상자 안 <small>(누르면 가방으로)</small></h3><div class="bag" id="chestIn"></div>
     <h3>내 가방 <small>(누르면 상자로)</small></h3><div class="bag" id="chestBag"></div>
     <p class="hint">상자 안 물건은 내 기록에 저장돼요. 같은 방 친구가 같은 상자를 열면 친구 자신의 물건이 보여요. 상자를 캐면 안의 물건은 가방으로 돌아와요.</p>
-    <div class="row"><button class="btn ghost" id="chestAll">블록·재료 모두 넣기</button><button class="btn" id="chestClose">닫기 <kbd>E</kbd></button></div>
+    <div class="row"><button class="btn ghost" id="chestAll">블록·재료 모두 넣기</button><button class="btn" id="chestClose">닫기 <kbd data-k="craft">E</kbd></button></div>
   </div>
 </div>
 <div class="overlay" id="invOv" hidden>
@@ -419,7 +423,7 @@ td.unk { color: #4e5786; }
     <h3>도구</h3><div class="bag" id="bagTools"></div>
     <h3>블록</h3><div class="bag" id="bagBlocks"></div>
     <h3>재료 <small>(손에 들 수는 있지만 놓을 수는 없어요)</small></h3><div class="bag" id="bagMats"></div>
-    <div class="row"><button class="btn ghost" id="hotClear">고른 칸 비우기</button><button class="btn ghost" id="dropOne">1개 버리기 <kbd>Q</kbd></button><button class="btn ghost" id="dropAll">모두 버리기 <kbd>Shift+Q</kbd></button><button class="btn" id="invClose">닫기 <kbd>I</kbd></button></div>
+    <div class="row"><button class="btn ghost" id="hotClear">고른 칸 비우기</button><button class="btn ghost" id="dropOne">1개 버리기 <kbd data-k="drop">Q</kbd></button><button class="btn ghost" id="dropAll">모두 버리기 <kbd data-k="drop" data-pre="Shift+">Shift+Q</kbd></button><button class="btn" id="invClose">닫기 <kbd>I</kbd></button></div>
   </div>
 </div>
 
@@ -432,6 +436,7 @@ td.unk { color: #4e5786; }
       <label class="chk"><input type="checkbox" id="sInv"> 위아래 시선 반전</label>
     </div>
     <div class="setIn"><b>조작 방식</b><div class="ctabs" id="sInput"></div><small id="sInputNote"></small></div>
+    <div class="setIn"><b>단축키 <small>(누른 뒤 새 키를 치면 바뀌어요 · Esc 취소)</small></b><div class="keyGrid" id="sKeys"></div><div class="ctabs"><button id="sKeyReset">처음 키로 되돌리기</button></div><small id="sKeyNote">바꿀 수 없는 것: 마우스 왼쪽 누르고 있기 = 캐기·공격 · 오른쪽 클릭 = 놓기·쓰기 · 1~9와 휠 = 칸 고르기 · Esc = 마우스 풀기 · Enter = 채팅</small></div>
     <div class="setIn"><b>보이는 거리 (넓은 지구)</b><div class="ctabs" id="sView"></div><small>화면이 버벅이면 '가까이'를 고르세요. 퀘스트·태블릿은 '가까이'나 '보통'을 추천해요.</small></div>
     <div class="setIn" id="hostSet" hidden><b>방장 설정 · 플레이어끼리 대결</b><div class="ctabs" id="sPvp"></div><small>방에 있는 모두에게 바로 적용돼요. 기지 코어 6칸 안은 안전 구역이에요.</small><b>방장 설정 · 채팅</b><div class="ctabs" id="sChat"></div><small>빠른 말만: 정해진 문장(안녕, 도와줘 등)만 보낼 수 있어요.</small></div>
     <div class="setIn" id="xrSet" hidden><b>VR (퀘스트)</b><div class="ctabs"><button id="sXR">VR로 보기</button></div><small>VR 안에서 끄려면 왼쪽 컨트롤러 X를 3초 동안 길게 누르세요.</small></div>
@@ -454,7 +459,7 @@ td.unk { color: #4e5786; }
         <div class="opt"><span class="label">헬멧 장식</span><div class="sw" id="swHat"></div></div>
       </div>
     </div>
-    <p>같은 방 친구들에게도 이 모습으로 보여요. 게임 중에는 <kbd>V</kbd>(폰은 <b>시점</b> 버튼)로 3인칭으로 바꿔 내 모습을 볼 수 있어요.</p>
+    <p>같은 방 친구들에게도 이 모습으로 보여요. 게임 중에는 <kbd data-k="view">V</kbd>(폰은 <b>시점</b> 버튼)로 3인칭으로 바꿔 내 모습을 볼 수 있어요.</p>
     <div class="row"><button class="btn" id="lookClose">완료</button></div>
   </div>
 </div>
@@ -492,7 +497,7 @@ td.unk { color: #4e5786; }
     <h2>우주 지도</h2>
     <p id="mapNote"></p>
     <div class="dest" id="destList"></div>
-    <div class="row"><button class="btn ghost" id="mapClose">닫기 <kbd>M</kbd></button></div>
+    <div class="row"><button class="btn ghost" id="mapClose">닫기 <kbd data-k="map">M</kbd></button></div>
   </div>
 </div>
 
@@ -1721,11 +1726,11 @@ function hits(px, py, pz) {
 const keys = {}; let stickV = { x: 0, y: 0 }, touchJump = false;
 function physics(dt) {
   const PL = PLANETS[S.planet], g = G_EARTH * PL.g;
-  let fx = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + stickV.x, fz = (keys.KeyS ? 1 : 0) - (keys.KeyW ? 1 : 0) + stickV.y;
+  let fx = (keys[KB("right")] ? 1 : 0) - (keys[KB("left")] ? 1 : 0) + stickV.x, fz = (keys[KB("back")] ? 1 : 0) - (keys[KB("fwd")] ? 1 : 0) + stickV.y;
   const len = Math.hypot(fx, fz); if (len > 1) { fx /= len; fz /= len; }
   const bx = Math.floor(P.pos.x), bz = Math.floor(P.pos.z);
   const inWater = LIQ(get(bx, Math.floor(P.pos.y + .5), bz)), feetW = LIQ(get(bx, Math.floor(P.pos.y + .1), bz)), headW = LIQ(get(bx, Math.floor(P.pos.y + EYE), bz));
-  const swim = inWater || feetW, up = keys.Space || touchJump;
+  const swim = inWater || feetW, up = keys[KB("jump")] || touchJump;
   // 물에 뛰어들면 첨벙, 헤엄치면 물살 소리
   if (swim && !P.wasSw && P.vel.y < -2.5) sfx.splash(Math.min(1, -P.vel.y / 12)); P.wasSw = swim;
   if (swim && Math.hypot(P.vel.x, P.vel.z) > .8 && (P.swA = (P.swA || 0) + dt) > .75) { P.swA = 0; sfx.swim(); }
@@ -3387,22 +3392,24 @@ const sfx = {
 let locked = false, isTouch = false;
 function pause(p) { paused = p; wantMine = false; atkHeld = false; tapHit = 0; $("tAtk").classList.remove("on"); if (p) { try { document.exitPointerLock(); } catch (e) {} for (const k in keys) keys[k] = false; stickV = { x: 0, y: 0 }; touchJump = false; recall = 0; } }
 addEventListener("keydown", (e) => {
+  if (keyWait) { keyGrab(e); return; }
   if (e.target && e.target.tagName === "INPUT") return;
-  if (!$("chestOv").hidden) { if (e.code === "KeyE" || e.code === "Escape" || e.code === "KeyI") closeChest(); return; }
+  const k = (a) => e.code === KB(a);
+  if (!$("chestOv").hidden) { if (k("craft") || e.code === "Escape" || k("inv")) closeChest(); return; }
   const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden || !$("setOv").hidden || !$("invOv").hidden;
-  if (e.code === "KeyE" && $("startOv").hidden && $("logOv").hidden) { if (!$("craftOv").hidden) $("craftClose").click(); else if (!anyOv) openCraft(); return; }
-  if (e.code === "KeyI" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("invOv").hidden) $("invClose").click(); else if (!anyOv) openInv(); return; }
-  if (e.code === "KeyJ" && $("startOv").hidden && $("logOv").hidden) { if (!$("dexOv").hidden) $("dexClose").click(); else if (!anyOv) openDex(); return; }
-  if (e.code === "KeyM" && $("startOv").hidden && $("logOv").hidden) { if (!$("mapOv").hidden) $("mapClose").click(); else if (!anyOv) openMap(); return; }
-  if (e.code === "KeyO" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("setOv").hidden) $("setClose").click(); else if (!anyOv) openSet(); return; }
-  if (e.code === "KeyP" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("rosterOv").hidden) $("rosterClose").click(); else if (!anyOv) { if ($("room").hidden) toast("친구와 같은 방에 들어가면 P로 친구 목록과 파티를 볼 수 있어요", 2400); else $("room").click(); } return; }
-  if (e.code === "KeyC" && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("lookOv").hidden) $("lookClose").click(); else if (!anyOv) openLook(); return; }
-  if ((e.code === "Enter" || e.code === "KeyT") && $("startOv").hidden && $("logOv").hidden && !anyOv && net.live && !net.teacher) { e.preventDefault(); net.openChat(); return; }
+  if (k("craft") && $("startOv").hidden && $("logOv").hidden) { if (!$("craftOv").hidden) $("craftClose").click(); else if (!anyOv) openCraft(); return; }
+  if (k("inv") && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("invOv").hidden) $("invClose").click(); else if (!anyOv) openInv(); return; }
+  if (k("dex") && $("startOv").hidden && $("logOv").hidden) { if (!$("dexOv").hidden) $("dexClose").click(); else if (!anyOv) openDex(); return; }
+  if (k("map") && $("startOv").hidden && $("logOv").hidden) { if (!$("mapOv").hidden) $("mapClose").click(); else if (!anyOv) openMap(); return; }
+  if (k("set") && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("setOv").hidden) $("setClose").click(); else if (!anyOv) openSet(); return; }
+  if (k("party") && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("rosterOv").hidden) $("rosterClose").click(); else if (!anyOv) { if ($("room").hidden) toast(`친구와 같은 방에 들어가면 ${keyLabel(KB("party"))} 키로 친구 목록과 파티를 볼 수 있어요`, 2400); else $("room").click(); } return; }
+  if (k("look") && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("lookOv").hidden) $("lookClose").click(); else if (!anyOv) openLook(); return; }
+  if ((e.code === "Enter" || k("chat")) && $("startOv").hidden && $("logOv").hidden && !anyOv && net.live && !net.teacher) { e.preventDefault(); net.openChat(); return; }
   if (paused) return;
-  if (e.code === "KeyV") { toggleView(); return; }
-  if (e.code === "KeyQ") { dropHeld(e.shiftKey); return; }
-  if (isTouch && SET.input === "auto" && /^(Key[WASD]|Space|Arrow)/.test(e.code)) useTouch(false);
-  keys[e.code] = true; if (e.code === "Space") e.preventDefault();
+  if (k("view")) { toggleView(); return; }
+  if (k("drop")) { dropHeld(e.shiftKey); return; }
+  if (isTouch && SET.input === "auto" && (/^Arrow/.test(e.code) || ["fwd", "back", "left", "right", "jump"].some(k))) useTouch(false);
+  keys[e.code] = true; if (e.code === "Space" || k("jump")) e.preventDefault();
   if (/^Digit[1-9]$/.test(e.code)) { sel = +e.code.slice(5) - 1; renderHotbar(); }
 });
 addEventListener("keyup", (e) => { keys[e.code] = false; });
@@ -3411,6 +3418,41 @@ document.addEventListener("mousemove", (e) => { if (locked && !paused) look(e.mo
 addEventListener("wheel", (e) => { if (!paused) { sel = (sel + (e.deltaY > 0 ? 1 : 8)) % 9; renderHotbar(); } }, { passive: true });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 const SET = (() => { const d = { sens: 1, vol: .8, inv: false, input: "auto", view: matchMedia("(pointer: coarse)").matches ? "near" : "mid" }; try { return Object.assign(d, JSON.parse(localStorage.getItem("spacecraft2-set") || "{}")); } catch (e) { return d; } })();
+// 단축키: 설정에서 바꿀 수 있어요(이 기기에만 저장). 1~9·Esc·Enter·Shift는 정해진 쓰임이 있어 고를 수 없어요
+const KEY_DEF = { fwd: "KeyW", left: "KeyA", back: "KeyS", right: "KeyD", jump: "Space", craft: "KeyE", inv: "KeyI", dex: "KeyJ", map: "KeyM", drop: "KeyQ", recall: "KeyR", look: "KeyC", view: "KeyV", set: "KeyO", party: "KeyP", chat: "KeyT" };
+const KEY_NAME = { fwd: "앞으로", left: "왼쪽으로", back: "뒤로", right: "오른쪽으로", jump: "점프·물에서 떠오르기", craft: "제작", inv: "가방·장비", dex: "도감·일지", map: "우주 지도", drop: "든 것 버리기 (Shift와 함께: 전부)", recall: "기지로 귀환 (누르고 있기)", look: "꾸미기", view: "1인칭·3인칭 시점", set: "설정·단축키", party: "친구 목록·파티", chat: "채팅 (Enter도 돼요)" };
+const KEY_LOCK = /^(Escape|Enter|NumpadEnter|Tab|Digit[1-9]|ShiftLeft|ShiftRight|MetaLeft|MetaRight|F\d+)$/;
+SET.keys = Object.assign({}, KEY_DEF, SET.keys && typeof SET.keys === "object" ? SET.keys : {});
+for (const a in SET.keys) if (!KEY_DEF[a] || typeof SET.keys[a] !== "string" || KEY_LOCK.test(SET.keys[a])) delete SET.keys[a];
+const KB = (a) => SET.keys[a] || KEY_DEF[a];
+function keyLabel(c) {
+  if (!c) return "?"; if (/^Key[A-Z]$/.test(c)) return c.slice(3); if (/^Digit\d$/.test(c)) return c.slice(5); if (/^Numpad\d$/.test(c)) return "숫자패드 " + c.slice(6);
+  return { Space: "Space", ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", ControlLeft: "왼 Ctrl", ControlRight: "오른 Ctrl", AltLeft: "왼 Alt", AltRight: "오른 Alt", Digit0: "0", Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]", Semicolon: ";", Quote: "'", Comma: ",", Period: ".", Slash: "/", Backslash: "\\", Backquote: "`" }[c] || c;
+}
+let keyWait = null;
+function showKeys() {
+  const box = $("sKeys"); box.innerHTML = "";
+  for (const a in KEY_DEF) {
+    const b = document.createElement("button"); b.innerHTML = "<span></span><kbd></kbd>"; b.firstChild.textContent = KEY_NAME[a];
+    b.lastChild.textContent = keyWait === a ? "새 키를 누르세요" : keyLabel(KB(a)); b.className = keyWait === a ? "on" : "";
+    b.onclick = () => { keyWait = keyWait === a ? null : a; showKeys(); }; box.appendChild(b);
+  }
+}
+function keyNote(t) { $("sKeyNote").textContent = t; }
+function keyGrab(e) {
+  e.preventDefault(); e.stopPropagation();
+  const a = keyWait; if (!e.code) return;
+  if (e.code === "Escape") { keyWait = null; showKeys(); return; }
+  if (KEY_LOCK.test(e.code)) { keyNote(`${keyLabel(e.code)} 키는 정해진 쓰임(칸 고르기·채팅·마우스 풀기·전부 버리기)이 있어서 고를 수 없어요. 다른 키를 누르세요.`); return; }
+  const other = Object.keys(KEY_DEF).find(o => o !== a && KB(o) === e.code);
+  if (other) SET.keys[other] = KB(a);
+  SET.keys[a] = e.code; keyWait = null; saveSet(); showKeys(); paintKeys();
+  keyNote(other ? `'${KEY_NAME[a]}'에 ${keyLabel(e.code)} 키를 넣고, 원래 그 키를 쓰던 '${KEY_NAME[other]}'에는 ${keyLabel(KB(other))} 키를 줬어요.` : `'${KEY_NAME[a]}'${josa(KEY_NAME[a].replace(/[^가-힣]+$/, ""), "은", "는")} 이제 ${keyLabel(e.code)} 키예요.`);
+}
+function paintKeys() { document.querySelectorAll("kbd[data-k]").forEach(el => { el.textContent = (el.dataset.pre || "") + keyLabel(KB(el.dataset.k)); }); }
+$("sKeyReset").onclick = () => { SET.keys = Object.assign({}, KEY_DEF); keyWait = null; saveSet(); showKeys(); paintKeys(); keyNote("처음 키로 되돌렸어요."); };
+$("setClose").addEventListener("click", () => { keyWait = null; });
+paintKeys();
 function look(dx, dy, s) { s *= SET.sens; P.yaw -= dx * s; P.pitch = Math.max(-1.55, Math.min(1.55, P.pitch - dy * s * (SET.inv ? -1 : 1))); }
 function openSet() {
   if ($("startOv").hidden) pause(true);
@@ -3434,7 +3476,7 @@ function showHostSet() {
   Object.entries(net.CHATM).forEach(([v, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = net.chatMode === v ? "on" : ""; b.onclick = () => { net.setChat(v); showHostSet(); }; cb.appendChild(b); });
 }
 function showView() { const box = $("sView"); box.innerHTML = ""; [["near", "가까이 (빠름)"], ["mid", "보통"], ["far", "멀리"]].forEach(([k, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = (SET.view || "mid") === k ? "on" : ""; b.onclick = () => { SET.view = k; saveSet(); showView(); visT = 9; }; box.appendChild(b); }); }
-function showSet() { showInput(); showView(); showHostSet(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
+function showSet() { showInput(); showView(); showHostSet(); showKeys(); $("oSens").textContent = (+SET.sens).toFixed(1) + "배"; $("oVol").textContent = Math.round(SET.vol * 100) + "%"; }
 function saveSet() { SET.sens = +$("sSens").value; SET.vol = +$("sVol").value; SET.inv = $("sInv").checked; showSet(); setAir(S.planet); try { localStorage.setItem("spacecraft2-set", JSON.stringify(SET)); } catch (e) {} }
 ["sSens", "sVol", "sInv"].forEach(id => $(id).addEventListener("input", saveSet));
 $("sVol").addEventListener("change", () => sfx.pop());
@@ -3488,10 +3530,10 @@ $("tMode").addEventListener("click", (e) => { mode = mode === "dig" ? "place" : 
 let recall = 0, recallHeld = false;
 $("bRecall").addEventListener("pointerdown", () => { recallHeld = true; }); ["pointerup", "pointerleave", "pointercancel"].forEach(ev => $("bRecall").addEventListener(ev, () => { recallHeld = false; }));
 function recallTick(dt) {
-  const on = !paused && (recallHeld || keys.KeyR);
+  const on = !paused && (recallHeld || keys[KB("recall")]);
   recall = on ? recall + dt : 0;
   $("recallBar").style.width = Math.min(100, recall / 1.5 * 100) + "%";
-  if (recall >= 1.5) { recall = 0; recallHeld = false; keys.KeyR = false; toBase(); toast("기지로 귀환했어요"); sfx.place(); }
+  if (recall >= 1.5) { recall = 0; recallHeld = false; keys[KB("recall")] = false; toBase(); toast("기지로 귀환했어요"); sfx.place(); }
 }
 let hudOn = false;
 // 터치 버튼 ↔ 마우스 시점. 터치되는 노트북은 마우스를 쓰면 다시 마우스로 돌아와요
