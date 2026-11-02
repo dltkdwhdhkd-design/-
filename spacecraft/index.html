@@ -728,8 +728,11 @@ for (let i = 50; i < 62; i++) STYLE[i] = "crop";
 STYLE[85] = "sapling";
 for (let i = 86; i <= 93; i++) STYLE[i] = "water";
 for (const id in BLOCKS) if (BLOCKS[id].style && !STYLE[id]) STYLE[id] = BLOCKS[id].style;
-const NT = 256, MT = 100; // 블록 칸 0~99, 재료 칸 100~159, 집 짓기 블록 160~255
-const atlas = document.createElement("canvas"); atlas.width = 16 * NT; atlas.height = 48;
+const NT = 256, MT = 100; // 블록 칸 0~99, 재료 칸 100~159, 집 짓기 블록 160~255, 그다음 256번부터 새 블록
+// 블록 번호가 256을 넘으면 그림판(아틀라스)을 한 줄(가로 256칸 × 세로 3칸)씩 아래로 늘려요. AX·AY = 번호의 그림 위치
+const SHEETS = Math.floor(Math.max(...Object.keys(BLOCKS).map(Number)) / 256) + 1, AH = 48 * SHEETS;
+const AX = (id) => (id & 255) * 16, AY = (id, row) => (id >> 8) * 48 + row * 16;
+const atlas = document.createElement("canvas"); atlas.width = 16 * NT; atlas.height = AH;
 const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height = 32;
 (function paint() {
   const g = atlas.getContext("2d");
@@ -943,10 +946,10 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
   };
   for (const id in BLOCKS) {
     const b = BLOCKS[id], st = STYLE[id];
-    tile(id * 16, 0, b.c, b, false, 0, id);
-    tile(id * 16, 16, b.top || b.c, b, !!b.top, 1, id);
+    tile(AX(id), AY(id, 0), b.c, b, false, 0, id);
+    tile(AX(id), AY(id, 1), b.top || b.c, b, !!b.top, 1, id);
     // 아랫면: 풀은 흙, 통나무는 나이테, 나머지는 옆면과 같아요
-    if (st === "grass" || st === "log") tile(id * 16, 32, b.c, b, false, st === "log" ? 1 : 2, id); else g.drawImage(atlas, id * 16, b.top && !b.table && !b.solar ? 16 : 0, 16, 16, id * 16, 32, 16, 16);
+    if (st === "grass" || st === "log") tile(AX(id), AY(id, 2), b.c, b, false, st === "log" ? 1 : 2, id); else g.drawImage(atlas, AX(id), AY(id, b.top && !b.table && !b.solar ? 1 : 0), 16, 16, AX(id), AY(id, 2), 16, 16);
   }
   // 아이템 아이콘(재료): 광물 덩어리·주괴·가루를 구별해요
   const blobAt = (ox, cx, cy, rx, ry, col) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1) put(ox, 0, x, y, typeof col === "function" ? col(x, y) : col); };
@@ -991,11 +994,11 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
 function iconCanvas(id) {
   if (TOOLS[id]) return TOOLS[id].drill ? drillIcon() : TOOLS[id].rocket ? rocketIcon() : TOOLS[id].hoe ? hoeIcon() : TOOLS[id].tier ? pickIcon(TOOLS[id].tier) : swordIcon(TOOLS[id].col);
   const c = document.createElement("canvas"); c.width = c.height = 16;
-  const B = BLOCKS[id], ox = !B ? (id - 100 + MT) * 16 : id * 16, oy = !B ? 0 : (B.top ? 16 : 0);
+  const B = BLOCKS[id], ox = !B ? (id - 100 + MT) * 16 : AX(id), oy = !B ? 0 : AY(id, B.top ? 1 : 0);
   // 계단·의자·탁자처럼 모양이 있는 블록은 옆에서 본 모습으로 그려요
   if (B && B.boxes && !B.ladder && Math.max(...B.boxes.map(q => q[4])) > .2) { const g = c.getContext("2d");
     for (const q of B.boxes) { const x0 = Math.round(q[2] * 16), x1 = Math.round(q[5] * 16), y0 = Math.round((1 - Math.min(1, q[4])) * 16), y1 = Math.round((1 - q[1]) * 16), w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
-      g.drawImage(atlas, (q[6] || id) * 16 + x0, y0, w, h, x0, y0, w, h); g.fillStyle = "rgba(255,255,255,.28)"; g.fillRect(x0, y0, w, 1); }
+      g.drawImage(atlas, AX(q[6] || id) + x0, AY(q[6] || id, 0) + y0, w, h, x0, y0, w, h); g.fillStyle = "rgba(255,255,255,.28)"; g.fillRect(x0, y0, w, 1); }
     return c; }
   c.getContext("2d").drawImage(atlas, ox, oy, 16, 16, 0, 0, 16, 16); return c;
 }
@@ -1045,7 +1048,7 @@ const VENUS_SURF = 12, VENUS_BASE = 36;
 /* ═════════════ 세계 ═════════════ */
 // 천체마다 땅 넓이가 달라요(지구는 304칸: 예전 96칸의 10배 넓이). 배열은 가장 큰 크기로 한 번만 만들어요
 let SX = 96, SZ = 96; const SY = 52, CH = 16, MAXS = 608;
-const W = new Uint8Array(MAXS * SY * MAXS), SH = new Uint8Array(MAXS * MAXS);
+const W = new Uint16Array(MAXS * SY * MAXS), SH = new Uint8Array(MAXS * MAXS);
 let wrapX = false, base = { x: 32, y: 12, z: 32 };
 const I = (x, y, z) => x + SX * (z + SZ * y);
 function get(x, y, z) {
@@ -1376,7 +1379,7 @@ function buildChunk(cx, cz) {
           const l = AO[ao] * shade * (b === 14 && shade < 1 ? 2.4 : 1);
           T.p.push(x + c[0], y + (wc && c[1] && !f.bottom ? wc[c[0] + c[2] * 2] : c[1] - (liq && f.top ? .12 : 0)), z + c[2]); T.n.push(f.d[0], f.d[1], f.d[2]);
           const row = f.top ? (BLOCKS[b].top ? 1 : 0) : f.d[1] < 0 ? 2 : 0;
-          T.u.push((b * 16 + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - f.uv[k][1] * 15.4) / 48);
+          T.u.push((AX(b) + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (AY(b, row) + 15.7 - f.uv[k][1] * 15.4) / AH);
           T.c.push(l, l, l); T.l.push(ls, lb);
         }
         if (aos[0] + aos[3] > aos[1] + aos[2]) T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
@@ -1415,7 +1418,7 @@ function shapeBox(T, x, y, z, b, s) {
       T.p.push(x + px, y + py, z + pz); T.n.push(f.d[0], f.d[1], f.d[2]);
       // 옆면은 칸 높이만큼만 무늬를 잘라 붙여요
       const vv = f.d[1] ? f.uv[k][1] : (c[1] ? s[4] : s[1]);
-      T.u.push((b * 16 + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - vv * 15.4) / 48);
+      T.u.push((AX(b) + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (AY(b, row) + 15.7 - vv * 15.4) / AH);
       const sh = f.d[1] > 0 ? 1 : f.d[1] < 0 ? .6 : .82; T.c.push(sh, sh, sh); T.l.push(skyF(lv[0]), B.lantern ? 1 : blF(lv[1]));
     }
     T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
@@ -1430,7 +1433,7 @@ function fenceBox(T, x, y, z, b, s) {
       const c = f.c[k], px = c[0] ? s[3] : s[0], py = c[1] ? s[4] : s[1], pz = c[2] ? s[5] : s[2];
       T.p.push(x + px, y + py, z + pz); T.n.push(f.d[0], f.d[1], f.d[2]);
       const uu = f.d[0] ? pz : px, vv = f.d[1] ? pz : py;
-      T.u.push((b * 16 + .3 + uu * 15.4) / (16 * NT), 1 - (15.7 - vv * 15.4) / 48);
+      T.u.push((AX(b) + .3 + uu * 15.4) / (16 * NT), 1 - (AY(b, 0) + 15.7 - vv * 15.4) / AH);
       const sh = f.d[1] > 0 ? 1 : f.d[1] < 0 ? .6 : f.d[0] ? .82 : .9; T.c.push(sh, sh, sh); T.l.push(ls, lb);
     }
     T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
@@ -1449,7 +1452,7 @@ function boxPart(T, x, y, z, b, q, lv) {
       const c = f.c[k], px = c[0] ? q[3] : q[0], py = c[1] ? q[4] : q[1], pz = c[2] ? q[5] : q[2];
       T.p.push(x + px, y + py, z + pz); T.n.push(d[0], d[1], d[2]);
       const uu = d[0] < 0 ? pz : d[0] > 0 ? 1 - pz : d[2] < 0 ? 1 - px : d[2] > 0 ? px : d[1] > 0 ? 1 - px : px, vv = Math.min(1, d[1] > 0 ? pz : d[1] < 0 ? 1 - pz : py);
-      T.u.push((tb * 16 + .3 + uu * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - vv * 15.4) / 48);
+      T.u.push((AX(tb) + .3 + uu * 15.4) / (16 * NT), 1 - (AY(tb, row) + 15.7 - vv * 15.4) / AH);
       const sh = d[1] > 0 ? 1 : d[1] < 0 ? .6 : d[0] ? .82 : .9; if (T.c) T.c.push(sh, sh, sh); if (T.l) T.l.push(ls, lb);
     }
     T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
@@ -1485,7 +1488,7 @@ function fenceMesh(T, x, y, z, b) {
 }
 // 농작물: 칸 안에 X자로 엇갈린 두 장(앞뒤 모두 보여요)
 function cross(T, x, y, z, b) {
-  const lv = lightAt(x, y, z), ls = skyF(lv[0]), lb = blF(lv[1]), u0 = (b * 16 + .3) / (16 * NT), u1 = (b * 16 + 15.7) / (16 * NT), v0 = 1 - 15.7 / 48, v1 = 1 - .3 / 48;
+  const lv = lightAt(x, y, z), ls = skyF(lv[0]), lb = blF(lv[1]), u0 = (AX(b) + .3) / (16 * NT), u1 = (AX(b) + 15.7) / (16 * NT), v0 = 1 - (AY(b, 0) + 15.7) / AH, v1 = 1 - (AY(b, 0) + .3) / AH;
   const Q = [[[.15, .15], [.85, .85]], [[.85, .15], [.15, .85]]];
   for (const [[ax, az], [bx, bz]] of Q) for (const flip of [0, 1]) {
     const n = T.p.length / 3, A = flip ? [bx, bz] : [ax, az], Bq = flip ? [ax, az] : [bx, bz];
@@ -1501,7 +1504,7 @@ function thinBox(T, x, y, z, b) {
     for (let k = 0; k < 4; k++) {
       const c = f.c[k];
       T.p.push(x + (c[0] ? hi : lo), y + (c[1] ? top : 0), z + (c[2] ? hi : lo)); T.n.push(f.d[0], f.d[1], f.d[2]);
-      T.u.push((b * 16 + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (15.7 - f.uv[k][1] * 15.4) / 48);
+      T.u.push((AX(b) + .3 + f.uv[k][0] * 15.4) / (16 * NT), 1 - (AY(b, 0) + 15.7 - f.uv[k][1] * 15.4) / AH);
       T.c.push(1, 1, 1); T.l.push(skyF(lv[0]), 1);
     }
     T.i.push(v0, v0 + 1, v0 + 2, v0 + 2, v0 + 1, v0 + 3);
@@ -1942,7 +1945,7 @@ function die() {
 /* ═════════════ 물리 ═════════════ */
 // 블록마다 부딪히는 상자: 꽉 찬 블록은 FULLB, 계단·반 블록·의자는 그 모양, 지나갈 수 있는 것은 없음
 const FULLB = [[0, 0, 0, 1, 1, 1]], COLS = [];
-for (let b = 0; b < 256; b++) { const B = BLOCKS[b]; COLS[b] = B && B.boxes && !B.soft ? (B.col || B.boxes) : SOLID(b) ? FULLB : null; }
+for (let b = 0; b < 256 * SHEETS; b++) { const B = BLOCKS[b]; COLS[b] = B && B.boxes && !B.soft ? (B.col || B.boxes) : SOLID(b) ? FULLB : null; }
 // 내 몸(가로 PW·키 PH)이 부딪히는 상자들을 하나씩 알려 줘요. fn이 true를 돌려주면 멈춰요
 function overlapBoxes(px, py, pz, fn) {
   const x0 = px - PW, x1 = px + PW, y1 = py + PH - .001, z0 = pz - PW, z1 = pz + PW;
@@ -4023,16 +4026,16 @@ const itemGlowMat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: .5, side:
 const itemGeos = {};
 function itemGeo(id) {
   if (itemGeos[id]) return itemGeos[id];
-  const B = BLOCKS[id], mat = !B, ox = mat ? (id - 100 + MT) * 16 : id * 16;
+  const B = BLOCKS[id], mat = !B, ox = mat ? (id - 100 + MT) * 16 : AX(id), oy0 = mat ? 0 : AY(id, 0);
   // 의자·계단 같은 모양 블록은 그 모양 그대로
   if (B && B.boxes && !B.ladder) { const T = { p: [], n: [], u: [], i: [] }; B.boxes.forEach(q => boxPart(T, -.5, -.5, -.5, id, q, null)); const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(T.p, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(T.n, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(T.u, 2)); g.setIndex(T.i); return (itemGeos[id] = g); }
   // 재료·음식·꽃·사다리는 마인크래프트처럼 납작한 그림 한 장으로 보여요
-  if (mat || B.plant || B.ladder) { const g = new THREE.PlaneGeometry(1, 1), uv = g.attributes.uv; for (let i = 0; i < 4; i++) { const u = uv.getX(i), v = uv.getY(i); uv.setXY(i, (ox + .3 + u * 15.4) / (16 * NT), 1 - (15.7 - v * 15.4) / 48); } return (itemGeos[id] = g); }
+  if (mat || B.plant || B.ladder) { const g = new THREE.PlaneGeometry(1, 1), uv = g.attributes.uv; for (let i = 0; i < 4; i++) { const u = uv.getX(i), v = uv.getY(i); uv.setXY(i, (ox + .3 + u * 15.4) / (16 * NT), 1 - (oy0 + 15.7 - v * 15.4) / AH); } return (itemGeos[id] = g); }
   const g = new THREE.BoxGeometry(1, 1, 1), uv = g.attributes.uv;
   for (let f = 0; f < 6; f++) {
     const row = mat ? 0 : f === 2 ? (BLOCKS[id].top ? 1 : 0) : f === 3 ? 2 : 0;
-    for (let k = 0; k < 4; k++) { const i = f * 4 + k, u = uv.getX(i), v = uv.getY(i); uv.setXY(i, (ox + .3 + u * 15.4) / (16 * NT), 1 - (row * 16 + 15.7 - v * 15.4) / 48); }
+    for (let k = 0; k < 4; k++) { const i = f * 4 + k, u = uv.getX(i), v = uv.getY(i); uv.setXY(i, (ox + .3 + u * 15.4) / (16 * NT), 1 - (oy0 + row * 16 + 15.7 - v * 15.4) / AH); }
   }
   return (itemGeos[id] = g);
 }
