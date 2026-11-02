@@ -37,7 +37,7 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 .A { color: var(--amp); font-weight: 700; } .V { color: var(--volt); font-weight: 700; } .O { color: var(--ohm); font-weight: 700; }
 
 .hud { position: fixed; z-index: 5; pointer-events: none; }
-.hud .click { pointer-events: auto; }
+.hud .click, .hud.click { pointer-events: auto; }
 #mission { top: calc(env(safe-area-inset-top, 0px) + 10px); left: max(10px, env(safe-area-inset-left, 0px)); width: min(340px, calc(100vw - 20px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; }
 #mission .lv { font-size: .78em; color: var(--dim); font-weight: 700; letter-spacing: .05em; }
 #mission .t { font-family: var(--font-display); font-size: 1.25em; }
@@ -1703,7 +1703,7 @@ renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
 // 새 버전 확인: 브라우저가 예전 페이지를 기억해도(최대 10분) 새 버전이 있으면 알려 줘요. 진행 기록은 그대로예요
-const VERSION = "2026-11-02-steering";
+const VERSION = "2026-11-03-taphotbar";
 function checkVersion() {
   try { fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.text() : "").then(h => { const m = h.match(/const VERSION = "([^"]+)"/); if (m && m[1] !== VERSION) { $("newVer").hidden = false; $("newVerGo").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); } }).catch(() => {}); } catch (e) {}
 }
