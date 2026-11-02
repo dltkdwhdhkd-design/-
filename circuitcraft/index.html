@@ -452,7 +452,7 @@ function makePart(id, i) {
     cylX(.17, .62, mat(br ? 0x444444 : 0xc4cad6), 0, .22, 0, g); cylX(.18, .06, mat(0x33363d), .31, .22, 0, g); cylX(.18, .06, mat(0x33363d), -.31, .22, 0, g);
     bx(.07, .26, .06, mat(COPPER), .41, .1, 0, g); bx(.07, .26, .06, mat(COPPER), -.41, .1, 0, g);
     bx(.5, .36, .56, mat(br ? 0x555555 : 0xf2c230), 0, -.12, 0, g);
-    const sh = new THREE.Group(); sh.rotation.x = Math.PI / 2; g.add(sh); u.spin = sh;
+    const sh = new THREE.Group(); sh.rotation.x = shaftAxis(i) === 2 ? 0 : Math.PI / 2; g.add(sh); u.spin = sh;
     sh.add(new THREE.Mesh(new THREE.CylinderGeometry(.065, .065, 1, 10), mat(0xf4f4f4))); bx(.035, 1.002, .11, mat(0x3a3f4a), .045, 0, 0, sh);
   } else if (k === "fuse") {
     terminals(g);
@@ -529,16 +529,19 @@ function shapeAxis(i) { // 축으로 이어진 쪽(바퀴축·전동기 회전�
   const x = cx(i), y = cy(i), z = cz(i), at = (X, Z) => (X >= 0 && Z >= 0 && X < SX && Z < SZ) ? ix(X, y, Z) : -1, ROTB = [14, 16, 18];
   const links = (j, ax) => j >= 0 && (W[j] === 15 || (W[i] === 15 && ROTB.includes(W[j])) || (W[j] === 28 && shaftAxis(j) === ax));
   const xs = [at(x - 1, z), at(x + 1, z)], zs = [at(x, z - 1), at(x, z + 1)];
+  const ys = [y + 1 < SY ? i + SX * SZ : -1, y > 0 ? i - SX * SZ : -1];
+  if (ys.some(j => j >= 0 && W[j] === 28 && shaftAxis(j) === 2)) return 2;
   if (xs.some(j => links(j, 0))) return 0; if (zs.some(j => links(j, 1))) return 1;
+  if (ys.some(j => j >= 0 && (W[j] === 15 || (W[i] === 15 && ROTB.includes(W[j]))))) return 2;
   const blk = (j) => j >= 0 && isSolid(W[j]) && !ROTB.includes(W[j]); if (xs.some(blk)) return 0; if (zs.some(blk)) return 1; return 0;
 }
 let wheelPhase = 0;
 function makeShaped(i) {
   const g = new THREE.Group(), ax = shapeAxis(i);
   // 바퀴·톱니바퀴·날개: 축(바퀴축·전동기 회전축·옆 바퀴)이 이어진 쪽으로 쇠막대가 칸 끝까지 뚫고 나가 서로 맞물려요
-  const shaftTo = (sgn) => { const X = cx(i) + (ax === 0 ? sgn : 0), Z = cz(i) + (ax === 1 ? sgn : 0); if (X < 0 || Z < 0 || X >= SX || Z >= SZ) return false; const j = ix(X, cy(i), Z), b = W[j]; return b === 15 || b === 14 || b === 16 || b === 18 || (b === 28 && shaftAxis(j) === ax); };
+  const shaftTo = (sgn) => { const X = cx(i) + (ax === 0 ? sgn : 0), Y = cy(i) + (ax === 2 ? sgn : 0), Z = cz(i) + (ax === 1 ? sgn : 0); if (!inb(X, Y, Z)) return false; const j = ix(X, Y, Z), b = W[j]; return b === 15 || b === 14 || b === 16 || b === 18 || (b === 28 && shaftAxis(j) === ax); };
   const thru = (parent) => { for (const sgn of [1, -1]) if (shaftTo(sgn)) { const r = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .5, 10), mat(0x8d939e)); r.position.y = sgn * .25 * (ax === 0 ? -1 : 1); parent.add(r); } };
-  const turn = (o) => { if (ax === 0) o.rotation.z = Math.PI / 2; else o.rotation.x = Math.PI / 2; };
+  const turn = (o) => { if (ax === 0) o.rotation.z = Math.PI / 2; else if (ax === 1) o.rotation.x = Math.PI / 2; };
   if (W[i] === 14) {
     const spin = new THREE.Group(); turn(spin); g.add(spin);
     const wheel = new THREE.Group(); wheel.rotation.y = wheelPhase; spin.add(wheel); g.userData.spin = wheel;
@@ -721,18 +724,18 @@ function magTick() {
 // 회전축과 한 줄로 이어진 바퀴축·바퀴·톱니바퀴·선풍기 날개만 함께 돌아요. 축에 안 이어진 바퀴는 그냥 따라 굴러가는 바퀴예요.
 // 자동차: 돌아가는 바퀴가 땅을 밀어요. 왼쪽·오른쪽 바퀴의 힘이 같으면 직진, 다르면 방향을 바꿔요(탱크·로봇청소기 방식).
 // 엘리베이터: 톱니바퀴가 톱니 기둥(랙)을 물고 타고 올라가요. 선풍기: 날개가 축 방향으로 바람을 보내 몸을 밀어요(띄우지는 못해요).
-const machAcc = new Map(), mstat = { car: 0, carAt: -1, turn: 0, lift: 0, liftAt: -1, blow: 0, blowAt: -1 };
+const machAcc = new Map(), mstat = { car: 0, carAt: -1, turn: 0, lift: 0, liftAt: -1, blow: 0, blowAt: -1, fly: 0, flyAt: -1, flyMsg: 0 };
 const ROLL = new Set([14, 16]); // 땅에서 굴러가는 것: 바퀴, 톱니바퀴
 let fans = [], spinning = new Map(); // 날개 바람 {c, s, ax, I}, 지금 도는 칸 → 각속도
-function shaftAxis(m) { return (ORI[m] === 4 || ORI[m] === 5) ? 0 : 1; } // 회전축 방향: 0 = x축, 1 = z축
+function shaftAxis(m) { if ((VAL[m] & 1) && ORI[m] !== 2 && ORI[m] !== 3) return 2; return (ORI[m] === 4 || ORI[m] === 5) ? 0 : 1; } // 회전축 방향: 0 = x축, 1 = z축, 2 = 위아래(세운 축)
 function rollDir(m, I) { const o = ORI[m], d = o === 0 || o === 1 || o === 4 || o === 5 ? o : o === 2 ? 0 : 1; return I > 0 ? d : d ^ 1; } // 이 전동기 바퀴가 땅에서 굴러갈 방향
 const spinSign = (d) => d === 0 || d === 5 ? -1 : 1;
 function shaftLine(m) { // 회전축 양쪽으로 한 줄로 이어진 바퀴축·바퀴·톱니바퀴·날개
-  const ax = shaftAxis(m), out = [];
+  const ax = shaftAxis(m), out = [], st = [1, SX, SX * SZ][ax], D = [[1, 0, 0], [0, 0, 1], [0, 1, 0]][ax];
   for (const s of [1, -1]) {
-    let x = cx(m), z = cz(m); const y = cy(m);
-    for (let k = 0; k < 12; k++) { if (ax === 0) x += s; else z += s; if (!inb(x, y, z)) break; const c = ix(x, y, z), b = W[c];
-      if (b === 15 || b === 14 || b === 16 || b === 18) { out.push({ c, s, b }); if (b !== 15 && !(inb(ax === 0 ? x + s : x, y, ax === 0 ? z : z + s) && W[ax === 0 ? c + s : c + s * SX] === 15)) break; } else break; }
+    let x = cx(m), y = cy(m), z = cz(m);
+    for (let k = 0; k < 12; k++) { x += D[0] * s; y += D[1] * s; z += D[2] * s; if (!inb(x, y, z)) break; const c = ix(x, y, z), b = W[c];
+      if (b === 15 || b === 14 || b === 16 || b === 18) { out.push({ c, s, b }); if (b !== 15 && !(inb(x + D[0] * s, y + D[1] * s, z + D[2] * s) && W[c + s * st] === 15)) break; } else break; }
   }
   return out;
 }
@@ -767,19 +770,24 @@ function turnStruct(S, sg) { // y축을 중심으로 90° 돌려요. sg = +1: (x
   const to = (c) => { const dx = cx(c) - PX0, dz = cz(c) - PZ0, X = PX0 + (sg > 0 ? dz : -dz), Z = PZ0 + (sg > 0 ? -dx : dx); return inb(X, cy(c), Z) ? ix(X, cy(c), Z) : -1; };
   return moveStruct(S, to, o => R[o], () => { const ux = player.x - PX0 - .5, uz = player.z - PZ0 - .5; player.x = PX0 + .5 + (sg > 0 ? uz : -uz); player.z = PZ0 + .5 + (sg > 0 ? -ux : ux); player.yaw += sg * Math.PI / 2; });
 }
+// 비행: 날개 미는 힘 = THRUST_K × 전류², 무게 = 블록 1, 부품 0.5, 전선 0.25, 바퀴·축·날개 0.3
+const THRUST_K = 20;
+function weightOf(S) { let w = 0; for (const c of S) { const b = W[c]; w += b === 20 ? .25 : isPart(b) ? .5 : BL[b] && BL[b].shaped ? .3 : 1; } return w; }
 function warn(msg) { if (performance.now() - (warn.t || 0) > 4000) { warn.t = performance.now(); toast(msg, 2800, "bad"); } }
 function machineTick(dt) {
   fans = []; spinning = new Map(); if (mode !== "sandbox" || !RES || solveDirty) return;
   const groups = [];
+  const groupOf = (m) => { let G = groups.find(g => g.S.has(m)); if (!G) { const S = structOf(m); if (!S) return null; G = { S, drive: [], climb: [], slip: [], key: m, air: false, thrust: 0 }; groups.push(G); } return G; };
+  for (const m of cellsOf("mot")) if (shaftAxis(m) === 2) { const G = groupOf(m); if (G) G.air = true; } // 세운 축 전동기가 달린 덩어리 = 비행체(꺼져 있으면 떨어져요)
   for (const m of cellsOf("mot")) {
     const I = pv(m).i; if (Math.abs(I) < .3 || (FL[m] & 2)) continue;
     const rate = Math.min(4, Math.abs(I) * 3), d = rollDir(m, I), ax = shaftAxis(m), sg = spinSign(d);
     spinning.set(m, sg * rate * 2);
-    let G = groups.find(g => g.S.has(m)); if (!G) { const S = structOf(m); if (!S) continue; G = { S, drive: [], climb: [], slip: [], key: m }; groups.push(G); }
+    const G = groupOf(m); if (!G) continue;
     for (const e of shaftLine(m)) {
       spinning.set(e.c, e.b === 18 ? sg * Math.abs(I) * 22 : sg * rate * 2);
-      if (e.b === 18) { fans.push({ c: e.c, s: e.s, ax, I: Math.abs(I), m }); continue; }
-      if (e.b === 15) continue;
+      if (e.b === 18) { fans.push({ c: e.c, s: e.s, ax, I: Math.abs(I), m }); if (ax === 2) G.thrust += (e.s < 0 ? 1 : -1) * THRUST_K * I * I; continue; } // 날개가 아래로 바람을 밀면 덩어리는 위로 밀려요(작용·반작용)
+      if (e.b === 15 || ax === 2) continue;
       const [dx, , dz] = DIRS[d], fw = e.c + dx + SX * dz, bw = e.c - dx - SX * dz;
       const rackF = inb(cx(e.c) + dx, cy(e.c), cz(e.c) + dz) && W[fw] === 17, rackB = inb(cx(e.c) - dx, cy(e.c), cz(e.c) - dz) && W[bw] === 17;
       if (rackF || rackB) { if (e.b === 16) G.climb.push({ c: e.c, up: rackF, rate, m }); else G.slip.push(e.c); continue; }
@@ -790,7 +798,11 @@ function machineTick(dt) {
     const S = G.S, key = [...S].filter(c => W[c] === 28).sort((a, b) => a - b)[0];
     if (G.slip.length && !G.climb.length) warn("고무바퀴는 톱니 기둥에서 미끄러져요. 회전축에 톱니바퀴를 끼워 톱니끼리 맞물리게 해요.");
     let act = null, rate = 0;
-    if (G.climb.length) {
+    const wt = G.air ? weightOf(S) : 0, held = G.air && [...S].some(c => below(c) >= 0 && W[below(c)] && !S.has(below(c)));
+    if (G.air && G.thrust > wt) { act = { k: "fly", d: 2 }; rate = Math.min(3, .6 + 2 * (G.thrust - wt) / wt); if (!mstat.flyMsg) { mstat.flyMsg = 1; toast(`🚁 날개가 미는 힘 ${G.thrust.toFixed(1)} > 무게 ${wt.toFixed(1)} → 떠올라요!`, 2600, "good"); } }
+    else if (G.air && !held) { act = { k: "fall", d: 3 }; rate = Math.max(.6, 4 * (1 - Math.max(0, G.thrust) / wt)); }
+    else if (G.air && G.thrust > 0 && !G.drive.length && !G.climb.length) { warn(`날개가 미는 힘 ${G.thrust.toFixed(1)}이 무게 ${wt.toFixed(1)}보다 작아 못 떠요. 전류를 키우거나(전지 직렬) 날개 단 전동기를 늘리거나 무게를 줄여요.`); continue; }
+    else if (G.climb.length) {
       const up = G.climb[0].up; if (G.climb.some(c => c.up !== up)) { warn("톱니바퀴들이 서로 반대로 돌아 걸렸어요."); continue; }
       rate = Math.min(...G.climb.map(c => c.rate)) * .7;
       const next = (c) => c + (up ? 1 : -1) * SX * SZ; const ok = G.climb.every(c => { const j = next(c.c), dd = rollDir(c.m, pv(c.m).i), [dx, , dz] = DIRS[dd]; const r = j + (c.up ? 1 : -1) * (dx + SX * dz); return cy(j) >= GY && cy(j) < SY && W[r] === 17; });
@@ -821,7 +833,8 @@ function machineTick(dt) {
     sfx.step(); const nk = moved.get(key);
     if (act.k === "car") { mstat.car++; mstat.carAt = nk; }
     else if (act.k === "turn") { mstat.turn++; mstat.carAt = nk; }
-    else if (act.d === 2) { mstat.lift++; mstat.liftAt = nk; }
+    else if (act.k === "fly") { mstat.fly++; mstat.flyAt = nk; }
+    else if (act.k === "lift" && act.d === 2) { mstat.lift++; mstat.liftAt = nk; }
     break; // 칸 번호가 바뀌었으니 다음 번에 다시
   }
 }
@@ -832,7 +845,9 @@ const windV = { x: 0, z: 0 };
 function windTick(dt) {
   windV.x = windV.z = 0; let pushed = false;
   for (const f of fans) {
-    const reach = Math.min(8, 2 + f.I * 5), ux = f.ax === 0 ? f.s : 0, uz = f.ax === 1 ? f.s : 0, x = cx(f.c) + .5, y = cy(f.c) + .5, z = cz(f.c) + .5;
+    const x = cx(f.c) + .5, y = cy(f.c) + .5, z = cz(f.c) + .5;
+    if (f.ax === 2) { if (Math.random() < dt * 16) { const p = sparks(x + (Math.random() - .5) * .8, y + f.s * .5, z + (Math.random() - .5) * .8, 0xdff4ff, 1); if (p) { p.v.set(0, f.s * 6, 0); p.g = 0; p.life = .35; } } continue; }
+    const reach = Math.min(8, 2 + f.I * 5), ux = f.ax === 0 ? f.s : 0, uz = f.ax === 1 ? f.s : 0;
     let L = 0; for (let k = 1; k <= reach; k++) { const X = Math.floor(x + ux * k), Z = Math.floor(z + uz * k); if (!inb(X, cy(f.c), Z) || isSolid(W[ix(X, cy(f.c), Z)])) break; L = k; }
     if (Math.random() < dt * 16) { const p = sparks(x + ux * .5 + (uz ? (Math.random() - .5) * .8 : 0), y + (Math.random() - .5) * .8, z + uz * .5 + (ux ? (Math.random() - .5) * .8 : 0), 0xdff4ff, 1); if (p) { p.v.set(ux * 6, 0, uz * 6); p.g = 0; p.life = Math.max(.15, L / 6); } }
     const along = (player.x - x) * ux + (player.z - z) * uz, side = Math.abs((player.x - x) * uz) + Math.abs((player.z - z) * ux);
@@ -863,6 +878,8 @@ const PRODUCTS = [
     ok: () => mstat.lift >= 3 && W[mstat.liftAt] === 28 ? mstat.liftAt : null },
   { id: "wind", e: "🌬", n: "선풍기", en: "운동", how: "전동기 옆 회전축에 선풍기 날개를 끼우고, 전지 - 스위치 - 전동기를 한 고리로. 날개 앞에 서면 바람에 몸이 밀려나요. 전류가 셀수록 바람이 세고 멀리 가요.",
     ok: () => mstat.blow >= 1 && W[mstat.blowAt] === 28 && running(mstat.blowAt) ? mstat.blowAt : null },
+  { id: "fly", e: "🚁", n: "날아오르는 드론", en: "운동", how: "① 전동기를 R로 여러 번 돌려 하얀 회전축이 위아래를 보게 해요. ② 전동기 바로 아래에 선풍기 날개를 붙여요(바람을 아래로 밀면 반작용으로 판이 위로 밀려요). ③ 나무판에 전동기와 전지·스위치를 함께 실어요. 날개가 미는 힘이 무게보다 커야 떠요. 전지를 직렬로 늘려 전류를 키우거나, 날개 단 전동기를 병렬로 여러 개 달아요. 스위치를 끄면 내려와요.",
+    ok: () => mstat.fly >= 3 && W[mstat.flyAt] === 28 ? mstat.flyAt : null },
   { id: "torch", e: "🔦", n: "손전등", en: "빛", how: "전지 2개를 직렬로 잇고, 스위치와 전구를 한 고리로. 전구 전압이 2.6V를 넘게, 스위치로 켜고 꺼요.",
     ok: () => cellsOf("bulb").find(i => running(i) && Math.abs(pv(i).v) > 2.6 && ctrlBy(i).length) },
   { id: "bell", e: "🔔", n: "초인종", en: "소리", how: "전지 + 스위치(누름 단추) + 버저를 한 고리로.",
@@ -886,7 +903,7 @@ const PRODUCTS = [
     ok: () => { const L = cellsOf("bulb").filter(lit); for (const b of L) { const P = solve(new Set([b])).part; const grp = L.filter(j => j !== b && lit(j) && !((P.get(j) || { v: 0 }).v ** 2 / 5 / BULB_REF > .07)); if (grp.length >= 3) return b; } return null; } },
 ];
 // 발명품마다 필요한 부품: 이름을 누르면 아래 칸에 꺼내 줘요
-const KITS = { car: [20, 14, 28, 15, 4, 21, 25], steer: [20, 14, 28, 15, 4, 21, 25], lift: [20, 17, 16, 28, 4, 21, 25], wind: [20, 28, 18, 21, 25], torch: [20, 21, 25, 22], bell: [20, 21, 25, 30], fan: [20, 28, 18, 31, 21, 25], lamp: [20, 21, 31, 22, 25], toast: [20, 21, 25, 35], crane: [20, 21, 25, 36, 13, 4], signal: [20, 21, 25, 32, 33, 34], alarm: [20, 21, 25, 30, 22], tap: [20, 21, 29, 22, 28, 30, 35], tree: [20, 21, 22] };
+const KITS = { car: [20, 14, 28, 15, 4, 21, 25], steer: [20, 14, 28, 15, 4, 21, 25], lift: [20, 17, 16, 28, 4, 21, 25], wind: [20, 28, 18, 21, 25], fly: [20, 28, 18, 21, 25, 4], torch: [20, 21, 25, 22], bell: [20, 21, 25, 30], fan: [20, 28, 18, 31, 21, 25], lamp: [20, 21, 31, 22, 25], toast: [20, 21, 25, 35], crane: [20, 21, 25, 36, 13, 4], signal: [20, 21, 25, 32, 33, 34], alarm: [20, 21, 25, 30, 22], tap: [20, 21, 29, 22, 28, 30, 35], tree: [20, 21, 22] };
 const prodLabels = new THREE.Group(); scene.add(prodLabels);
 function productTick() {
   if (!RES || RES.cells.length > 600) return;
@@ -1246,7 +1263,7 @@ function startLevel(k) {
 }
 const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 15, 16, 17, 18, 13, 4, 6, 7, 8, 3, 12, 5, 9];
 function startSandbox(fresh) {
-  Object.assign(mstat, { car: 0, carAt: -1, turn: 0, lift: 0, liftAt: -1, blow: 0, blowAt: -1 }); machAcc.clear();
+  Object.assign(mstat, { car: 0, carAt: -1, turn: 0, lift: 0, liftAt: -1, blow: 0, blowAt: -1, fly: 0, flyAt: -1, flyMsg: 0 }); machAcc.clear();
   mode = "sandbox"; LV = null; LVi = -1; clearWorld(); $("hint").hidden = true;
   if (fresh || !loadSandbox()) { for (const [x, z] of [[21, 34], [22, 34], [23, 34]]) put(x, GY, z, 13, 0, false); } // 처음엔 철 블록 몇 개
   hot = [20, 21, 22, 23, 24, 25, 26, 27, 28]; sel = 0; inv = {};
@@ -1405,6 +1422,11 @@ function breakIt() {
 function rotateIt() {
   const h = raycast(7); if (!h || !isPart(W[h.i])) { toast("부품을 바라보고 돌려요.", 1000); return; }
   if (mode === "level" && LOCK[h.i]) { toast("🔒 고정된 부품은 돌릴 수 없어요.", 1200); return; }
+  if (W[h.i] === 28) { // 전동기: 회전축이 옆(4방향) → 단자 위아래 → 회전축 위아래(4방향)
+    const ST = [[0, 0], [4, 0], [1, 0], [5, 0], [2, 0], [3, 0], [0, 1], [4, 1], [1, 1], [5, 1]];
+    const k = ST.findIndex(([o, v]) => o === ORI[h.i] && v === (VAL[h.i] & 1)), [o, v] = ST[(k + 1) % ST.length];
+    ORI[h.i] = o; VAL[h.i] = v; edited(h.i); rebuildPartsNear(h.i); sfx.click(true); toast(v ? "회전축: 위아래 ↕ (날개를 아래에 달면 드론)" : "회전축: 옆 ↔", 1100); return;
+  }
   ORI[h.i] = ROT_ORDER[(ROT_ORDER.indexOf(ORI[h.i]) + 1) % 6]; edited(h.i); sfx.click(true);
 }
 
@@ -1651,7 +1673,7 @@ renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
 // 새 버전 확인: 브라우저가 예전 페이지를 기억해도(최대 10분) 새 버전이 있으면 알려 줘요. 진행 기록은 그대로예요
-const VERSION = "2026-11-02-drivetrain2";
+const VERSION = "2026-11-02-drone";
 function checkVersion() {
   try { fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.text() : "").then(h => { const m = h.match(/const VERSION = "([^"]+)"/); if (m && m[1] !== VERSION) { $("newVer").hidden = false; $("newVerGo").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); } }).catch(() => {}); } catch (e) {}
 }
