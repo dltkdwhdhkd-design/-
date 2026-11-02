@@ -1,0 +1,1339 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>서킷 크래프트</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 화면 전체가 1인칭 블록 세계. 임무는 왼쪽 위, 측정기는 오른쪽 위, 부품 칸은 아래 */
+:root {
+  --void: #070a14;
+  --panel: rgba(12, 16, 30, .88);
+  --line: #34406f;
+  --ink: #f1f3ff;
+  --dim: #a6aed6;
+  --amp: #ffd65a;
+  --volt: #ff8a5c;
+  --ohm: #8fe3ff;
+  --good: #6fe39a;
+  --bad: #ff6b6b;
+  --font-display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--void); color: var(--ink); font-family: var(--font-body); font-size: clamp(12px, 1vw, 16px); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 400; margin: 0; text-wrap: balance; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--ohm); outline-offset: 2px; }
+.btn { border: 0; border-radius: 10px; padding: .6em 1.2em; font-weight: 700; background: var(--amp); color: #2b1d00; }
+.btn.ghost { background: var(--panel); color: var(--ink); border: 1.5px solid var(--line); }
+.btn.big { font-size: 1.15em; padding: .75em 1.6em; }
+kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 5px; padding: 0 5px; background: #ffffff0d; font-size: .85em; }
+.A { color: var(--amp); font-weight: 700; } .V { color: var(--volt); font-weight: 700; } .O { color: var(--ohm); font-weight: 700; }
+
+.hud { position: fixed; z-index: 5; pointer-events: none; }
+.hud .click { pointer-events: auto; }
+#mission { top: calc(env(safe-area-inset-top, 0px) + 10px); left: max(10px, env(safe-area-inset-left, 0px)); width: min(340px, calc(100vw - 20px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; }
+#mission .lv { font-size: .78em; color: var(--dim); font-weight: 700; letter-spacing: .05em; }
+#mission .t { font-family: var(--font-display); font-size: 1.25em; }
+#mission ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+#mission li { display: grid; grid-template-columns: 1.3em 1fr; gap: 4px; line-height: 1.4; color: var(--dim); }
+#mission li.now { color: var(--ink); }
+#mission li.ok { color: var(--good); }
+#mission li::before { content: "○"; }
+#mission li.now::before { content: "▶"; color: var(--amp); }
+#mission li.ok::before { content: "✓"; }
+#mission .live { font-size: .9em; background: #ffffff0a; border-radius: 8px; padding: 6px 8px; line-height: 1.5; }
+#mission .live:empty { display: none; }
+#mission .row { display: flex; gap: 6px; flex-wrap: wrap; }
+#mission .row button { border: 1px solid var(--line); background: #ffffff0d; border-radius: 8px; padding: 3px 10px; font-size: .85em; }
+#hint { font-size: .9em; color: var(--ohm); line-height: 1.5; }
+#graph { width: 100%; height: 120px; background: #0006; border-radius: 8px; }
+
+#probe { top: calc(env(safe-area-inset-top, 0px) + 10px); right: max(10px, env(safe-area-inset-right, 0px)); width: min(270px, calc(100vw - 20px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 4px; }
+#probe .n { font-weight: 700; font-size: 1.05em; }
+#probe .vals { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-variant-numeric: tabular-nums; }
+#probe .f { font-size: .88em; color: var(--dim); line-height: 1.45; }
+#probe .warn { color: var(--bad); font-weight: 700; font-size: .9em; }
+
+#cross { left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+#cross::before, #cross::after { content: ""; position: absolute; background: #fffc; box-shadow: 0 0 2px #000; }
+#cross::before { left: 8px; top: 0; width: 2px; height: 18px; }
+#cross::after { top: 8px; left: 0; height: 2px; width: 18px; }
+
+#hotbar { left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 5px; }
+#hotbar .s { width: 48px; height: 48px; border-radius: 8px; border: 2px solid transparent; background: #ffffff0a; position: relative; display: grid; place-items: center; }
+#hotbar .s.on { border-color: var(--amp); background: #ffd65a22; }
+#hotbar .s canvas { width: 38px; height: 38px; image-rendering: pixelated; }
+#hotbar .s b { position: absolute; right: 3px; bottom: 1px; font-size: .78em; text-shadow: 0 1px 2px #000; }
+#hotbar .s i { position: absolute; left: 4px; top: 1px; font-size: .62em; color: var(--dim); font-style: normal; }
+#hotName { left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); background: var(--panel); border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: .95em; white-space: nowrap; }
+#viewTag { left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 10px); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 4px 14px; font-size: .9em; white-space: nowrap; }
+#keysHelp { right: max(10px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; font-size: .78em; color: var(--dim); line-height: 1.75; max-width: 230px; }
+#toast { left: 50%; top: 30%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 18px; font-weight: 700; max-width: min(520px, 90vw); text-align: center; line-height: 1.5; }
+#toast.bad { border-color: var(--bad); color: #ffd0d0; }
+#toast.good { border-color: var(--good); }
+
+.ov { position: fixed; inset: 0; z-index: 20; background: #050812e6; display: grid; place-items: center; padding: 16px; overflow: auto; }
+.card { background: #0e1426; border: 1px solid var(--line); border-radius: 16px; padding: 22px; width: min(760px, 100%); display: grid; gap: 14px; }
+.card p { margin: 0; line-height: 1.65; color: var(--dim); }
+.card p b { color: var(--ink); }
+.title { font-size: clamp(2.2em, 6vw, 3.6em); background: linear-gradient(90deg, #ffd65a, #ff8a5c 60%, #8fe3ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.levels button { text-align: left; border: 1px solid var(--line); background: #ffffff08; border-radius: 12px; padding: 10px; display: grid; gap: 3px; }
+.levels button:disabled { opacity: .35; cursor: not-allowed; }
+.levels button small { color: var(--dim); }
+.levels button .st { color: var(--amp); letter-spacing: 2px; }
+.rowb { display: flex; gap: 8px; flex-wrap: wrap; }
+.notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.note { background: #ffffff08; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 6px; align-content: start; }
+.note h3 { font-size: 1.1em; }
+.note p { font-size: .92em; }
+.note.lock { opacity: .4; }
+.note canvas { width: 100%; height: auto; background: #0006; border-radius: 8px; }
+.stars { font-size: 2.2em; color: var(--amp); letter-spacing: 6px; }
+.starline { color: var(--dim); line-height: 1.7; }
+.inv { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.inv button { border: 1px solid var(--line); background: #ffffff08; border-radius: 10px; padding: 6px; display: grid; justify-items: center; gap: 2px; font-size: .8em; }
+.inv canvas { width: 40px; height: 40px; image-rendering: pixelated; }
+.inv button.on { border-color: var(--amp); }
+label.rng { display: grid; grid-template-columns: 7em 1fr 3em; gap: 8px; align-items: center; color: var(--dim); }
+
+/* 터치 */
+#touch { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+#touch button, #stick { pointer-events: auto; position: absolute; border-radius: 50%; border: 2px solid #ffffff44; background: #ffffff18; font-weight: 700; color: #fff; touch-action: none; }
+#stick { left: max(20px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 80px); width: 130px; height: 130px; }
+#knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: #ffffff55; }
+#tPlace { right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); width: 74px; height: 74px; background: #6fe39a33 !important; }
+#tBreak { right: max(104px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 130px); width: 74px; height: 74px; background: #ff6b6b33 !important; }
+#tJump { right: max(18px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); width: 74px; height: 74px; }
+#tDown { right: max(104px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 60px); width: 56px; height: 56px; font-size: .8em; }
+#tTop { position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); top: calc(env(safe-area-inset-top, 0px) + 160px); display: grid; gap: 6px; pointer-events: auto; }
+#tTop button { position: static; border-radius: 10px; width: 64px; height: 40px; font-size: .8em; }
+@media (max-width: 900px), (max-height: 520px) {
+  #tTop { top: calc(env(safe-area-inset-top, 0px) + 8px); display: flex; }
+  #tTop button { width: 54px; height: 36px; }
+  body.touch #probe { top: calc(env(safe-area-inset-top, 0px) + 52px); bottom: auto; left: 50%; right: auto; transform: translateX(-50%); width: 210px; font-size: .8em; padding: 6px 10px; }
+  body.touch #probe .f { display: none; }
+  body.touch #viewTag { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); font-size: .75em; }
+}
+@media (max-width: 700px), (max-height: 520px) {
+  #probe { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); right: auto; left: max(10px, env(safe-area-inset-left, 0px)); width: min(240px, 60vw); font-size: .85em; padding: 6px 10px; }
+  #mission { width: min(270px, 70vw); font-size: .85em; padding: 8px 10px; }
+  #hotbar .s { width: 36px; height: 36px; } #hotbar .s canvas { width: 28px; height: 28px; }
+  #hotName { bottom: calc(env(safe-area-inset-bottom, 0px) + 56px); }
+  #keysHelp { display: none; }
+}
+body.touch #keysHelp { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div class="hud" id="cross" hidden></div>
+<div class="hud" id="mission" hidden>
+  <div class="lv" id="mLv"></div>
+  <div class="t" id="mT"></div>
+  <ol id="mSteps"></ol>
+  <div class="live" id="mLive"></div>
+  <canvas id="graph" width="320" height="120" hidden></canvas>
+  <div id="hint" hidden></div>
+  <div class="row click"><button id="bHint">💡 힌트</button><button id="bNote">📘 개념 노트 <kbd>N</kbd></button><button id="bMenu">☰ 메뉴</button></div>
+</div>
+<div class="hud" id="probe" hidden></div>
+<div class="hud" id="viewTag" hidden></div>
+<div class="hud click" id="hotbar" hidden></div>
+<div class="hud" id="hotName" hidden></div>
+<div class="hud" id="keysHelp" hidden>
+  <kbd>WASD</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>F</kbd> 날기<br>
+  왼쪽 클릭 빼기 · 오른쪽 클릭 놓기/스위치<br>
+  <kbd>R</kbd> 부품 방향 돌리기 · <kbd>V</kbd> 전류 보기<br>
+  <kbd>E</kbd> 부품 상자 · <kbd>N</kbd> 노트 · <kbd>Esc</kbd> 메뉴
+</div>
+<div class="hud" id="toast" hidden></div>
+
+<div id="touch" hidden>
+  <div id="stick"><div id="knob"></div></div>
+  <button id="tPlace">놓기<br>켜기</button>
+  <button id="tBreak">빼기</button>
+  <button id="tJump">점프</button>
+  <button id="tDown" hidden>내려</button>
+  <div id="tTop"><button id="tRot">돌리기</button><button id="tView">보기</button><button id="tFly">날기</button><button id="tInv">부품</button><button id="tEsc">메뉴</button></div>
+</div>
+
+<!-- 시작 화면 -->
+<div class="ov" id="startOv">
+  <div class="card">
+    <h1 class="title">서킷 크래프트</h1>
+    <p>밤이 되자 마을 전기가 모두 나갔어요. 블록 하나하나가 진짜 <b>전지·전선·전구·저항</b>이에요. 회로를 지어 불을 켜면, 게임이 <b class="V">전압(V)</b>, <b class="A">전류(A)</b>, <b class="O">저항(Ω)</b>을 실제 공식으로 계산해요. 전구 밝기, 선풍기 속도, 퓨즈와 합선까지 모두 계산 결과대로 움직여요.</p>
+    <h2>이야기 모드: 정전된 마을 살리기</h2>
+    <div class="levels" id="lvGrid"></div>
+    <div class="rowb">
+      <button class="btn big" id="bSandbox">🔧 자유 실험실</button>
+      <button class="btn ghost big" id="bNotes0">📘 개념 노트</button>
+      <button class="btn ghost big" id="bSet0">⚙ 설정</button>
+    </div>
+    <p style="font-size:.85em">컴퓨터: 마우스·키보드 / 폰·패드: 화면 버튼. 진행 상황은 이 기기에 저장돼요.</p>
+  </div>
+</div>
+
+<!-- 임무 소개 -->
+<div class="ov" id="briefOv" hidden>
+  <div class="card">
+    <div class="lv" id="bLv" style="color:var(--dim);font-weight:700"></div>
+    <h2 id="bT" style="font-size:2em"></h2>
+    <p id="bStory"></p>
+    <div class="note"><h3>가진 부품</h3><div class="inv" id="bInv"></div></div>
+    <div class="rowb"><button class="btn big" id="bGo">시작!</button><button class="btn ghost" id="bBack">돌아가기</button></div>
+  </div>
+</div>
+
+<!-- 성공 -->
+<div class="ov" id="winOv" hidden>
+  <div class="card">
+    <h2 style="font-size:2em" id="wT">불이 켜졌어요!</h2>
+    <div class="stars" id="wStars"></div>
+    <div class="starline" id="wStarLine"></div>
+    <div class="note"><h3 id="wLessonT">오늘 알아낸 것</h3><p id="wLesson"></p><canvas id="wGraph" width="480" height="200" hidden></canvas></div>
+    <div class="rowb"><button class="btn big" id="wNext">다음 임무 ▶</button><button class="btn ghost" id="wStay">여기서 더 실험하기</button><button class="btn ghost" id="wRetry">다시 하기</button><button class="btn ghost" id="wHome">처음 화면</button></div>
+  </div>
+</div>
+
+<!-- 메뉴 -->
+<div class="ov" id="menuOv" hidden>
+  <div class="card">
+    <h2>잠깐 멈춤</h2>
+    <div class="rowb"><button class="btn big" id="mResume">계속하기</button><button class="btn ghost" id="mRetry">처음부터 다시</button><button class="btn ghost" id="mHome">처음 화면</button><button class="btn ghost" id="mSet">⚙ 설정</button></div>
+    <div class="rowb" id="sbTools"><button class="btn ghost" id="mDay">☀ 낮/밤 바꾸기</button><button class="btn ghost" id="mClear">🧹 실험실 비우기</button></div>
+  </div>
+</div>
+
+<!-- 부품 상자 -->
+<div class="ov" id="invOv" hidden>
+  <div class="card">
+    <h2>부품 상자</h2>
+    <p>고른 부품이 아래쪽 지금 칸(<span id="invSlot"></span>번)에 들어가요.</p>
+    <div class="inv" id="invGrid"></div>
+    <div class="rowb"><button class="btn" id="invClose">닫기</button></div>
+  </div>
+</div>
+
+<!-- 노트 -->
+<div class="ov" id="notesOv" hidden>
+  <div class="card" style="width:min(980px,100%)">
+    <h2>📘 개념 노트</h2>
+    <p>임무를 깨면 노트가 하나씩 열려요. 선생님은 이 노트를 화면에 띄워 설명할 수 있어요.</p>
+    <div class="notes" id="notesGrid"></div>
+    <div class="rowb"><button class="btn" id="notesClose">닫기</button></div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="ov" id="setOv" hidden>
+  <div class="card">
+    <h2>⚙ 설정</h2>
+    <label class="rng">마우스 감도 <input type="range" id="sSens" min=".3" max="2.5" step=".1"><span id="oSens"></span></label>
+    <label class="rng">소리 크기 <input type="range" id="sVol" min="0" max="1" step=".05"><span id="oVol"></span></label>
+    <label class="rng">조작 <span class="rowb" id="sInput"></span><span></span></label>
+    <div class="rowb"><button class="btn" id="setClose">닫기</button><button class="btn ghost" id="setReset">진행 기록 지우기</button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+/* ═════════════ 부품과 블록 ═════════════ */
+// 1~19: 땅·건축 블록(전기가 안 통해요). 20~: 전기 부품
+const BL = {
+  1: { n: "풀", t: [0, 1, 2] }, 2: { n: "흙", t: [2, 2, 2] }, 3: { n: "돌", t: [3, 3, 3] }, 4: { n: "나무판", t: [4, 4, 4] },
+  5: { n: "통나무", t: [6, 5, 6] }, 6: { n: "벽돌", t: [7, 7, 7] }, 7: { n: "유리", t: [8, 8, 8], see: true }, 8: { n: "흰 벽", t: [9, 9, 9] },
+  9: { n: "지붕", t: [10, 10, 10] }, 10: { n: "나뭇잎", t: [11, 11, 11], see: true }, 11: { n: "바닥돌", t: [12, 12, 12], hard: true }, 12: { n: "고무 매트", t: [13, 13, 13] },
+};
+// R: 저항(Ω). 전지는 전압 V와 내부 저항 r. 전선은 거의 0Ω(0.01Ω)
+const PT = {
+  20: { n: "구리 전선", k: "wire", sym: "wire", d: "전기가 아주 잘 통해요(저항 거의 0). 붙어 있는 전선끼리는 모두 이어져요." },
+  21: { n: "전지 1.5V", k: "bat", V: 1.5, r: 0.1, max: 3, d: "빨간 쪽이 (+)극. 여러 개를 +와 −끼리 한 줄로 이으면 전압이 더해져요." },
+  22: { n: "꼬마전구", k: "bulb", R: 5, d: "저항 5Ω. 전기 에너지를 빛으로 바꿔요. 전압이 4.8V를 넘으면 필라멘트가 끊어져요." },
+  23: { n: "저항 10Ω", k: "res", R: 10, d: "전류의 흐름을 방해하는 정도가 10Ω인 부품이에요." },
+  24: { n: "니크롬선 2Ω", k: "nic", R: 2, d: "한 칸에 2Ω. 길게 이을수록(직렬) 저항이 커지고, 나란히 여러 줄로 이으면(굵게) 작아져요." },
+  25: { n: "스위치", k: "sw", d: "오른쪽 클릭으로 열고 닫아요. 열리면 회로가 끊겨요." },
+  26: { n: "전류계", k: "amm", R: 0.01, max: 3, d: "회로에 직렬로 끼워 전류(A)를 재요. 빨간 단자가 (+)." },
+  27: { n: "전압계", k: "vm", R: 1e6, d: "재고 싶은 부품의 양 끝에 병렬로 대어 전압(V)을 재요. 빨간 단자가 (+)." },
+  28: { n: "전동기(선풍기)", k: "mot", R: 4, d: "저항 4Ω. 전류가 셀수록 빨리 돌고, 전류 방향을 바꾸면 반대로 돌아요." },
+  29: { n: "퓨즈 2A", k: "fuse", R: 0.01, max: 2, d: "전류가 2A를 넘으면 끊어져 회로를 지켜요. 오른쪽 클릭으로 새 퓨즈로 갈아요." },
+  30: { n: "버저", k: "buz", R: 10, d: "저항 10Ω. 전류가 흐르면 삐 소리가 나요. 전류가 셀수록 크고 높아요." },
+};
+const isPart = (id) => id >= 21 && !!PT[id];
+const isCond = (id) => id >= 20 && !!PT[id];
+const isSolid = (id) => id > 0 && id < 20;
+const itemName = (id) => (PT[id] || BL[id] || { n: "?" }).n;
+const BULB_REF = 1.5 * 1.5 / 5; // 전지 1개에 전구 1개일 때 전력(밝기 1)
+const BULB_MAX_V = 4.8;
+const G_WIRE = 1000; // 전선 이음 0.001Ω
+
+/* ═════════════ 세계 ═════════════ */
+const SX = 48, SY = 24, SZ = 48, NN = SX * SY * SZ;
+const W = new Uint8Array(NN), ORI = new Uint8Array(NN), LOCK = new Uint8Array(NN), FL = new Uint8Array(NN);
+// FL: 1 스위치 닫힘, 2 망가짐(전구·퓨즈·전류계), 4 전지 과열(합선)
+const ix = (x, y, z) => x + SX * (z + SZ * y);
+const inb = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < SX && y < SY && z < SZ;
+const cx = (i) => i % SX, cz = (i) => Math.floor(i / SX) % SZ, cy = (i) => Math.floor(i / (SX * SZ));
+const get = (x, y, z) => inb(x, y, z) ? W[ix(x, y, z)] : (y < 0 ? 11 : 0);
+const DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+const ROT_ORDER = [0, 4, 1, 5, 2, 3];
+function hash(x, z, s) { let h = (x * 374761393 + z * 668265263 + s * 1442695041) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+
+/* ═════════════ 3D 준비 ═════════════ */
+const canvas = $("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(72, 1, 0.05, 200);
+camera.rotation.order = "YXZ";
+const amb = new THREE.AmbientLight(0xffffff, .3); scene.add(amb);
+const hemi = new THREE.HemisphereLight(0xbfd4ff, 0x404030, .3); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, .4); sun.position.set(.4, 1, .25); scene.add(sun);
+const LIGHTS = []; for (let i = 0; i < 8; i++) { const l = new THREE.PointLight(0xffd890, 0, 11, 1.6); scene.add(l); LIGHTS.push(l); }
+
+// 텍스처 묶음: 16px 칸
+const TILE = 16, ATN = 16;
+const atlasC = document.createElement("canvas"); atlasC.width = TILE * ATN; atlasC.height = TILE;
+(function paintAtlas() {
+  const g = atlasC.getContext("2d");
+  const px = (t, x, y, c) => { g.fillStyle = c; g.fillRect(t * TILE + x, y, 1, 1); };
+  const fillN = (t, base, vary, s) => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = hash(x + t * 31, y, s) - .5; px(t, x, y, shade(base, r * vary)); } };
+  function shade(hex, k) { const n = parseInt(hex.slice(1), 16); let r = n >> 16, gg = (n >> 8) & 255, b = n & 255; const f = (v) => Math.max(0, Math.min(255, Math.round(v * (1 + k)))); return `rgb(${f(r)},${f(gg)},${f(b)})`; }
+  fillN(0, "#5fae4a", .25, 1); // 풀 위
+  fillN(1, "#8a5d3b", .2, 2); for (let x = 0; x < 16; x++) for (let y = 0; y < 3 + (hash(x, 0, 9) * 3 | 0); y++) px(1, x, y, shade("#5fae4a", (hash(x, y, 4) - .5) * .3)); // 풀 옆
+  fillN(2, "#8a5d3b", .22, 3); fillN(3, "#8d8f96", .22, 4);
+  fillN(4, "#b98a52", .12, 5); for (let y = 0; y < 16; y += 4) for (let x = 0; x < 16; x++) px(4, x, y, "#7b5631"); for (let y = 0; y < 16; y += 4) px(4, (y * 3) % 16, y + 2, "#7b5631");
+  fillN(5, "#6e4b2a", .15, 6); for (let x = 1; x < 16; x += 3) for (let y = 0; y < 16; y++) if (hash(x, y, 7) > .3) px(5, x, y, "#553a1f");
+  fillN(6, "#b08a58", .1, 8); for (let r = 2; r < 8; r += 2) for (let a = 0; a < 40; a++) px(6, 8 + Math.round(Math.cos(a / 6.37) * r * .9), 8 + Math.round(Math.sin(a / 6.37) * r * .9), "#7d5f37");
+  fillN(7, "#a5513c", .15, 9); for (let y = 0; y < 16; y += 4) for (let x = 0; x < 16; x++) px(7, x, y, "#d9cbb5"); for (let y = 0; y < 16; y += 4) for (let k = 0; k < 4; k++) px(7, ((y / 4) % 2 ? 4 : 0) + k * 8 & 15, y + 1, "#d9cbb5"), px(7, ((y / 4) % 2 ? 4 : 0) + k * 8 & 15, y + 2, "#d9cbb5"), px(7, ((y / 4) % 2 ? 4 : 0) + k * 8 & 15, y + 3, "#d9cbb5");
+  g.clearRect(8 * TILE, 0, TILE, TILE); for (let k = 0; k < 16; k++) { px(8, k, 0, "#e8f6ff"); px(8, k, 15, "#e8f6ff"); px(8, 0, k, "#e8f6ff"); px(8, 15, k, "#e8f6ff"); } px(8, 3, 3, "#ffffff"); px(8, 4, 4, "#ffffff"); px(8, 4, 3, "#ffffff");
+  fillN(9, "#e6e2d8", .06, 10);
+  fillN(10, "#8e3b2c", .14, 11); for (let y = 3; y < 16; y += 4) for (let x = 0; x < 16; x++) px(10, x, y, "#5e241a");
+  g.clearRect(11 * TILE, 0, TILE, TILE); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (hash(x, y, 12) > .22) px(11, x, y, shade("#3f8a3a", (hash(x, y, 13) - .5) * .5));
+  fillN(12, "#55585f", .3, 14);
+  fillN(13, "#2a2c33", .12, 15); for (let y = 2; y < 16; y += 4) for (let x = 0; x < 16; x++) px(13, x, y, "#3a3d46");
+})();
+const atlasTex = new THREE.CanvasTexture(atlasC); atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter;
+const terrMat = new THREE.MeshLambertMaterial({ map: atlasTex, vertexColors: true, alphaTest: .5 });
+
+/* ═════════════ 땅 메쉬 ═════════════ */
+const CH = 16, chunks = {};
+const FACES = [
+  { d: [1, 0, 0], v: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], s: .8, t: 1 },
+  { d: [-1, 0, 0], v: [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]], s: .8, t: 1 },
+  { d: [0, 1, 0], v: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], s: 1, t: 0 },
+  { d: [0, -1, 0], v: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], s: .5, t: 2 },
+  { d: [0, 0, 1], v: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], s: .65, t: 1 },
+  { d: [0, 0, -1], v: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]], s: .65, t: 1 },
+];
+function buildChunk(kx, kz) {
+  const key = kx + "," + kz; if (chunks[key]) { scene.remove(chunks[key]); chunks[key].geometry.dispose(); delete chunks[key]; }
+  const pos = [], uv = [], col = [], idxs = []; let n = 0;
+  for (let y = 0; y < SY; y++) for (let z = kz * CH; z < kz * CH + CH; z++) for (let x = kx * CH; x < kx * CH + CH; x++) {
+    const b = W[ix(x, y, z)]; if (!isSolid(b)) continue; const B = BL[b];
+    for (const f of FACES) {
+      const nb = get(x + f.d[0], y + f.d[1], z + f.d[2]);
+      if (isSolid(nb) && (!BL[nb].see || nb === b)) continue;
+      if (y + f.d[1] < 0) continue;
+      const t = B.t[f.t], u0 = t / ATN, u1 = (t + 1) / ATN;
+      const sh = f.s * (.85 + .15 * hash(x, z, y));
+      for (const v of f.v) { pos.push(x + v[0], y + v[1], z + v[2]); col.push(sh, sh, sh); }
+      uv.push(u0, 0, u1, 0, u1, 1, u0, 1);
+      idxs.push(n, n + 1, n + 2, n, n + 2, n + 3); n += 4;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idxs); geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, terrMat); scene.add(m); chunks[key] = m;
+}
+function buildAllChunks() { for (let kx = 0; kx < SX / CH; kx++) for (let kz = 0; kz < SZ / CH; kz++) buildChunk(kx, kz); }
+function rebuildAround(x, z) {
+  const set = new Set();
+  for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Z = z + dz; if (X < 0 || Z < 0 || X >= SX || Z >= SZ) continue; set.add(Math.floor(X / CH) + "," + Math.floor(Z / CH)); }
+  set.forEach(k => { const [a, b] = k.split(",").map(Number); buildChunk(a, b); });
+}
+
+/* ═════════════ 부품 모양 ═════════════ */
+const partGroup = new THREE.Group(); scene.add(partGroup);
+const partObj = new Map(); // 칸 번호 → 3D 물체
+const matC = {}; const mat = (c, o = {}) => { const k = c + JSON.stringify(o); return matC[k] || (matC[k] = new THREE.MeshLambertMaterial(Object.assign({ color: c }, o))); };
+const COPPER = 0xc87533;
+function bx(w, h, d, m, x = 0, y = 0, z = 0, p) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); if (p) p.add(b); return b; }
+function cylX(r, len, m, x = 0, y = 0, z = 0, p, seg = 14) { const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, seg), m); c.rotation.z = Math.PI / 2; c.position.set(x, y, z); if (p) p.add(c); return c; }
+function textTex(lines, bg, fg, w = 128, h = 64) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
+  g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = fg; g.textAlign = "center"; g.textBaseline = "middle";
+  const L = [].concat(lines); L.forEach((t, i) => { g.font = `700 ${Math.floor(h / (L.length + .4))}px sans-serif`; g.fillText(t, w / 2, h * (i + .5) / L.length + 2); });
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+}
+const TEX = {
+  bat: (() => { const c = document.createElement("canvas"); c.width = 128; c.height = 128; const g = c.getContext("2d"); g.fillStyle = "#1f6f4a"; g.fillRect(0, 0, 128, 128); g.fillStyle = "#ffffff"; g.font = "700 30px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; for (const u of [32, 96]) { g.save(); g.translate(u, 64); g.rotate(-Math.PI / 2); g.fillText("+ 1.5V −", 0, 0); g.restore(); } return new THREE.CanvasTexture(c); })(), amm: textTex(["A"], "#f3f0e6", "#202020", 64, 64), vm: textTex(["V"], "#f3f0e6", "#202020", 64, 64),
+  res: null,
+};
+function terminals(g) { bx(.1, .22, .22, mat(COPPER), .45, 0, 0, g); bx(.1, .22, .22, mat(COPPER), -.45, 0, 0, g); }
+function makePart(id, i) {
+  const k = PT[id].k, g = new THREE.Group(), fl = FL[i];
+  const u = {}; g.userData = u;
+  if (k === "bat") {
+    const hot = fl & 4;
+    cylX(.27, .62, new THREE.MeshLambertMaterial({ map: TEX.bat, color: hot ? 0xff8866 : 0xffffff }), -.04, 0, 0, g, 18);
+    cylX(.27, .1, mat(0xd8342c), .32, 0, 0, g, 18); cylX(.1, .08, mat(0xd8d8d8), .41, 0, 0, g); // + 쪽
+    cylX(.27, .06, mat(0x333333), -.38, 0, 0, g, 18); bx(.06, .2, .2, mat(0x999999), -.44, 0, 0, g);
+    const plus = bx(.02, .16, .04, mat(0xffffff), .375, 0, 0, g); bx(.02, .04, .16, mat(0xffffff), .375, 0, 0, g); plus.position.y = 0;
+  } else if (k === "bulb") {
+    bx(.96, .14, .44, mat(0x6b4b2e), 0, -.38, 0, g);
+    bx(.12, .3, .2, mat(COPPER), .42, -.2, 0, g); bx(.12, .3, .2, mat(COPPER), -.42, -.2, 0, g);
+    bx(.1, .22, .22, mat(COPPER), .45, 0, 0, g); bx(.1, .22, .22, mat(COPPER), -.45, 0, 0, g);
+    cylX(.025, .7, mat(0x555555), 0, -.18, 0, g, 6);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(.13, .13, .16, 14), mat(0xaaaaaa)); base.position.y = -.22; g.add(base);
+    const glass = new THREE.Mesh(new THREE.SphereGeometry(.24, 18, 14), new THREE.MeshBasicMaterial({ color: 0x777766, transparent: true, opacity: .55 }));
+    glass.position.y = .06; g.add(glass); u.glass = glass;
+    const fil = bx(.14, .03, .03, new THREE.MeshBasicMaterial({ color: fl & 2 ? 0x222222 : 0x885522 }), 0, .02, 0, g); u.fil = fil;
+    if (fl & 2) { fil.scale.x = .4; fil.position.x = .05; glass.material.color.setHex(0x333333); }
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffd47a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+    halo.position.y = .06; g.add(halo); u.halo = halo;
+  } else if (k === "res") {
+    cylX(.03, .9, mat(0xbbbbbb), 0, 0, 0, g, 6); terminals(g);
+    cylX(.15, .5, mat(0xd8c08a), 0, 0, 0, g);
+    [[-.15, 0x7a3b10], [-.05, 0x111111], [.05, 0x111111], [.17, 0xd4af37]].forEach(([x, c]) => cylX(.155, .05, mat(c), x, 0, 0, g));
+  } else if (k === "nic") {
+    bx(.96, .12, .5, mat(0xe9e1cf), 0, -.3, 0, g);
+    bx(.08, .5, .1, mat(0xe9e1cf), .4, -.1, 0, g); bx(.08, .5, .1, mat(0xe9e1cf), -.4, -.1, 0, g);
+    for (let a = -.36; a <= .37; a += .06) { const r = new THREE.Mesh(new THREE.TorusGeometry(.09, .018, 5, 10), mat(0x9a9aa6)); r.rotation.y = Math.PI / 2; r.position.set(a, .02, 0); g.add(r); }
+    terminals(g);
+  } else if (k === "sw") {
+    bx(.96, .1, .5, mat(0x8a6a44), 0, -.35, 0, g);
+    bx(.1, .3, .2, mat(COPPER), -.4, -.18, 0, g); bx(.1, .3, .2, mat(COPPER), .4, -.18, 0, g);
+    bx(.1, .22, .22, mat(COPPER), .45, 0, 0, g); bx(.1, .22, .22, mat(COPPER), -.45, 0, 0, g);
+    const pv = new THREE.Group(); pv.position.set(-.4, 0, 0); g.add(pv);
+    bx(.8, .05, .12, mat(0xd9a24a), .4, 0, 0, pv); bx(.1, .2, .1, mat(0xd8342c), .78, .1, 0, pv);
+    pv.rotation.z = fl & 1 ? 0 : .7; u.lever = pv;
+  } else if (k === "amm" || k === "vm") {
+    const body = bx(.8, .62, .5, mat(0xf3f0e6), 0, -.1, 0, g);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(.5, .4), new THREE.MeshBasicMaterial({ map: k === "amm" ? TEX.amm : TEX.vm }));
+    face.position.set(0, -.05, .253); g.add(face); const face2 = face.clone(); face2.rotation.y = Math.PI; face2.position.z = -.253; g.add(face2);
+    bx(.12, .2, .2, mat(0xd8342c), .45, 0, 0, g); bx(.12, .2, .2, mat(0x222222), -.45, 0, 0, g);
+    if (fl & 2) body.material = mat(0x444444);
+    const lab = labelSprite(); lab.position.set(0, .55, 0); g.add(lab); u.label = lab;
+  } else if (k === "mot") {
+    bx(.96, .1, .5, mat(0x555a66), 0, -.38, 0, g); terminals(g);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, .4, 16), mat(0x9aa3b5)); body.position.y = -.12; g.add(body);
+    cylX(.03, .9, mat(0x777777), 0, -.2, 0, g, 6);
+    const fan = new THREE.Group(); fan.position.y = .14; g.add(fan);
+    for (let a = 0; a < 3; a++) { const bl = bx(.42, .02, .14, mat(0x4aa3ff), .22, 0, 0); const h = new THREE.Group(); h.rotation.y = a * Math.PI * 2 / 3; bl.rotation.x = .35; h.add(bl); fan.add(h); }
+    bx(.08, .08, .08, mat(0xdddddd), 0, 0, 0, fan); u.fan = fan;
+  } else if (k === "fuse") {
+    terminals(g);
+    cylX(.12, .7, new THREE.MeshLambertMaterial({ color: 0xcfefff, transparent: true, opacity: .4 }), 0, 0, 0, g);
+    cylX(.125, .08, mat(0xbbbbbb), .33, 0, 0, g); cylX(.125, .08, mat(0xbbbbbb), -.33, 0, 0, g);
+    if (fl & 2) { cylX(.015, .2, mat(0x222222), -.2, 0, 0, g, 5); cylX(.015, .2, mat(0x222222), .2, 0, 0, g, 5); }
+    else cylX(.015, .62, mat(0xeeeeee), 0, 0, 0, g, 5);
+  } else if (k === "buz") {
+    terminals(g); cylX(.03, .9, mat(0x777777), 0, -.15, 0, g, 6);
+    const d = new THREE.Mesh(new THREE.CylinderGeometry(.26, .28, .25, 18), mat(0x222428)); d.position.y = -.1; g.add(d);
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, .02, 10), mat(0x000000)); h.position.y = .03; g.add(h);
+  }
+  return g;
+}
+const glowTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "#ffffffff"); gr.addColorStop(.25, "#fff0c0aa"); gr.addColorStop(1, "#ffd08000"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+function labelSprite() {
+  const c = document.createElement("canvas"); c.width = 192; c.height = 64;
+  const t = new THREE.CanvasTexture(c); const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  s.scale.set(.9, .3, 1); s.renderOrder = 10; s.userData = { c, t, txt: "" }; return s;
+}
+function setLabel(s, txt, col) {
+  const u = s.userData; if (u.txt === txt + col) return; u.txt = txt + col;
+  const g = u.c.getContext("2d"); g.clearRect(0, 0, 192, 64); g.fillStyle = "#0b0f1ecc"; g.beginPath(); g.roundRect ? g.roundRect(2, 2, 188, 60, 14) : g.rect(2, 2, 188, 60); g.fill();
+  g.fillStyle = col; g.font = "700 38px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, 96, 34); u.t.needsUpdate = true;
+}
+function orient(o, d) {
+  o.rotation.set(0, 0, 0);
+  if (d === 1) o.rotation.y = Math.PI; else if (d === 2) o.rotation.z = Math.PI / 2; else if (d === 3) o.rotation.z = -Math.PI / 2;
+  else if (d === 4) o.rotation.y = -Math.PI / 2; else if (d === 5) o.rotation.y = Math.PI / 2;
+}
+// 전선: 가운데 마디 + 이어진 쪽으로만 팔
+function wireLinks(i) {
+  const x = cx(i), y = cy(i), z = cz(i), out = [];
+  for (let k = 0; k < 6; k++) { const [dx, dy, dz] = DIRS[k], X = x + dx, Y = y + dy, Z = z + dz; if (!inb(X, Y, Z)) continue; const j = ix(X, Y, Z); if (termAt(j, k ^ 1)) out.push(k); }
+  return out;
+}
+const wireGeoHub = new THREE.BoxGeometry(.2, .2, .2), wireGeoArm = new THREE.BoxGeometry(.4, .13, .13);
+function makeWire(i) {
+  const g = new THREE.Group(); const m = new THREE.MeshLambertMaterial({ color: COPPER, emissive: 0x000000 });
+  g.userData = { wm: m }; g.add(new THREE.Mesh(wireGeoHub, m));
+  const L = wireLinks(i);
+  for (const k of L) { const a = new THREE.Mesh(wireGeoArm, m); const [dx, dy, dz] = DIRS[k]; a.position.set(dx * .3, dy * .3, dz * .3); if (dy) a.rotation.z = Math.PI / 2; if (dz) a.rotation.y = Math.PI / 2; g.add(a); }
+  if (!L.length) { const flat = new THREE.Mesh(new THREE.BoxGeometry(.5, .06, .5), m); flat.position.y = -.1; g.add(flat); }
+  return g;
+}
+function rebuildPart(i) {
+  const old = partObj.get(i); if (old) { partGroup.remove(old); old.traverse(o => { if (o.geometry && o.geometry !== wireGeoHub && o.geometry !== wireGeoArm) o.geometry.dispose(); }); partObj.delete(i); }
+  const id = W[i]; if (!isCond(id)) return;
+  const o = id === 20 ? makeWire(i) : makePart(id, i);
+  o.position.set(cx(i) + .5, cy(i) + .5, cz(i) + .5); if (id !== 20) orient(o, ORI[i]);
+  o.userData.cell = i; partGroup.add(o); partObj.set(i, o);
+  if (o.userData.label) o.userData.label.material.rotation = 0;
+}
+function rebuildPartsNear(i) { rebuildPart(i); const x = cx(i), y = cy(i), z = cz(i); for (const [dx, dy, dz] of DIRS) { const X = x + dx, Y = y + dy, Z = z + dz; if (inb(X, Y, Z) && W[ix(X, Y, Z)] === 20) rebuildPart(ix(X, Y, Z)); } }
+function rebuildAllParts() { partObj.forEach((o) => partGroup.remove(o)); partObj.clear(); for (let i = 0; i < NN; i++) if (isCond(W[i])) rebuildPart(i); }
+
+/* ═════════════ 회로 계산 (옴의 법칙 + 키르히호프 법칙) ═════════════ */
+// 칸 i의 k 방향 면이 전기를 주고받는 단자인지. 전선은 여섯 면 모두, 부품은 양 끝 두 면만
+function termAt(i, k) { const b = W[i]; if (b === 20) return true; if (!isPart(b)) return false; return ORI[i] === k || (ORI[i] ^ 1) === k; }
+let RES = null; // 마지막 계산 결과
+function partEdge(i, open) {
+  // 부품 안쪽 길: g(전도도 = 1/R), s(전지가 A→B로 밀어 주는 전류)
+  const P = PT[W[i]], f = FL[i];
+  if (P.k === "bat") return f & 4 ? null : { g: 1 / P.r, s: P.V / P.r };
+  if (P.k === "sw") return (f & 1) && !(open && open.has(i)) ? { g: G_WIRE, s: 0 } : null;
+  if (f & 2) return null; // 망가진 전구·퓨즈·전류계는 끊긴 길
+  return { g: 1 / P.R, s: 0 };
+}
+function solve(open) {
+  const nodeA = new Int32Array(NN).fill(-1), nodeB = new Int32Array(NN).fill(-1); // 전선은 A만 사용
+  const pos = [], cells = []; let n = 0;
+  for (let i = 0; i < NN; i++) {
+    const b = W[i]; if (!isCond(b)) continue; cells.push(i);
+    const x = cx(i) + .5, y = cy(i) + .5, z = cz(i) + .5;
+    if (b === 20) { nodeA[i] = n++; pos.push(x, y, z); }
+    else { const d = DIRS[ORI[i]]; nodeA[i] = n++; pos.push(x - d[0] * .5, y - d[1] * .5, z - d[2] * .5); nodeB[i] = n++; pos.push(x + d[0] * .5, y + d[1] * .5, z + d[2] * .5); }
+  }
+  const nodeOf = (i, k) => W[i] === 20 ? nodeA[i] : ORI[i] === k ? nodeB[i] : (ORI[i] ^ 1) === k ? nodeA[i] : -1;
+  const E = []; // {a,b,g,s,cell}
+  for (const i of cells) {
+    const x = cx(i), y = cy(i), z = cz(i);
+    for (const k of [0, 2, 4]) {
+      const [dx, dy, dz] = DIRS[k], X = x + dx, Y = y + dy, Z = z + dz; if (!inb(X, Y, Z)) continue;
+      const j = ix(X, Y, Z); if (!isCond(W[j])) continue;
+      const a = nodeOf(i, k), b = nodeOf(j, k ^ 1); if (a < 0 || b < 0) continue;
+      E.push({ a, b, g: G_WIRE, s: 0, cell: -1, wi: W[i] === 20 ? i : -1, wj: W[j] === 20 ? j : -1 });
+    }
+    if (W[i] !== 20) { const pe = partEdge(i, open); if (pe) E.push({ a: nodeA[i], b: nodeB[i], g: pe.g, s: pe.s, cell: i }); }
+  }
+  // 이어진 덩어리 나누기
+  const par = new Int32Array(n); for (let k = 0; k < n; k++) par[k] = k;
+  const find = (a) => { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; };
+  for (const e of E) { const ra = find(e.a), rb = find(e.b); if (ra !== rb) par[ra] = rb; }
+  const groups = new Map(), hasSrc = new Set();
+  for (let k = 0; k < n; k++) { const r = find(k); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(k); }
+  for (const e of E) if (e.s) hasSrc.add(find(e.a));
+  const V = new Float64Array(n); let tooBig = false;
+  const loc = new Int32Array(n);
+  for (const [r, list] of groups) {
+    if (!hasSrc.has(r) || list.length < 2) continue;
+    const m = list.length - 1; if (m > 900) { tooBig = true; continue; }
+    list.forEach((nd, k) => loc[nd] = k - 1); // 첫 마디를 0V(기준)로
+    const A = new Float64Array(m * m), bv = new Float64Array(m);
+    for (const e of E) {
+      if (find(e.a) !== r) continue; const p = loc[e.a], q = loc[e.b];
+      if (p >= 0) A[p * m + p] += e.g; if (q >= 0) A[q * m + q] += e.g;
+      if (p >= 0 && q >= 0) { A[p * m + q] -= e.g; A[q * m + p] -= e.g; }
+      if (e.s) { if (q >= 0) bv[q] += e.s; if (p >= 0) bv[p] -= e.s; }
+    }
+    const x = gauss(A, bv, m); list.forEach((nd, k) => { V[nd] = k ? x[k - 1] : 0; });
+  }
+  // 결과: 길마다 전류, 부품마다 전압·전류
+  const part = new Map(), wireI = new Map();
+  for (const e of E) {
+    e.I = e.g * (V[e.a] - V[e.b]); if (e.s) e.I = e.s - e.g * (V[e.b] - V[e.a]); // A→B 방향
+    if (e.cell >= 0) part.set(e.cell, { v: V[nodeB[e.cell]] - V[nodeA[e.cell]], i: e.I });
+    if (e.wi >= 0) wireI.set(e.wi, Math.max(wireI.get(e.wi) || 0, Math.abs(e.I)));
+    if (e.wj >= 0) wireI.set(e.wj, Math.max(wireI.get(e.wj) || 0, Math.abs(e.I)));
+  }
+  for (const i of cells) if (W[i] !== 20 && !part.has(i)) part.set(i, { v: nodeB[i] >= 0 ? V[nodeB[i]] - V[nodeA[i]] : 0, i: 0 });
+  // 전압 색 보기용: 덩어리 안에서 가장 낮은 곳을 0으로
+  const lo = new Map(), hi = new Map();
+  for (let k = 0; k < n; k++) { const r = find(k); lo.set(r, Math.min(lo.has(r) ? lo.get(r) : 1e9, V[k])); hi.set(r, Math.max(hi.has(r) ? hi.get(r) : -1e9, V[k])); }
+  const wireV = new Map();
+  for (const i of cells) if (W[i] === 20) { const nd = nodeA[i], r = find(nd), span = hi.get(r) - lo.get(r); wireV.set(i, { v: V[nd] - lo.get(r), span, live: hasSrc.has(r) && span > .01 }); }
+  return { V, E, pos, part, wireI, wireV, tooBig, cells, nodeA, nodeB };
+}
+function gauss(A, b, m) {
+  for (let k = 0; k < m; k++) {
+    let p = k, best = Math.abs(A[k * m + k]);
+    for (let i = k + 1; i < m; i++) { const v = Math.abs(A[i * m + k]); if (v > best) { best = v; p = i; } }
+    if (best < 1e-14) continue;
+    if (p !== k) { for (let j = 0; j < m; j++) { const t = A[k * m + j]; A[k * m + j] = A[p * m + j]; A[p * m + j] = t; } const t = b[k]; b[k] = b[p]; b[p] = t; }
+    const pk = A[k * m + k];
+    for (let i = k + 1; i < m; i++) {
+      const f = A[i * m + k] / pk; if (!f) continue;
+      for (let j = k; j < m; j++) A[i * m + j] -= f * A[k * m + j];
+      b[i] -= f * b[k];
+    }
+  }
+  const x = new Float64Array(m);
+  for (let k = m - 1; k >= 0; k--) { let s = b[k]; for (let j = k + 1; j < m; j++) s -= A[k * m + j] * x[j]; const d = A[k * m + k]; x[k] = Math.abs(d) < 1e-14 ? 0 : s / d; }
+  return x;
+}
+// 계산하고, 너무 센 전류·전압이면 부품이 망가지는지 확인(한 번 망가지면 다시 계산)
+let solveDirty = true;
+function recompute() {
+  solveDirty = false; let r, guard = 0, news = [];
+  while (true) {
+    r = solve(); let broke = false;
+    if (guard++ > 6) break;
+    for (const [i, pv] of r.part) {
+      const P = PT[W[i]];
+      if (P.k === "bulb" && !(FL[i] & 2) && Math.abs(pv.v) > BULB_MAX_V) { FL[i] |= 2; broke = true; news.push(["bulb", i]); }
+      else if (P.k === "fuse" && !(FL[i] & 2) && Math.abs(pv.i) > P.max) { FL[i] |= 2; broke = true; news.push(["fuse", i]); }
+      else if (P.k === "amm" && !(FL[i] & 2) && Math.abs(pv.i) > P.max) { FL[i] |= 2; broke = true; news.push(["amm", i]); }
+      else if (P.k === "bat" && !(FL[i] & 4) && Math.abs(pv.i) > P.max) { FL[i] |= 4; broke = true; news.push(["bat", i]); }
+    }
+    if (!broke) break;
+  }
+  RES = r;
+  for (const [what, i] of news) { rebuildPart(i); accident(what, i); }
+  if (r.tooBig) toast("회로가 너무 커서 계산을 쉬어요. 마디를 900개보다 적게 만들어 주세요.", 2400, "bad");
+  applyVisuals();
+  if (LV) goalTick(true);
+}
+function accident(what, i) {
+  const x = cx(i) + .5, y = cy(i) + .5, z = cz(i) + .5;
+  if (what === "bulb") { sparks(x, y, z, 0xffffff, 26); sfx.pop(); toast("펑! 전압이 너무 높아(4.8V 넘음) 전구 필라멘트가 끊어졌어요.\n오른쪽 클릭으로 새 전구로 갈 수 있어요.", 3000, "bad"); stats.acc++; }
+  else if (what === "fuse") { if (LV) LV.blown = true; sparks(x, y, z, 0xffcc55, 20); sfx.pop(); toast("퓨즈가 끊어졌어요! 2A보다 센 전류가 흘렀어요.\n전기 기구를 줄이고 오른쪽 클릭으로 퓨즈를 갈아요.", 3200, "bad"); }
+  else if (what === "amm") { sparks(x, y, z, 0xffffff, 18); sfx.pop(); toast("전류계가 고장 났어요! 너무 센 전류(3A 넘음)가 흘렀어요.\n전류계는 꼭 전구와 '직렬'로 끼워야 해요. (오른쪽 클릭: 고치기)", 3600, "bad"); stats.acc++; }
+  else if (what === "bat") { sparks(x, y, z, 0xff7a3a, 30); smoke(x, y, z); sfx.fizz(); toast("합선! 전구나 저항을 거치지 않는 지름길로 전류가 한꺼번에 흘러 전지가 뜨거워졌어요.\n지름길 전선을 빼면 다시 작동해요.", 4000, "bad"); stats.acc++; }
+}
+
+/* ═════════════ 보이는 효과: 전구 밝기·선풍기·계기·전류 점 ═════════════ */
+let viewMode = 0; // 0 끄기, 1 전류(+→−), 2 전자(−→+), 3 전압 색
+const VIEW_NAME = ["보기: 끔", "⚡ 전류 보기: (+)극 → (−)극 방향 (노란 점)", "🔵 전자 보기: 전자는 (−)극 → (+)극으로 움직여요 (파란 점)", "🌈 전압 보기: 빨강 = 높은 전압, 파랑 = 낮은 전압"];
+const bulbs = []; // {i, b(밝기)}
+function applyVisuals() {
+  bulbs.length = 0; if (!RES) return;
+  for (const [i, pv] of RES.part) {
+    const o = partObj.get(i); if (!o) continue; const P = PT[W[i]], u = o.userData;
+    if (P.k === "bulb") {
+      const b = (FL[i] & 2) ? 0 : (pv.v * pv.v / P.R) / BULB_REF; u.b = b;
+      const s = Math.min(1.8, Math.sqrt(b));
+      if (u.glass) { const c = new THREE.Color(0x666655).lerp(new THREE.Color(0xfff4c8), Math.min(1, s)); u.glass.material.color.copy(c); u.glass.material.opacity = .55 + .4 * Math.min(1, s); }
+      if (u.fil && !(FL[i] & 2)) u.fil.material.color.setHex(s > .05 ? 0xffffff : 0x885522);
+      if (u.halo) { u.halo.material.opacity = Math.min(1, s * .9); const sc = .4 + 1.6 * s; u.halo.scale.set(sc, sc, 1); }
+      if (b > .02) bulbs.push({ i, b });
+    }
+    if (u.label) {
+      if (P.k === "amm") setLabel(u.label, FL[i] & 2 ? "고장" : fmt(pv.i, 2) + " A", pv.i < -.005 ? "#ff9a9a" : "#ffd65a");
+      else setLabel(u.label, fmt(pv.v, 2) + " V", pv.v < -.005 ? "#ff9a9a" : "#ff8a5c");
+    }
+  }
+  // 전압 색
+  partObj.forEach((o, i) => {
+    if (W[i] !== 20) return; const m = o.userData.wm; const wv = RES.wireV.get(i);
+    if (viewMode === 3 && wv && wv.live) { const t = Math.max(0, Math.min(1, wv.v / wv.span)); const c = new THREE.Color().setHSL(.66 * (1 - t), .9, .5); m.color.copy(c); m.emissive.copy(c).multiplyScalar(.45); }
+    else { m.color.setHex(COPPER); m.emissive.setHex(0x000000); }
+  });
+}
+const fmt = (v, d) => (Math.abs(v) < Math.pow(10, -d) / 2 ? 0 : v).toFixed(d);
+// 전류 점
+const DOTMAX = 4000;
+const dotMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(.09, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe066 }), DOTMAX);
+dotMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); dotMesh.count = 0; dotMesh.frustumCulled = false; scene.add(dotMesh);
+const dm = new THREE.Matrix4();
+let flowT = 0;
+function dotTick(dt) {
+  flowT += dt; let c = 0;
+  if (!RES || (viewMode !== 1 && viewMode !== 2)) { dotMesh.count = 0; return; }
+  dotMesh.material.color.setHex(viewMode === 1 ? 0xffe066 : 0x66ccff);
+  const P = RES.pos;
+  for (const e of RES.E) {
+    const I = e.I; if (!(Math.abs(I) > .004)) continue;
+    const ax = P[e.a * 3], ay = P[e.a * 3 + 1], az = P[e.a * 3 + 2], bxx = P[e.b * 3], by = P[e.b * 3 + 1], bz = P[e.b * 3 + 2];
+    const L = Math.hypot(bxx - ax, by - ay, bz - az); if (L < .01) continue;
+    let dir = I > 0 ? 1 : -1; if (viewMode === 2) dir = -dir;
+    const v = Math.min(4, .35 + 2.2 * Math.abs(I)), sp = .3, nd = Math.round(L / sp);
+    for (let k = 0; k < nd && c < DOTMAX; k++) {
+      let u = ((flowT * v * dir + k * sp) % L + L) % L / L;
+      dm.makeTranslation(ax + (bxx - ax) * u, ay + (by - ay) * u, az + (bz - az) * u); dotMesh.setMatrixAt(c++, dm);
+    }
+  }
+  dotMesh.count = c; dotMesh.instanceMatrix.needsUpdate = true;
+}
+let buzOsc = null, buzGain = null, motOsc = null, motGain = null;
+function liveTick(dt, t) {
+  let buzP = 0, motI = 0;
+  if (RES) for (const [i, pv] of RES.part) {
+    const o = partObj.get(i); if (!o) continue; const k = PT[W[i]].k;
+    if (k === "mot") { o.userData.fan.rotation.y += dt * 22 * pv.i; motI = Math.max(motI, Math.abs(pv.i)); }
+    if (k === "buz") buzP += pv.v * pv.i;
+    if (k === "bat" && (FL[i] & 4) && Math.random() < dt * 3) smoke(cx(i) + .5, cy(i) + .7, cz(i) + .5, 1);
+    if (k === "bulb" && o.userData.halo && o.userData.b > 0) o.userData.halo.material.rotation = Math.sin(t * 3 + i) * .05;
+  }
+  // 소리: 버저·전동기
+  if (actx) {
+    const vol = SET.vol;
+    if (!buzOsc) { buzOsc = actx.createOscillator(); buzOsc.type = "square"; buzGain = actx.createGain(); buzGain.gain.value = 0; buzOsc.connect(buzGain).connect(master); buzOsc.start(); motOsc = actx.createOscillator(); motOsc.type = "sawtooth"; motGain = actx.createGain(); motGain.gain.value = 0; const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 500; motOsc.connect(lp).connect(motGain).connect(master); motOsc.start(); }
+    const on = !paused;
+    buzGain.gain.setTargetAtTime(on ? Math.min(.06, buzP * .05) * vol : 0, actx.currentTime, .03);
+    buzOsc.frequency.setTargetAtTime(380 + 500 * Math.min(1, Math.sqrt(buzP)), actx.currentTime, .05);
+    motGain.gain.setTargetAtTime(on ? Math.min(.05, motI * .05) * vol : 0, actx.currentTime, .05);
+    motOsc.frequency.setTargetAtTime(40 + 90 * motI, actx.currentTime, .1);
+  }
+  // 가까운 밝은 전구에 진짜 빛 넣기
+  const px = player.x, py = player.y, pz = player.z;
+  const cand = bulbs.map(b => ({ b, d: Math.hypot(cx(b.i) + .5 - px, cy(b.i) - py, cz(b.i) + .5 - pz) })).sort((a, b) => a.d - b.d);
+  LIGHTS.forEach((l, k) => { const c = cand[k]; if (!c) { l.intensity = 0; return; } const i = c.b.i; l.position.set(cx(i) + .5, cy(i) + .6, cz(i) + .5); const s = Math.min(1.8, Math.sqrt(c.b.b)); l.intensity = 1.6 * s; l.distance = 6 + 6 * Math.min(1.5, s); });
+}
+
+/* ═════════════ 파편·연기 ═════════════ */
+const fx = [];
+const fxGeo = new THREE.BoxGeometry(.06, .06, .06);
+function sparks(x, y, z, col, n) { for (let k = 0; k < n; k++) { const m = new THREE.Mesh(fxGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true })); m.position.set(x, y, z); scene.add(m); fx.push({ m, v: new THREE.Vector3((Math.random() - .5) * 4, Math.random() * 4, (Math.random() - .5) * 4), t: 0, life: .5 + Math.random() * .4, g: 9 }); } }
+function smoke(x, y, z, n = 8) { for (let k = 0; k < n; k++) { const m = new THREE.Mesh(new THREE.BoxGeometry(.18, .18, .18), new THREE.MeshBasicMaterial({ color: 0x777777, transparent: true, opacity: .6 })); m.position.set(x + (Math.random() - .5) * .3, y, z + (Math.random() - .5) * .3); scene.add(m); fx.push({ m, v: new THREE.Vector3((Math.random() - .5) * .3, .8 + Math.random() * .5, (Math.random() - .5) * .3), t: 0, life: 1.4, g: -0.2, grow: 1 }); } }
+function breakBits(x, y, z, id) { const c = isCond(id) ? (id === 20 ? COPPER : 0xcccccc) : 0x8a6a4a; for (let k = 0; k < 8; k++) { const m = new THREE.Mesh(fxGeo, mat(c)); m.position.set(x + .5, y + .5, z + .5); scene.add(m); fx.push({ m, v: new THREE.Vector3((Math.random() - .5) * 3, Math.random() * 3, (Math.random() - .5) * 3), t: 0, life: .5, g: 12 }); } }
+function fxTick(dt) {
+  for (let k = fx.length - 1; k >= 0; k--) {
+    const f = fx[k]; f.t += dt; f.v.y -= f.g * dt; f.m.position.addScaledVector(f.v, dt);
+    if (f.grow) f.m.scale.setScalar(1 + f.t * 1.5);
+    if (f.m.material.transparent) f.m.material.opacity = Math.max(0, 1 - f.t / f.life) * (f.grow ? .6 : 1);
+    if (f.t > f.life) { scene.remove(f.m); if (f.m.material.transparent) f.m.material.dispose(); fx.splice(k, 1); }
+  }
+}
+
+/* ═════════════ 하늘 ═════════════ */
+let night = true;
+const stars = (() => { const g = new THREE.BufferGeometry(), p = []; for (let k = 0; k < 900; k++) { const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = 120; const s = Math.sqrt(1 - u * u); if (u < .05) continue; p.push(Math.cos(a) * s * r, u * r, Math.sin(a) * s * r); } g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); return new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: .6, sizeAttenuation: false })); })();
+scene.add(stars);
+const moon = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 12), new THREE.MeshBasicMaterial({ color: 0xf2f0dc })); moon.position.set(-60, 70, -50); scene.add(moon);
+function setSky(n) {
+  night = n; stars.visible = n; moon.visible = n;
+  scene.background = new THREE.Color(n ? 0x0a1028 : 0x8cc8ff); scene.fog = new THREE.Fog(n ? 0x0a1028 : 0x8cc8ff, 30, 70);
+  amb.intensity = n ? .16 : .55; hemi.intensity = n ? .18 : .45; sun.intensity = n ? .16 : .75; sun.color.setHex(n ? 0x9fb4ff : 0xffffff);
+}
+
+/* ═════════════ 세계 만들기 ═════════════ */
+const GY = 4; // 땅 위 첫 칸
+function clearWorld() { W.fill(0); ORI.fill(0); LOCK.fill(0); FL.fill(0); for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) { W[ix(x, 0, z)] = 11; W[ix(x, 1, z)] = 3; W[ix(x, 2, z)] = 2; W[ix(x, 3, z)] = 1; } }
+function put(x, y, z, id, d = 0, lock = true, fl = 0) { if (!inb(x, y, z)) return -1; const i = ix(x, y, z); W[i] = id; ORI[i] = d; LOCK[i] = lock ? 1 : 0; FL[i] = fl; return i; }
+function tree(x, z) { for (let y = GY; y < GY + 4; y++) put(x, y, z, 5); for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 3; dy <= 5; dy++) { if (Math.abs(dx) + Math.abs(dz) + (dy === 5 ? 2 : 0) > 3) continue; if (!dx && !dz && dy < 4) continue; put(x + dx, GY + dy, z + dz, 10); } }
+function trees(avoid) { for (let k = 0; k < 40; k++) { const x = 2 + Math.floor(hash(k, 1, 77) * (SX - 4)), z = 2 + Math.floor(hash(k, 2, 77) * (SZ - 4)); if (avoid(x, z)) continue; tree(x, z); } }
+// 집: 벽돌 벽, 문 구멍(앞쪽 = z가 작은 쪽), 유리창, 지붕
+function house(x0, z0, w, d, h = 4, doorDx) {
+  for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + d; z++) {
+    put(x, GY - 1, z, 4);
+    const edge = x === x0 || z === z0 || x === x0 + w - 1 || z === z0 + d - 1;
+    for (let y = GY; y < GY + h; y++) if (edge) put(x, y, z, 6);
+    put(x, GY + h, z, 9);
+  }
+  const dx = x0 + (doorDx == null ? Math.floor(w / 2) : doorDx);
+  for (let x = dx - 1; x <= dx + 1; x++) for (let y = GY; y < GY + 2; y++) { W[ix(x, y, z0)] = 0; LOCK[ix(x, y, z0)] = 0; } // 문은 세 칸 넓이(전선 두 줄이 서로 닿지 않고 지나가게)
+  W[ix(x0, GY + 1, z0 + Math.floor(d / 2))] = 7; W[ix(x0 + w - 1, GY + 1, z0 + Math.floor(d / 2))] = 7;
+  W[ix(x0 + 1, GY + 1, z0 + d - 1)] = 7; W[ix(x0 + w - 2, GY + 1, z0 + d - 1)] = 7;
+}
+function pad(x0, z0, w, d, id = 12) { for (let x = x0; x < x0 + w; x++) for (let z = z0; z < z0 + d; z++) put(x, GY - 1, z, id); }
+
+/* ═════════════ 임무 ═════════════ */
+// 계산 결과로 확인해요. lit = 불이 켜짐(밝기 0.07 넘음)
+const pv = (i) => (RES && RES.part.get(i)) || { v: 0, i: 0 };
+const cellsOf = (k) => { const out = []; if (!RES) return out; for (const i of RES.cells) if (PT[W[i]] && PT[W[i]].k === k) out.push(i); return out; };
+const bright = (i) => W[i] === 22 && !(FL[i] & 2) ? (pv(i).v ** 2 / 5) / BULB_REF : 0;
+const lit = (i) => bright(i) > .07;
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
+const batTotal = () => cellsOf("bat").reduce((a, i) => a + Math.abs(pv(i).i), 0);
+const LEVELS = [
+  {
+    t: "첫 불빛", sky: true,
+    story: "정전된 마을의 첫 번째 가로등이에요. 전지와 전구가 놓여 있어요. <b>구리 전선</b>으로 전지의 (+)극(빨간 쪽)에서 전구를 지나 다시 (−)극으로 돌아오는 <b>끊어지지 않은 길</b>을 만들어 보세요.",
+    inv: { 20: 24 }, par: 16,
+    setup(L) { pad(18, 19, 12, 10); L.bat = put(21, GY, 24, 21, 0); L.b1 = put(25, GY, 24, 22, 0); },
+    spawn: [24, GY, 15, Math.PI],
+    steps: [{ t: "전구에 불 켜기", ok: (L) => lit(L.b1) }],
+    hint: "전선은 바닥에 한 칸씩 놓아요. 전구와 전지는 <b>양 끝의 구리 단자</b>로만 전기가 들어가고 나와요. 빨간 (+)극 → 전구 한쪽 끝, 전구 다른 쪽 끝 → 전지 (−)극. 두 전선 줄이 서로 닿으면 안 돼요!",
+    live: (L) => `전구 전압 <span class="V">${fmt(pv(L.b1).v, 2)} V</span> · 전류 <span class="A">${fmt(pv(L.b1).i, 2)} A</span>`,
+    lesson: "전류는 <b>(+)극에서 나와 전구를 지나 (−)극으로 돌아오는 닫힌 길(닫힌 회로)</b>이 있어야 흘러요. 길이 한 칸이라도 끊기면(열린 회로) 전류가 흐르지 않아요. <kbd>V</kbd>를 눌러 전류가 흐르는 모습을 보세요.",
+    note: "circuit",
+  },
+  {
+    t: "스위치로 켜고 끄기", sky: true,
+    story: "가로등을 매번 전선을 뺐다 꽂았다 할 수는 없겠죠? <b>스위치</b>를 회로 안에 끼워 넣고, 오른쪽 클릭으로 열고 닫아 보세요.",
+    inv: { 20: 26, 25: 1 }, par: 17,
+    setup(L) { pad(18, 19, 12, 10); L.bat = put(21, GY, 24, 21, 0); L.b1 = put(25, GY, 24, 22, 0); },
+    spawn: [24, GY, 15, Math.PI],
+    steps: [
+      { t: "스위치를 거쳐 전구 켜기", ok: (L) => lit(L.b1) && cellsOf("sw").some(i => Math.abs(pv(i).i) > .05) },
+      { t: "스위치를 열어(오른쪽 클릭) 전구 끄기", ok: (L) => !lit(L.b1) && L.tog && performance.now() - L.tog < 1500 && cellsOf("sw").length > 0 },
+      { t: "다시 닫아서 켜기", ok: (L) => lit(L.b1) && L.tog && performance.now() - L.tog < 1500 },
+    ],
+    hint: "스위치도 양 끝 단자로 이어요. 전지 → 스위치 → 전구 → 전지처럼 <b>한 줄 안에</b> 끼워요. 스위치 방향이 틀리면 <kbd>R</kbd>(폰: 돌리기)로 돌려요.",
+    live: (L) => `전구 전류 <span class="A">${fmt(pv(L.b1).i, 2)} A</span>`,
+    lesson: "스위치는 회로를 <b>열고(끊고) 닫아(잇고)</b> 전류를 흐르게 하거나 멈춰요. 우리 집 전등 스위치도 똑같이 회로를 끊었다 이었다 해요.",
+    note: "switch",
+  },
+  {
+    t: "전류계로 전류 재기", sky: true,
+    story: "전구에 얼마나 많은 전류가 흐르는지 재고 싶어요. <b>전류계</b>를 회로에 끼워 전류(단위 A, 암페어)를 재 보세요. 이번엔 <kbd>V</kbd>(폰: 보기)를 눌러 눈에 안 보이는 전류도 봐요.",
+    inv: { 20: 28, 26: 1 }, par: 18,
+    setup(L) { pad(18, 19, 12, 10); L.bat = put(21, GY, 24, 21, 0); L.b1 = put(25, GY, 24, 22, 0); },
+    spawn: [24, GY, 15, Math.PI],
+    steps: [
+      { t: "전류계를 전구와 한 줄(직렬)로 끼워 전구 켜기", ok: (L) => lit(L.b1) && cellsOf("amm").some(i => Math.abs(pv(i).i) > .05 && near(Math.abs(pv(i).i), Math.abs(pv(L.b1).i), .01)) },
+      { t: "전류계 빨간 단자(+)를 전지 (+)극 쪽으로 (값이 + 가 되게)", ok: (L) => lit(L.b1) && cellsOf("amm").some(i => pv(i).i > .05) },
+      { t: "V를 눌러 전류가 흐르는 모습 보기", ok: () => viewMode === 1 || viewMode === 2 },
+    ],
+    hint: "전류계는 전구 <b>앞이나 뒤에 끼워서</b> 같은 전류가 자기를 지나가게 해요. 전지 양 끝에 바로 대면 합선이 되어 고장 나요! 값이 −로 나오면 <kbd>R</kbd>로 방향을 돌려요.",
+    live: (L) => { const a = cellsOf("amm")[0]; return `전구 전류 <span class="A">${fmt(pv(L.b1).i, 3)} A</span>` + (a != null ? ` · 전류계 <span class="A">${fmt(pv(a).i, 3)} A</span>` : ""); },
+    lesson: "전류는 1초 동안 전선을 지나는 전하의 양이고 단위는 <b>A(암페어)</b>예요. 전류계는 측정할 곳에 <b>직렬</b>로 연결하고, (+)단자를 전지 (+)극 쪽에 이어요. 전류의 방향은 (+)→(−)이지만, 실제로 움직이는 <b>전자는 (−)→(+)</b>로 움직여요. (<kbd>V</kbd>를 한 번 더 눌러 확인)",
+    note: "current",
+  },
+  {
+    t: "더 밝게! 전지 두 개", sky: true,
+    story: "전구가 좀 어둡대요. 전지를 하나 더 받았어요. 전지 두 개를 이어서 전구를 <b>더 밝게</b> 만들고, <b>전압계</b>로 전구에 걸린 전압(단위 V, 볼트)을 재 보세요.",
+    inv: { 20: 30, 21: 2, 27: 1 }, par: 18,
+    setup(L) { pad(18, 19, 12, 10); L.b1 = put(25, GY, 24, 22, 0); },
+    spawn: [24, GY, 15, Math.PI],
+    steps: [
+      { t: "전지 2개를 (+)와 (−)가 맞닿게 이어 전구에 2.6V 넘게 걸기", ok: (L) => pv(L.b1).v ** 2 > 2.6 ** 2 },
+      { t: "전압계를 전구 양 끝에 나란히(병렬) 대어 재기", ok: (L) => lit(L.b1) && cellsOf("vm").some(i => near(Math.abs(pv(i).v), Math.abs(pv(L.b1).v), .03) && Math.abs(pv(i).v) > 1) },
+    ],
+    hint: "전지를 붙일 때 한 전지의 빨간 (+)극이 다른 전지의 (−)극에 닿게 일렬로 놓아요(방향은 <kbd>R</kbd>). 전압계는 전구 양쪽 단자에서 전선을 하나씩 따로 뽑아 이어요. 전압계를 한 줄(직렬)로 끼우면 전구가 안 켜져요.",
+    live: (L) => { const v = cellsOf("vm")[0]; return `전구 전압 <span class="V">${fmt(pv(L.b1).v, 2)} V</span> · 전류 <span class="A">${fmt(pv(L.b1).i, 2)} A</span>` + (v != null ? `<br>전압계 <span class="V">${fmt(pv(v).v, 2)} V</span>` : ""); },
+    lesson: "전압은 전류를 흐르게 하는 능력(단위 <b>V, 볼트</b>)이에요. 전지를 <b>직렬로 연결하면 전압이 더해져</b>(1.5V + 1.5V = 3V) 전류가 세지고 전구가 더 밝아져요. 전압계는 잴 곳의 양 끝에 <b>병렬</b>로 연결해요.",
+    note: "voltage",
+  },
+  {
+    t: "옴의 법칙 실험실", sky: true, graph: true,
+    story: "과학자처럼 실험해 봐요. 10Ω 저항에 전지를 <b>1개, 2개, 3개</b> 이어 가며 저항에 걸린 <b class='V'>전압</b>과 흐르는 <b class='A'>전류</b>를 전압계·전류계로 재요. 잴 때마다 그래프에 점이 찍혀요.",
+    inv: { 20: 40, 21: 3, 26: 1, 27: 1 }, par: 24,
+    setup(L) { pad(17, 19, 14, 11); L.r = put(25, GY, 24, 23, 0); L.pts = {}; },
+    spawn: [24, GY, 15, Math.PI],
+    steps: [1, 2, 3].map(k => ({ t: `전지 ${k}개일 때 전압·전류 재기`, ok: (L) => !!L.pts[k] })),
+    tick(L) {
+      const r = pv(L.r); if (Math.abs(r.i) < .05) return;
+      const am = cellsOf("amm").some(i => near(Math.abs(pv(i).i), Math.abs(r.i), Math.abs(r.i) * .02 + .002));
+      const vm = cellsOf("vm").some(i => near(Math.abs(pv(i).v), Math.abs(r.v), .04));
+      if (!am || !vm) return; const k = Math.round(Math.abs(r.v) / 1.5);
+      if (k >= 1 && k <= 3 && !L.pts[k]) { L.pts[k] = { v: Math.abs(r.v), i: Math.abs(r.i) }; sfx.ding(); toast(`기록! ${fmt(Math.abs(r.v), 2)} V일 때 ${fmt(Math.abs(r.i), 3)} A`, 1800, "good"); }
+    },
+    hint: "전류계는 저항과 한 줄(직렬), 전압계는 저항 양 끝에 나란히(병렬). 두 계기가 모두 저항을 재고 있을 때만 기록돼요. 전지를 하나씩 더 이어 붙이며 다시 재요.",
+    live: (L) => `저항 전압 <span class="V">${fmt(pv(L.r).v, 2)} V</span> · 전류 <span class="A">${fmt(pv(L.r).i, 3)} A</span>` + (Math.abs(pv(L.r).i) > .01 ? `<br>전압 ÷ 전류 = <span class="O">${fmt(Math.abs(pv(L.r).v / pv(L.r).i), 1)} Ω</span>` : ""),
+    lesson: "전압을 2배, 3배로 올리면 전류도 2배, 3배가 돼요. <b>전류는 전압에 비례</b>하고 <b>저항에 반비례</b>해요. 이것이 <b>옴의 법칙: V = I × R</b> (전압 = 전류 × 저항)이에요. 그래프의 기울기(전압 ÷ 전류)가 바로 저항 10Ω이에요.",
+    note: "ohm",
+  },
+  {
+    t: "무드등 밝기 맞추기", sky: true,
+    story: "카페 사장님이 너무 밝지 않은 <b>은은한 무드등</b>을 원해요. 전지 묶음(3V)과 전구는 고정. <b>니크롬선</b>을 이어 저항을 키워서 전구 전류를 <b>0.15 ~ 0.22 A</b>로 맞춰 보세요.",
+    inv: { 20: 30, 24: 8 }, par: 14,
+    setup(L) { pad(17, 19, 14, 11); put(19, GY, 22, 21, 0); L.bat = put(20, GY, 22, 21, 0); L.b1 = put(28, GY, 26, 22, 0); },
+    spawn: [24, GY, 15, Math.PI],
+    steps: [{ t: "전구 전류를 0.15~0.22 A로 맞추고 2초 유지", ok: (L) => { const I = Math.abs(pv(L.b1).i); if (I >= .15 && I <= .22) { L.hold = L.hold || performance.now(); return performance.now() - L.hold > 2000; } L.hold = 0; return false; } }],
+    hint: "니크롬선 한 칸은 2Ω이에요. 한 줄로 길게(직렬) 이을수록 저항이 커져 전류가 줄어요. 지금 저항은 전구 5Ω + 전지 속 0.2Ω. 3V ÷ 0.2A = 15Ω쯤 되려면 니크롬선이 몇 칸 필요할까요?",
+    live: (L) => { const I = Math.abs(pv(L.b1).i), ok = I >= .15 && I <= .22; const nic = cellsOf("nic").filter(i => Math.abs(pv(i).i) > .01).length; return `전구 전류 <span class="A">${fmt(I, 3)} A</span> ${ok ? "✅ 딱 좋아요" : I > .22 ? "⬆ 너무 밝아요" : I > .01 ? "⬇ 너무 어두워요" : ""}<br>회로 속 니크롬선 ${nic}칸 = <span class="O">${nic * 2} Ω</span>`; },
+    lesson: "같은 물질이라도 <b>길이가 길수록 저항이 커요</b>(길이에 비례). 단면적이 넓을수록(굵을수록) 저항은 작아져요. 저항이 커지면 같은 전압에서 전류가 줄어 전구가 어두워져요. 밝기 조절기(디머)가 이런 원리예요.",
+    note: "resist",
+  },
+  {
+    t: "줄줄이 장식 전구 (직렬)", sky: true,
+    story: "축제용 장식 전구 3개를 <b>한 줄로 쭉(직렬)</b> 이어서 켜 보세요. 그리고 전구 하나를 빼면 어떻게 되는지 직접 확인해요.",
+    inv: { 20: 30, 21: 2, 22: 3 }, par: 14,
+    setup(L) { pad(16, 18, 16, 12); },
+    spawn: [24, GY, 15, Math.PI],
+    steps: [
+      { t: "전구 3개를 한 줄로 이어 모두 켜기", ok: () => { const B = cellsOf("bulb").filter(lit); if (B.length < 3) return false; const I0 = Math.abs(pv(B[0]).i); return B.every(i => near(Math.abs(pv(i).i), I0, .01)) && near(batTotal() / Math.max(1, cellsOf("bat").filter(i => Math.abs(pv(i).i) > .01).length), I0, .02); } },
+      { t: "전구 하나를 빼 보기 (왼쪽 클릭)", ok: (L) => { const n = cellsOf("bulb").length; return n === 2 && cellsOf("bulb").every(i => !lit(i)); } },
+    ],
+    hint: "전지 → 전구 → 전구 → 전구 → 전지처럼 전구끼리 단자를 맞대거나 전선으로 이어요. 갈림길이 없어야 직렬이에요.",
+    live: () => cellsOf("bulb").map((i, k) => `전구${k + 1} <span class="V">${fmt(pv(i).v, 2)}V</span> <span class="A">${fmt(pv(i).i, 2)}A</span>`).join("<br>"),
+    lesson: "<b>직렬 연결</b>은 전류가 지나는 길이 하나뿐이에요. 그래서 모든 전구에 <b>같은 세기의 전류</b>가 흐르고, 전지 전압은 전구들이 <b>나눠 가져요</b>(1V씩). 전구가 많을수록 전체 저항이 커져 어두워지고, <b>하나가 끊기면 모두 꺼져요</b>.",
+    note: "series",
+  },
+  {
+    t: "두 집에 불 켜기 (병렬)", sky: true,
+    story: "이웃한 두 집에 전기를 보내야 해요. 그런데 직렬로 이으면 두 집 다 어두워요. <b>두 집 모두 2.6V 넘게</b> 밝게 켜는 방법을 찾아보세요.",
+    inv: { 20: 90, 21: 2 }, par: 70,
+    setup(L) { house(12, 26, 7, 7); house(29, 26, 7, 7); L.b1 = put(15, GY, 30, 22, 0); L.b2 = put(32, GY, 30, 22, 0); pad(21, 16, 6, 5); },
+    spawn: [24, GY, 12, Math.PI],
+    steps: [{ t: "두 집 전구 모두 2.6V 넘게 켜기", ok: (L) => Math.abs(pv(L.b1).v) > 2.6 && Math.abs(pv(L.b2).v) > 2.6 }],
+    hint: "전지에서 나온 전선이 <b>두 갈래로 갈라져</b> 각각 집으로 갔다가, 다시 합쳐져 전지로 돌아오게 해요. 각 전구가 전지 양 끝에 바로 이어진 것처럼 만드는 거예요.",
+    live: (L) => `왼쪽 집 <span class="V">${fmt(pv(L.b1).v, 2)}V</span> <span class="A">${fmt(pv(L.b1).i, 2)}A</span> · 오른쪽 집 <span class="V">${fmt(pv(L.b2).v, 2)}V</span> <span class="A">${fmt(pv(L.b2).i, 2)}A</span><br>전지에서 나오는 전류 <span class="A">${fmt(Math.max(0, ...cellsOf("bat").map(i => Math.abs(pv(i).i))), 2)} A</span>`,
+    lesson: "<b>병렬 연결</b>은 길이 여러 갈래예요. 갈래마다 <b>전압이 같아서</b>(전지 전압 그대로) 전구가 모두 밝고, 갈래의 전류를 <b>더하면 전체 전류</b>가 돼요(I = I₁ + I₂). 한 갈래가 끊겨도 다른 집은 켜져 있어서 <b>우리 집 전기 배선은 병렬</b>이에요.",
+    note: "parallel",
+  },
+  {
+    t: "퓨즈와 합선", sky: true,
+    story: "선풍기 1대와 전구 여러 개를 전지 묶음(3V)에 병렬로 연결해요. 전지 바로 옆에는 <b>2A 퓨즈</b>가 있어요. 전기 기구를 너무 많이 꽂으면 어떻게 될까요? <b>선풍기 + 전구 2개</b>를 퓨즈가 끊어지지 않게 켜 보세요.",
+    inv: { 20: 50, 22: 3, 28: 1 }, par: 30,
+    setup(L) { pad(15, 17, 18, 14); put(19, GY, 20, 21, 0); L.bat = put(20, GY, 20, 21, 0); L.fuse = put(21, GY, 20, 29, 0); },
+    spawn: [24, GY, 13, Math.PI],
+    steps: [
+      { t: "전구 3개와 선풍기를 모두 병렬로 켜 보기 (무슨 일이?)", ok: (L) => L.blown },
+      { t: "선풍기 + 전구 2개를 퓨즈를 지나 2.4V 넘게 켜기", ok: (L) => !(FL[L.fuse] & 2) && cellsOf("mot").some(i => Math.abs(pv(i).v) > 2.4) && cellsOf("bulb").filter(i => Math.abs(pv(i).v) > 2.4).length >= 2 && Math.abs(pv(L.fuse).i) > 1.2 },
+    ],
+    hint: "퓨즈의 오른쪽 끝(전지 반대쪽)에서 전선을 시작해 갈래를 나눠요. 전구 5Ω은 약 0.55A, 선풍기 4Ω은 약 0.7A가 흘러요. 다 더하면 몇 A일까요? 퓨즈가 끊어지면 오른쪽 클릭으로 갈아 끼워요.",
+    live: (L) => `퓨즈를 지나는 전체 전류 <span class="A">${fmt(Math.abs(pv(L.fuse).i), 2)} A</span> / 2 A ${FL[L.fuse] & 2 ? "💥 끊어짐" : ""}`,
+    lesson: "병렬로 기구를 많이 이을수록 <b>전체 저항은 작아지고 전체 전류는 커져요</b>. 전류가 너무 세면 전선이 뜨거워져 불이 날 수 있어서, <b>퓨즈</b>(차단기)가 끊어져 회로를 막아요. 멀티탭에 기구를 한꺼번에 많이 꽂으면 위험한 이유예요. 저항 없이 (+)와 (−)가 바로 이어지는 <b>합선</b>도 아주 위험해요.",
+    note: "fuse",
+  },
+  {
+    t: "정전된 마을 되살리기", sky: true,
+    story: "마지막 임무! 발전소(전지 묶음 3V)에서 <b>네 집</b>에 전기를 보내요. 진짜 집처럼, 집마다 <b>자기 스위치</b>가 있어서 한 집을 꺼도 다른 집은 켜져 있어야 해요.",
+    inv: { 20: 140, 25: 4 }, par: 80,
+    setup(L) {
+      pad(21, 10, 6, 6); put(23, GY, 13, 21, 0); L.bat = put(24, GY, 13, 21, 0);
+      house(5, 22, 7, 7); house(36, 22, 7, 7); house(5, 36, 7, 7); house(36, 36, 7, 7);
+      L.hs = [put(8, GY, 26, 22, 0), put(39, GY, 26, 22, 0), put(8, GY, 40, 22, 0), put(39, GY, 40, 22, 0)];
+    },
+    spawn: [24, GY, 18, Math.PI],
+    steps: [
+      { t: "네 집 모두 2.4V 넘게 불 켜기", ok: (L) => L.hs.every(i => Math.abs(pv(i).v) > 2.4) },
+      { t: "집마다 스위치를 달아 따로 켜고 끌 수 있게 하기", ok: (L) => L.indep },
+    ],
+    tick(L, changed) {
+      if (!changed) return; L.indep = false; if (!L.hs.every(i => Math.abs(pv(i).v) > 2.4)) return;
+      const sws = cellsOf("sw").filter(i => FL[i] & 1); const got = new Set();
+      for (const s of sws) { const r = solve(new Set([s])); const off = L.hs.map(i => { const p = r.part.get(i); return !p || (p.v * p.v / 5) / BULB_REF < .07; }); if (off.filter(Boolean).length === 1) got.add(off.indexOf(true)); }
+      L.indep = got.size === 4;
+    },
+    hint: "발전소에서 큰 전선 두 줄(+ 줄, − 줄)을 마을로 뻗고, 집마다 갈래를 나눠요. 갈래마다 스위치 → 전구 순서로 이으면 그 집만 켜고 끌 수 있어요. 두 큰 줄이 서로 닿지 않게 조심해요(합선!).",
+    live: (L) => L.hs.map((i, k) => `${k + 1}번 집 <span class="V">${fmt(pv(i).v, 2)}V</span>`).join(" · ") + `<br>스위치마다 따로 끄기: ${L.indep ? "✅" : "아직"}`,
+    lesson: "축하해요! 마을에 다시 불이 들어왔어요. 실제 집의 전기도 이렇게 <b>병렬</b>로 연결되어 모든 기구에 <b>같은 전압(우리나라 220V)</b>이 걸리고, 기구마다 <b>스위치</b>로 따로 켜고 꺼요. 전체 전류는 각 갈래 전류의 합이라서, 차단기가 너무 센 전류를 막아 줘요.",
+    note: "home",
+  },
+];
+// 개념 노트
+const NOTES = {
+  circuit: { t: "닫힌 회로", p: "전류는 전지 (+)극 → 전구 → (−)극으로 이어진 <b>끊김 없는 고리</b>에서만 흘러요. 한 곳이라도 끊기면 전류는 0이에요." },
+  switch: { t: "스위치", p: "회로를 끊고(열림) 이어(닫힘) 전류를 조절해요. 회로도 기호는 끊어진 선과 그 위의 작은 막대예요." },
+  current: { t: "전류 (A)", p: "<b>전류</b>는 전하의 흐름, 단위 <b>A(암페어)</b>. 전류의 방향은 (+)→(−), 실제 <b>전자는 (−)→(+)</b>로 움직여요. 전류계는 <b>직렬</b>로 연결해요." },
+  voltage: { t: "전압 (V)", p: "<b>전압</b>은 전류를 흐르게 하는 능력, 단위 <b>V(볼트)</b>. 물 높이 차이가 물을 흐르게 하듯 전압 차이가 전류를 흐르게 해요. 전지를 직렬로 이으면 전압이 더해져요. 전압계는 <b>병렬</b>로 연결해요." },
+  ohm: { t: "옴의 법칙", p: "<b>V = I × R</b>. 저항이 일정하면 전류는 전압에 <b>비례</b>, 전압이 일정하면 전류는 저항에 <b>반비례</b>해요.", graph: true },
+  resist: { t: "저항 (Ω)", p: "<b>저항</b>은 전류의 흐름을 방해하는 정도, 단위 <b>Ω(옴)</b>. 전선이 <b>길수록 커지고</b>, <b>굵을수록 작아져요</b>. 전자가 원자와 부딪히며 생겨요." },
+  series: { t: "직렬 연결", p: "길이 하나. 모든 곳의 <b>전류가 같고</b>, 전압은 나눠 가져요(V = V₁ + V₂). 전체 저항 = R₁ + R₂. 하나가 끊기면 모두 꺼져요." },
+  parallel: { t: "병렬 연결", p: "길이 여러 갈래. 갈래마다 <b>전압이 같고</b>, 전체 전류는 갈래 전류의 합(I = I₁ + I₂). 하나가 꺼져도 나머지는 켜져요." },
+  fuse: { t: "퓨즈와 합선", p: "기구를 병렬로 많이 이을수록 전체 전류가 커져요. 너무 센 전류는 열을 내어 위험해서 <b>퓨즈·차단기</b>가 끊어져요. 저항 없이 바로 이어지는 <b>합선</b>은 아주 위험해요." },
+  home: { t: "우리 집 전기", p: "집의 전기 기구는 모두 <b>병렬</b>로 연결되어 같은 전압(220V)을 받아요. 기구마다 스위치가 있고, 전체 전류는 차단기가 지켜봐요." },
+};
+const NOTE_FREE = [
+  { t: "물로 생각하기", p: "<b>전압</b> = 물탱크의 높이 차이, <b>전류</b> = 흐르는 물의 양, <b>저항</b> = 좁은 관. 높이 차가 클수록, 관이 넓을수록 물이 많이 흘러요. 게임에서 <kbd>V</kbd>를 세 번 누르면 전압을 색(빨강 = 높음)으로 볼 수 있어요." },
+  { t: "부품 설명서", p: Object.keys(PT).map(id => `<b>${PT[id].n}</b>: ${PT[id].d}`).join("<br>") },
+  { t: "회로도 기호", sym: true, p: "부품 칸의 그림이 회로도 기호예요. 전지의 긴 선이 (+)극, 짧은 선이 (−)극이에요." },
+];
+
+/* ═════════════ 상태 ═════════════ */
+const SET = (() => { const d = { sens: 1, vol: .7, input: "auto" }; try { return Object.assign(d, JSON.parse(localStorage.getItem("circuitcraft-set") || "{}")); } catch (e) { return d; } })();
+const PROG = (() => { try { return JSON.parse(localStorage.getItem("circuitcraft-prog") || "{}"); } catch (e) { return {}; } })();
+PROG.stars = PROG.stars || {};
+function saveProg() { try { localStorage.setItem("circuitcraft-prog", JSON.stringify(PROG)); } catch (e) {} }
+function saveSet() { try { localStorage.setItem("circuitcraft-set", JSON.stringify(SET)); } catch (e) {} }
+let LV = null, LVi = -1, mode = "none"; // mode: level | sandbox
+let inv = {}; // 임무에서 남은 부품 수
+let hot = [], sel = 0;
+let paused = true;
+const stats = { acc: 0 };
+const player = { x: 24, y: GY, z: 20, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, fly: false, ground: false };
+
+function startLevel(k) {
+  LVi = k; const D = LEVELS[k]; mode = "level";
+  LV = { D, step: 0, tog: 0, done: false, blown: false };
+  clearWorld(); D.setup(LV);
+  trees((x, z) => (x > 12 && x < 36 && z > 8 && z < 34) || W[ix(x, GY, z)] || W[ix(x, GY - 1, z)] !== 1 || ((k === 7 || k === 9) && (z > 18)));
+  inv = Object.assign({}, D.inv); stats.acc = 0;
+  hot = Object.keys(D.inv).map(Number); sel = 0;
+  setSky(true); afterWorld();
+  const [x, y, z, yaw] = D.spawn; Object.assign(player, { x: x + .5, y, z: z + .5, vx: 0, vy: 0, vz: 0, yaw, pitch: -.35, fly: false });
+  showHud(true); renderMission(); renderHot();
+}
+const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 4, 6, 7, 8, 3, 12, 5, 9];
+function startSandbox(fresh) {
+  mode = "sandbox"; LV = null; LVi = -1; clearWorld();
+  if (!fresh && !loadSandbox()) { /* 빈 실험실 */ }
+  hot = [20, 21, 22, 23, 24, 25, 26, 27, 28]; sel = 0; inv = {};
+  setSky(PROG.sbNight ?? false); afterWorld();
+  Object.assign(player, { x: 24.5, y: GY, z: 30.5, vx: 0, vy: 0, vz: 0, yaw: Math.PI * 0, pitch: -.3, fly: false });
+  showHud(true); renderMission(); renderHot();
+}
+function afterWorld() { buildAllChunks(); rebuildAllParts(); recompute(); }
+let sbT = 0;
+function saveSandbox() {
+  if (mode !== "sandbox") return;
+  const L = []; for (let i = 0; i < NN; i++) { if (cy(i) < GY && W[i] === (cy(i) === 0 ? 11 : cy(i) === 1 ? 3 : cy(i) === 2 ? 2 : 1)) continue; if (cy(i) >= GY && !W[i]) continue; L.push([i, W[i], ORI[i], FL[i] & 1]); }
+  try { localStorage.setItem("circuitcraft-sandbox", JSON.stringify(L)); } catch (e) {}
+}
+function loadSandbox() { try { const L = JSON.parse(localStorage.getItem("circuitcraft-sandbox") || "null"); if (!L) return false; for (const [i, b, o, f] of L) if (i >= 0 && i < NN && (BL[b] || PT[b] || b === 0)) { W[i] = b; ORI[i] = o & 7; FL[i] = f; } return true; } catch (e) { return false; } }
+
+/* ═════════════ 임무 진행 화면 ═════════════ */
+function renderMission() {
+  const el = $("mission");
+  if (mode === "sandbox") {
+    $("mLv").textContent = "자유 실험실"; $("mT").textContent = "마음껏 회로 만들기";
+    $("mSteps").innerHTML = ""; $("hint").hidden = true; $("bHint").hidden = true; $("graph").hidden = true;
+    $("mLive").innerHTML = "부품을 바라보면 오른쪽 위에 전압·전류·저항이 보여요. <kbd>E</kbd> 부품 상자, <kbd>V</kbd> 보기 바꾸기."; el.hidden = false; return;
+  }
+  const D = LV.D; $("bHint").hidden = false;
+  $("mLv").textContent = `임무 ${LVi + 1} / ${LEVELS.length}`; $("mT").textContent = D.t;
+  $("mSteps").innerHTML = D.steps.map((s, k) => `<li class="${k < LV.step ? "ok" : k === LV.step ? "now" : ""}">${s.t}</li>`).join("");
+  $("hint").innerHTML = D.hint; $("graph").hidden = !D.graph;
+  el.hidden = false; liveText();
+}
+function liveText() {
+  if (!LV) return; const D = LV.D;
+  let s = D.live ? D.live(LV) : "";
+  if (inv) s += `<br><span style="color:var(--dim)">남은 부품: ${Object.keys(inv).map(id => `${itemName(id)} ${inv[id]}`).join(", ")}</span>`;
+  $("mLive").innerHTML = s;
+  if (D.graph) drawGraph($("graph"), LV.pts, true);
+}
+function drawGraph(cv, pts, small) {
+  const g = cv.getContext("2d"), w = cv.width, h = cv.height; g.clearRect(0, 0, w, h);
+  const L = 36, B = h - 24, T = 10, Rr = w - 10, maxV = 5, maxI = .5;
+  g.strokeStyle = "#ffffff55"; g.lineWidth = 1; g.beginPath(); g.moveTo(L, T); g.lineTo(L, B); g.lineTo(Rr, B); g.stroke();
+  g.fillStyle = "#a6aed6"; g.font = `${small ? 10 : 13}px sans-serif`; g.textAlign = "center";
+  for (let v = 0; v <= 5; v++) { const x = L + (Rr - L) * v / maxV; g.fillText(v + "V", x, B + 14); }
+  g.textAlign = "right"; for (let i = 0; i <= .5; i += .1) { const y = B - (B - T) * i / maxI; g.fillText(i.toFixed(1), L - 4, y + 4); }
+  g.save(); g.translate(10, (T + B) / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("전류(A)", 0, 0); g.restore();
+  const P = Object.values(pts || {});
+  if (P.length >= 2) { g.strokeStyle = "#8fe3ff"; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(L, B); const s = P.reduce((a, p) => a + p.i * p.v, 0) / P.reduce((a, p) => a + p.v * p.v, 0); g.lineTo(Rr, B - (B - T) * (s * maxV) / maxI); g.stroke(); g.setLineDash([]); if (!small) { g.fillStyle = "#8fe3ff"; g.textAlign = "left"; g.fillText(`기울기의 역수 = 전압 ÷ 전류 ≈ ${(1 / s).toFixed(1)} Ω`, L + 10, T + 14); } }
+  P.forEach(p => { const x = L + (Rr - L) * p.v / maxV, y = B - (B - T) * p.i / maxI; g.fillStyle = "#ffd65a"; g.beginPath(); g.arc(x, y, small ? 4 : 6, 0, 7); g.fill(); });
+  if (!P.length) { g.fillStyle = "#a6aed6"; g.textAlign = "center"; g.fillText("전압계·전류계로 재면 점이 찍혀요", (L + Rr) / 2, (T + B) / 2); }
+}
+function goalTick(changed) {
+  if (!LV || LV.done) return; const D = LV.D;
+  if (D.tick) D.tick(LV, changed);
+  while (LV.step < D.steps.length && D.steps[LV.step].ok(LV)) { LV.step++; sfx.ding(); if (LV.step < D.steps.length) toast("✓ " + D.steps[LV.step - 1].t, 1600, "good"); }
+  renderMission();
+  if (LV.step >= D.steps.length) { LV.done = true; const cur = LV; setTimeout(() => { if (LV === cur && mode === "level") win(); }, 900); }
+}
+function win() {
+  const D = LV.D, used = (D.inv[20] || 0) - (inv[20] || 0);
+  const s2 = used <= D.par, s3 = stats.acc === 0, st = 1 + (s2 ? 1 : 0) + (s3 ? 1 : 0);
+  PROG.stars[LVi] = Math.max(PROG.stars[LVi] || 0, st); PROG.done = PROG.done || {}; PROG.done[D.note] = true; if (D.graph && LV.pts) PROG.ohm = LV.pts; saveProg();
+  pause(true); sfx.win();
+  $("wT").textContent = LVi === LEVELS.length - 1 ? "🎉 마을에 불이 다시 켜졌어요!" : `임무 ${LVi + 1} 성공!`;
+  $("wStars").textContent = "★".repeat(st) + "☆".repeat(3 - st);
+  $("wStarLine").innerHTML = `★ 임무 성공<br>${s2 ? "★" : "☆"} 전선 ${D.par}칸 이하로 짓기 (이번: ${used}칸)<br>${s3 ? "★" : "☆"} 사고 없이 (합선·전구 끊어짐·전류계 고장 ${stats.acc}번)`;
+  $("wLesson").innerHTML = D.lesson; $("wGraph").hidden = !D.graph; if (D.graph) drawGraph($("wGraph"), LV.pts, false);
+  $("wNext").hidden = LVi >= LEVELS.length - 1;
+  $("winOv").hidden = false; showHud(false);
+}
+
+/* ═════════════ 측정기 (바라보는 부품) ═════════════ */
+function probeTick() {
+  const h = raycast(7), el = $("probe");
+  if (!h || !isCond(W[h.i]) || !RES) { el.hidden = true; return; }
+  const i = h.i, id = W[i], P = PT[id];
+  let html = `<div class="n">${P.n}${LOCK[i] && mode === "level" ? " 🔒" : ""}</div>`;
+  if (id === 20) { const I = RES.wireI.get(i) || 0; html += `<div class="vals"><span>전류</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">전선은 저항이 거의 0이라 전압을 거의 쓰지 않아요.</div>`; el.innerHTML = html; el.hidden = false; return; }
+  const p = pv(i), v = p.v, I = p.i;
+  if (P.k === "bat") html += `<div class="vals"><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span><span>속 저항</span><span class="O">${P.r} Ω</span></div><div class="f">아무것도 안 이었을 때 1.5V. 전류가 많이 흐를수록 전지 속 저항 때문에 조금 줄어요.</div>`;
+  else if (P.k === "sw") html += `<div class="vals"><span>상태</span><span>${FL[i] & 1 ? "닫힘 (전류 흐름)" : "열림 (끊김)"}</span><span>전류</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">오른쪽 클릭(폰: 켜기)으로 바꿔요.</div>`;
+  else if (P.k === "amm") html += `<div class="vals"><span>읽은 값</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">전류계는 저항이 거의 0이라서 반드시 <b>직렬</b>로 끼워요.</div>`;
+  else if (P.k === "vm") html += `<div class="vals"><span>읽은 값</span><span class="V">${fmt(v, 2)} V</span></div><div class="f">전압계는 저항이 아주 커서(1,000,000Ω) 전류를 거의 안 받아요. <b>병렬</b>로 대요.</div>`;
+  else {
+    const R = P.R; html += `<div class="vals"><span>저항</span><span class="O">${R} Ω</span><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span>` + (P.k === "bulb" ? `<span>밝기</span><span>${fmt(bright(i), 2)}배</span>` : "") + `</div>`;
+    if (Math.abs(I) > .002 && P.k !== "fuse") html += `<div class="f">V = I × R → ${fmt(Math.abs(v), 2)} V = ${fmt(Math.abs(I), 3)} A × ${R} Ω</div>`;
+  }
+  if (FL[i] & 2) html += `<div class="warn">망가졌어요. 오른쪽 클릭으로 새것으로 갈아요.</div>`;
+  if (FL[i] & 4) html += `<div class="warn">합선으로 과열! 지름길 전선을 빼요.</div>`;
+  if (P.k === "bat" || P.k === "amm" || P.k === "vm") html += `<div class="f">빨간 쪽이 (+). 방향 돌리기: <kbd>R</kbd></div>`;
+  el.innerHTML = html; el.hidden = false;
+}
+
+/* ═════════════ 조준·놓기·빼기 ═════════════ */
+function raycast(max) {
+  const ox = player.x, oy = player.y + 1.62, oz = player.z;
+  const dx = -Math.sin(player.yaw) * Math.cos(player.pitch), dy = Math.sin(player.pitch), dz = -Math.cos(player.yaw) * Math.cos(player.pitch);
+  let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
+  const sx = Math.sign(dx), sy = Math.sign(dy), sz = Math.sign(dz);
+  const tdx = Math.abs(1 / dx), tdy = Math.abs(1 / dy), tdz = Math.abs(1 / dz);
+  let tx = (sx > 0 ? x + 1 - ox : ox - x) * tdx, ty = (sy > 0 ? y + 1 - oy : oy - y) * tdy, tz = (sz > 0 ? z + 1 - oz : oz - z) * tdz;
+  let face = -1, t = 0;
+  while (t <= max) {
+    if (inb(x, y, z) && W[ix(x, y, z)]) return { x, y, z, i: ix(x, y, z), face };
+    if (tx < ty && tx < tz) { x += sx; t = tx; tx += tdx; face = sx > 0 ? 1 : 0; }
+    else if (ty < tz) { y += sy; t = ty; ty += tdy; face = sy > 0 ? 3 : 2; }
+    else { z += sz; t = tz; tz += tdz; face = sz > 0 ? 5 : 4; }
+  }
+  return null;
+}
+function facingDir() { const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw); return Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 1) : (fz > 0 ? 4 : 5); }
+function edited(i) {
+  const x = cx(i), z = cz(i);
+  if (isCond(W[i]) || partObj.has(i)) rebuildPartsNear(i);
+  else { const o = partObj.get(i); if (o) rebuildPart(i); }
+  rebuildAround(x, z); rebuildPartsNear(i);
+  for (let k = 0; k < NN; k++) if (FL[k] & 4) { FL[k] &= ~4; rebuildPart(k); } // 회로를 고치면 과열이 풀려요
+  solveDirty = true; if (mode === "sandbox") sbT = 1.5;
+}
+function playerHits(x, y, z) { return x + 1 > player.x - .3 && x < player.x + .3 && z + 1 > player.z - .3 && z < player.z + .3 && y + 1 > player.y && y < player.y + 1.8; }
+function place() {
+  const h = raycast(7); if (!h) return;
+  const b = W[h.i];
+  // 부품을 바라보며 놓기 버튼 = 사용하기
+  if (PT[b]) {
+    const k = PT[b].k;
+    if (k === "sw") { FL[h.i] ^= 1; rebuildPart(h.i); solveDirty = true; if (LV) LV.tog = performance.now(); sfx.click(FL[h.i] & 1); if (mode === "sandbox") sbT = 1.5; return; }
+    if (FL[h.i] & 2) { FL[h.i] &= ~2; rebuildPart(h.i); solveDirty = true; sfx.click(true); toast("새것으로 갈았어요.", 1200); return; }
+  }
+  const id = hot[sel]; if (!id) return;
+  if (h.face < 0) return;
+  const [dx, dy, dz] = DIRS[h.face], x = h.x + dx, y = h.y + dy, z = h.z + dz;
+  if (!inb(x, y, z) || W[ix(x, y, z)]) return;
+  if (isSolid(id) && playerHits(x, y, z)) return;
+  if (mode === "level") { if (!inv[id]) { toast(`${itemName(id)}이(가) 다 떨어졌어요. 놓은 것을 빼면 돌아와요.`, 1600); return; } inv[id]--; }
+  const i = ix(x, y, z); W[i] = id; LOCK[i] = 0; FL[i] = id === 25 ? 1 : 0;
+  ORI[i] = isPart(id) ? facingDir() : 0;
+  edited(i); sfx.place(); renderHot(); if (LV) liveText();
+}
+function breakIt() {
+  const h = raycast(7); if (!h) return;
+  const b = W[h.i]; if (BL[b] && BL[b].hard) return;
+  if (mode === "level" && LOCK[h.i]) { toast("🔒 이 블록은 임무에 꼭 필요해서 뺄 수 없어요.", 1300); return; }
+  if (mode === "level" && !isCond(b)) { toast("임무에서는 땅과 집은 그대로 두어요.", 1200); return; }
+  W[h.i] = 0; FL[h.i] = 0; LOCK[h.i] = 0; breakBits(h.x, h.y, h.z, b);
+  if (mode === "level" && inv[b] != null) inv[b]++;
+  edited(h.i); sfx.brk(); renderHot(); if (LV) liveText();
+}
+function rotateIt() {
+  const h = raycast(7); if (!h || !isPart(W[h.i])) { toast("부품을 바라보고 돌려요.", 1000); return; }
+  if (mode === "level" && LOCK[h.i]) { toast("🔒 고정된 부품은 돌릴 수 없어요.", 1200); return; }
+  ORI[h.i] = ROT_ORDER[(ROT_ORDER.indexOf(ORI[h.i]) + 1) % 6]; edited(h.i); sfx.click(true);
+}
+
+/* ═════════════ 부품 칸 그림 (회로도 기호) ═════════════ */
+const iconCache = {};
+function icon(id) {
+  if (iconCache[id]) return iconCache[id];
+  const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d");
+  if (BL[id]) { g.imageSmoothingEnabled = false; g.drawImage(atlasC, BL[id].t[1] * TILE, 0, TILE, TILE, 2, 2, 28, 28); return iconCache[id] = c; }
+  g.strokeStyle = "#f1f3ff"; g.fillStyle = "#f1f3ff"; g.lineWidth = 2; g.lineCap = "round";
+  const line = (a, b, c2, d) => { g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke(); };
+  const k = PT[id].k;
+  if (k === "wire") { g.strokeStyle = "#e3934f"; g.lineWidth = 4; line(3, 16, 29, 16); line(16, 6, 16, 26); }
+  else if (k === "bat") { line(2, 16, 12, 16); line(20, 16, 30, 16); g.strokeStyle = "#ff6b6b"; line(12, 6, 12, 26); g.strokeStyle = "#f1f3ff"; g.lineWidth = 4; line(20, 11, 20, 21); g.fillStyle = "#ff6b6b"; g.font = "700 10px sans-serif"; g.fillText("+", 4, 10); }
+  else if (k === "bulb") { line(2, 16, 8, 16); line(24, 16, 30, 16); g.beginPath(); g.arc(16, 16, 8, 0, 7); g.stroke(); line(10, 10, 22, 22); line(22, 10, 10, 22); }
+  else if (k === "res" || k === "nic") { line(2, 16, 7, 16); line(25, 16, 30, 16); g.strokeRect(7, 11, 18, 10); if (k === "nic") { g.fillStyle = "#9a9aa6"; g.fillRect(9, 13, 14, 6); } }
+  else if (k === "sw") { line(2, 20, 9, 20); line(23, 20, 30, 20); g.beginPath(); g.arc(9, 20, 2, 0, 7); g.fill(); g.beginPath(); g.arc(23, 20, 2, 0, 7); g.fill(); line(9, 20, 22, 10); }
+  else if (k === "amm" || k === "vm" || k === "mot") { line(2, 16, 7, 16); line(25, 16, 30, 16); g.beginPath(); g.arc(16, 16, 9, 0, 7); g.stroke(); g.font = "700 13px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = k === "amm" ? "#ffd65a" : k === "vm" ? "#ff8a5c" : "#8fe3ff"; g.fillText(k === "amm" ? "A" : k === "vm" ? "V" : "M", 16, 17); }
+  else if (k === "fuse") { line(2, 16, 30, 16); g.strokeRect(8, 12, 16, 8); }
+  else if (k === "buz") { line(2, 20, 10, 20); line(22, 20, 30, 20); line(10, 20, 10, 12); line(22, 20, 22, 12); g.beginPath(); g.arc(16, 12, 6, Math.PI, 0); g.stroke(); }
+  return iconCache[id] = c;
+}
+
+/* ═════════════ 화면 ═════════════ */
+let hudOn = false, isTouch = false;
+function showHud(v) { hudOn = v; ["cross", "hotbar", "hotName", "keysHelp", "mission"].forEach(id => $(id).hidden = !v); $("touch").hidden = !(v && isTouch); if (!v) { $("probe").hidden = true; $("viewTag").hidden = true; } else showViewTag(); }
+function renderHot() {
+  const el = $("hotbar"); el.innerHTML = "";
+  hot.forEach((id, k) => {
+    const s = document.createElement("div"); s.className = "s" + (k === sel ? " on" : "");
+    s.appendChild(icon(id).cloneNode()); s.firstChild.getContext("2d").drawImage(icon(id), 0, 0);
+    const n = document.createElement("i"); n.textContent = k + 1; s.appendChild(n);
+    if (mode === "level") { const b = document.createElement("b"); b.textContent = inv[id] ?? 0; s.appendChild(b); if (!inv[id]) s.style.opacity = .45; }
+    s.onpointerdown = (e) => { e.stopPropagation(); sel = k; renderHot(); };
+    el.appendChild(s);
+  });
+  const id = hot[sel]; $("hotName").textContent = id ? itemName(id) + (PT[id] && PT[id].R ? ` · ${PT[id].R >= 1e5 ? "아주 큰" : PT[id].R} Ω` : "") : "";
+}
+let toastT = 0;
+function toast(t, ms = 1300, cls = "") { const el = $("toast"); el.textContent = t; el.style.whiteSpace = "pre-line"; el.className = "hud " + cls; el.hidden = false; toastT = performance.now() + ms; }
+function showViewTag() { const el = $("viewTag"); el.textContent = VIEW_NAME[viewMode]; el.hidden = !hudOn || viewMode === 0; }
+function cycleView() { viewMode = (viewMode + 1) % 4; showViewTag(); applyVisuals(); sfx.click(true); if (LV) goalTick(false); }
+
+function openNotes() {
+  pause(true); const box = $("notesGrid"); box.innerHTML = "";
+  const done = PROG.done || {};
+  NOTE_FREE.forEach(n => { const d = document.createElement("div"); d.className = "note"; d.innerHTML = `<h3>${n.t}</h3><p>${n.p}</p>`; if (n.sym) { const r = document.createElement("div"); r.className = "inv"; Object.keys(PT).forEach(id => { const b = document.createElement("button"); b.appendChild(icon(+id).cloneNode()); b.firstChild.getContext("2d").drawImage(icon(+id), 0, 0); b.append(PT[id].n); r.appendChild(b); }); d.appendChild(r); } box.appendChild(d); });
+  LEVELS.forEach((L, k) => {
+    const n = NOTES[L.note], d = document.createElement("div"); const open = done[L.note] || mode === "sandbox";
+    d.className = "note" + (open ? "" : " lock");
+    d.innerHTML = open ? `<h3>${n.t}</h3><p>${n.p}</p>` : `<h3>🔒 ${n.t}</h3><p>임무 ${k + 1} 「${L.t}」을 깨면 열려요.</p>`;
+    if (open && n.graph) { const c = document.createElement("canvas"); c.width = 480; c.height = 200; d.appendChild(c); drawGraph(c, PROG.ohm || (mode === "sandbox" ? {} : {}), false); }
+    box.appendChild(d);
+  });
+  $("notesOv").hidden = false;
+}
+function openInv() {
+  if (mode !== "sandbox") { toast("임무에서는 받은 부품만 써요. 1~9로 골라요.", 1500); return; }
+  pause(true); $("invSlot").textContent = sel + 1; const box = $("invGrid"); box.innerHTML = "";
+  SB_ITEMS.forEach(id => { const b = document.createElement("button"); b.className = hot[sel] === id ? "on" : ""; const c = icon(id).cloneNode(); c.getContext("2d").drawImage(icon(id), 0, 0); b.appendChild(c); b.append(itemName(id)); b.onclick = () => { const j = hot.indexOf(id); if (j >= 0 && j !== sel) hot[j] = hot[sel]; hot[sel] = id; renderHot(); closeOv("invOv"); }; box.appendChild(b); });
+  $("invOv").hidden = false;
+}
+function closeOv(id) { $(id).hidden = true; if (mode !== "none" && $("startOv").hidden && $("winOv").hidden && $("briefOv").hidden) resume(); }
+function renderLevels() {
+  const g = $("lvGrid"); g.innerHTML = "";
+  LEVELS.forEach((L, k) => {
+    const b = document.createElement("button"); const st = PROG.stars[k] || 0; const open = k === 0 || PROG.stars[k - 1] || PROG.unlockAll;
+    b.disabled = !open; b.innerHTML = `<small>임무 ${k + 1}</small><b>${L.t}</b><span class="st">${"★".repeat(st)}${"☆".repeat(3 - st)}</span>`;
+    b.onclick = () => brief(k); g.appendChild(b);
+  });
+}
+function brief(k) {
+  const L = LEVELS[k]; $("startOv").hidden = true; $("winOv").hidden = true;
+  $("bLv").textContent = `임무 ${k + 1}`; $("bT").textContent = L.t; $("bStory").innerHTML = L.story;
+  const box = $("bInv"); box.innerHTML = "";
+  Object.keys(L.inv).forEach(id => { const b = document.createElement("button"); const c = icon(+id).cloneNode(); c.getContext("2d").drawImage(icon(+id), 0, 0); b.appendChild(c); b.append(`${itemName(id)} × ${L.inv[id]}`); box.appendChild(b); });
+  $("briefOv").hidden = false;
+  $("bGo").onclick = () => { $("briefOv").hidden = true; startLevel(k); resume(); setTimeout(() => toast(LEVELS[k].steps[0].t, 2200), 300); };
+}
+function home() { mode = "none"; LV = null; showHud(false); ["winOv", "menuOv", "briefOv", "notesOv", "invOv"].forEach(id => $(id).hidden = true); renderLevels(); $("startOv").hidden = false; pause(true); }
+
+/* ═════════════ 소리 ═════════════ */
+let actx = null, master = null;
+function ac() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); master = actx.createGain(); master.connect(actx.destination); } catch (e) {} } if (actx && actx.state === "suspended") actx.resume(); master && (master.gain.value = 1); }
+function tone(f, d = .08, type = "square", v = .06, f2) { if (!actx) return; const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime; o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d); g.gain.setValueAtTime(v * SET.vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(master); o.start(t); o.stop(t + d + .02); }
+function noiseB(d, v, fq = 2000) { if (!actx) return; const n = Math.floor(actx.sampleRate * d), buf = actx.createBuffer(1, n, actx.sampleRate), a = buf.getChannelData(0); for (let k = 0; k < n; k++) a[k] = (Math.random() * 2 - 1) * (1 - k / n) ** 2; const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain(); s.buffer = buf; f.type = "bandpass"; f.frequency.value = fq; g.gain.value = v * SET.vol; s.connect(f).connect(g).connect(master); s.start(); }
+const sfx = {
+  place: () => { tone(320, .05, "square", .05); noiseB(.05, .2, 1500); },
+  brk: () => { noiseB(.09, .35, 900); tone(200, .06, "triangle", .05, 120); },
+  click: (on) => tone(on ? 900 : 600, .04, "square", .05),
+  pop: () => { noiseB(.25, .8, 3000); tone(1400, .1, "sawtooth", .05, 300); },
+  fizz: () => { noiseB(.8, .5, 5000); },
+  ding: () => { tone(880, .12, "sine", .1); setTimeout(() => tone(1320, .18, "sine", .1), 90); },
+  win: () => { [523, 659, 784, 1047].forEach((f, k) => setTimeout(() => tone(f, .25, "triangle", .1), k * 120)); },
+};
+
+/* ═════════════ 입력 ═════════════ */
+const keys = {};
+let locked = false, noLock = !canvas.requestPointerLock, lockFails = 0;
+function pause(p) { paused = p; if (p) { try { document.exitPointerLock(); } catch (e) {} for (const k in keys) keys[k] = false; stickV.x = stickV.y = 0; tJump = false; tDown = false; } }
+function lockMouse() { if (isTouch || noLock || locked) return; try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => { if (++lockFails >= 3) noLock = true; }); } catch (e) { if (++lockFails >= 3) noLock = true; } }
+function resume() { pause(false); lockMouse(); }
+function anyOv() { return ["startOv", "briefOv", "winOv", "menuOv", "invOv", "notesOv", "setOv"].some(id => !$(id).hidden); }
+function openMenu() { pause(true); $("sbTools").hidden = mode !== "sandbox"; $("menuOv").hidden = false; }
+addEventListener("keydown", (e) => {
+  ac();
+  if (e.code === "Escape") { for (const id of ["invOv", "notesOv", "setOv"]) if (!$(id).hidden) { closeOv(id); return; } if (!$("menuOv").hidden) { closeOv("menuOv"); return; } return; }
+  if (e.code === "KeyN" && mode !== "none") { if (!$("notesOv").hidden) closeOv("notesOv"); else if (!anyOv()) openNotes(); return; }
+  if (e.code === "KeyE" && mode !== "none") { if (!$("invOv").hidden) closeOv("invOv"); else if (!anyOv()) openInv(); return; }
+  if (paused || anyOv()) return;
+  keys[e.code] = true; if (e.code === "Space") e.preventDefault();
+  if (/^Digit[1-9]$/.test(e.code)) { const k = +e.code.slice(5) - 1; if (k < hot.length) { sel = k; renderHot(); } }
+  if (e.code === "KeyR") rotateIt();
+  if (e.code === "KeyV") cycleView();
+  if (e.code === "KeyF") toggleFly();
+  if (e.code === "KeyT" && mode === "sandbox") { setSky(!night); PROG.sbNight = night; saveProg(); }
+  if (isTouch && SET.input === "auto" && /^Key[WASD]$/.test(e.code)) useTouch(false);
+});
+addEventListener("keyup", (e) => { keys[e.code] = false; });
+document.addEventListener("pointerlockchange", () => {
+  const was = locked; locked = document.pointerLockElement === canvas;
+  if (was && !locked && !paused && !isTouch && !anyOv()) openMenu(); // Esc로 마우스가 풀리면 메뉴
+});
+document.addEventListener("mousemove", (e) => { if (locked && !paused) look(e.movementX, e.movementY, .0024); });
+addEventListener("wheel", (e) => { if (!paused && hot.length) { sel = (sel + (e.deltaY > 0 ? 1 : hot.length - 1)) % hot.length; renderHot(); } }, { passive: true });
+canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+function look(dx, dy, s) { s *= SET.sens; player.yaw -= dx * s; player.pitch = Math.max(-1.55, Math.min(1.55, player.pitch - dy * s)); }
+const drags = {};
+canvas.addEventListener("pointerdown", (e) => {
+  ac(); if (paused) return;
+  if (e.pointerType === "mouse" && SET.input !== "touch") {
+    if (isTouch) useTouch(false);
+    if (locked || noLock) { if (e.button === 2) place(); else if (e.button === 0) breakIt(); if (!noLock) return; }
+    else { lockMouse(); return; }
+  } else if (SET.input !== "mouse") useTouch(true);
+  drags[e.pointerId] = { x: e.clientX, y: e.clientY, type: e.pointerType };
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+});
+canvas.addEventListener("pointermove", (e) => { const d = drags[e.pointerId]; if (!d || locked) return; const dx = e.clientX - d.x, dy = e.clientY - d.y; d.x = e.clientX; d.y = e.clientY; look(dx, dy, d.type === "mouse" ? .005 : .006); });
+const endPtr = (e) => { delete drags[e.pointerId]; };
+canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointercancel", endPtr);
+// 터치
+const stick = $("stick"), knob = $("knob"), stickV = { x: 0, y: 0 }; let stickId = null, tJump = false, tDown = false;
+function useTouch(t) { if (isTouch === t) return; isTouch = t; document.body.classList.toggle("touch", t); $("touch").hidden = !(hudOn && t); }
+if (matchMedia("(pointer: coarse)").matches && SET.input !== "mouse") useTouch(true);
+if (SET.input === "touch") useTouch(true);
+function moveStick(e) { const r = stick.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const m = Math.hypot(dx, dy), R = r.width / 2; if (m > R) { dx *= R / m; dy *= R / m; } knob.style.transform = `translate(${dx}px,${dy}px)`; stickV.x = dx / R; stickV.y = dy / R; }
+stick.addEventListener("pointerdown", (e) => { ac(); stickId = e.pointerId; stick.setPointerCapture(e.pointerId); moveStick(e); });
+stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) moveStick(e); });
+const stickEnd = (e) => { if (e.pointerId !== stickId) return; stickId = null; stickV.x = stickV.y = 0; knob.style.transform = ""; };
+stick.addEventListener("pointerup", stickEnd); stick.addEventListener("pointercancel", stickEnd);
+const tb = (id, down, up) => { const b = $(id); b.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); ac(); if (!paused) down(); }); if (up) { b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("pointerleave", up); } };
+tb("tPlace", place); tb("tBreak", breakIt); tb("tJump", () => { tJump = true; }, () => { tJump = false; }); tb("tDown", () => { tDown = true; }, () => { tDown = false; });
+tb("tRot", rotateIt); tb("tView", cycleView); tb("tFly", toggleFly); tb("tInv", openInv); tb("tEsc", openMenu);
+function toggleFly() { player.fly = !player.fly; player.vy = 0; $("tDown").hidden = !player.fly; toast(player.fly ? "날기 켬 (Space 위로, Shift 아래로)" : "날기 끔", 1100); }
+
+/* ═════════════ 물리 ═════════════ */
+function solidAt(x, y, z) { if (x < 0 || z < 0 || x >= SX || z >= SZ) return true; if (y < 0) return true; if (y >= SY) return false; return isSolid(W[ix(x, y, z)]); }
+function hits(px, py, pz) {
+  for (let x = Math.floor(px - .3); x <= Math.floor(px + .3); x++) for (let y = Math.floor(py); y <= Math.floor(py + 1.79); y++) for (let z = Math.floor(pz - .3); z <= Math.floor(pz + .3); z++) if (solidAt(x, y, z)) return true;
+  return false;
+}
+function physics(dt) {
+  const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - stickV.y, s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + stickV.x;
+  const sp = player.fly ? 7 : (keys.ShiftLeft ? 2.2 : 4.3);
+  const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
+  let mx = fx * f + rx * s, mz = fz * f + rz * s; const m = Math.hypot(mx, mz); if (m > 1) { mx /= m; mz /= m; }
+  player.vx = mx * sp; player.vz = mz * sp;
+  const up = keys.Space || tJump;
+  if (player.fly) player.vy = (up ? 6 : 0) - ((keys.ShiftLeft || keys.ShiftRight || tDown) ? 6 : 0);
+  else { player.vy -= 24 * dt; if (up && player.ground) player.vy = 7.6; player.vy = Math.max(player.vy, -30); }
+  const steps = Math.ceil(dt / .02), h = dt / steps;
+  for (let k = 0; k < steps; k++) {
+    let nx = player.x + player.vx * h; if (hits(nx, player.y, player.z)) { nx = player.vx > 0 ? Math.floor(nx + .3) - .3 - 1e-3 : Math.floor(nx - .3) + 1.3 + 1e-3; if (hits(nx, player.y, player.z)) nx = player.x; player.vx = 0; } player.x = nx;
+    let nz = player.z + player.vz * h; if (hits(player.x, player.y, nz)) { nz = player.vz > 0 ? Math.floor(nz + .3) - .3 - 1e-3 : Math.floor(nz - .3) + 1.3 + 1e-3; if (hits(player.x, player.y, nz)) nz = player.z; player.vz = 0; } player.z = nz;
+    let ny = player.y + player.vy * h; player.ground = false;
+    if (hits(player.x, ny, player.z)) { if (player.vy < 0) { ny = Math.floor(ny) + 1; player.ground = true; } else ny = Math.floor(ny + 1.8) - 1.8 - 1e-3; if (hits(player.x, ny, player.z)) ny = player.y; player.vy = 0; }
+    player.y = Math.min(SY + 6, ny);
+  }
+}
+
+/* ═════════════ 루프 ═════════════ */
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener("resize", resize); resize();
+let last = performance.now(), probeT = 0, liveT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
+  if (!paused && mode !== "none") physics(dt);
+  if (solveDirty && mode !== "none") recompute();
+  camera.position.set(player.x, player.y + 1.62, player.z); camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
+  if (mode !== "none") { dotTick(dt); liveTick(dt, t); fxTick(dt); }
+  if (hudOn && (probeT -= dt) < 0) { probeT = .12; probeTick(); }
+  if (LV && (liveT -= dt) < 0) { liveT = .3; goalTick(false); }
+  if (sbT > 0 && (sbT -= dt) <= 0) saveSandbox();
+  if (toastT && now > toastT) { $("toast").hidden = true; toastT = 0; }
+  if (mode === "none") { camera.position.set(24 + Math.sin(t * .08) * 14, 12, 24 + Math.cos(t * .08) * 14); camera.lookAt(24, 4, 24); }
+  renderer.render(scene, camera);
+}
+
+/* ═════════════ 버튼 ═════════════ */
+$("bSandbox").onclick = () => { ac(); $("startOv").hidden = true; startSandbox(false); resume(); };
+$("bNotes0").onclick = () => openNotes();
+$("notesClose").onclick = () => closeOv("notesOv");
+$("invClose").onclick = () => closeOv("invOv");
+$("bBack").onclick = () => { $("briefOv").hidden = true; $("startOv").hidden = false; };
+$("bHint").onclick = () => { $("hint").hidden = !$("hint").hidden; };
+$("bNote").onclick = () => openNotes();
+$("bMenu").onclick = () => openMenu();
+$("mResume").onclick = () => closeOv("menuOv");
+$("mRetry").onclick = () => { $("menuOv").hidden = true; if (mode === "level") { startLevel(LVi); resume(); } else { startSandbox(false); resume(); } };
+$("mHome").onclick = home; $("wHome").onclick = home;
+$("mDay").onclick = () => { setSky(!night); PROG.sbNight = night; saveProg(); };
+$("mClear").onclick = () => { if (!confirm("실험실을 모두 비울까요?")) return; try { localStorage.removeItem("circuitcraft-sandbox"); } catch (e) {} $("menuOv").hidden = true; startSandbox(true); resume(); };
+$("wNext").onclick = () => { $("winOv").hidden = true; brief(LVi + 1); };
+$("wRetry").onclick = () => { $("winOv").hidden = true; startLevel(LVi); resume(); };
+$("wStay").onclick = () => { $("winOv").hidden = true; showHud(true); renderMission(); resume(); };
+function openSet() { $("sSens").value = SET.sens; $("sVol").value = SET.vol; showSet(); $("setOv").hidden = false; }
+function showSet() {
+  $("oSens").textContent = (+SET.sens).toFixed(1); $("oVol").textContent = Math.round(SET.vol * 100) + "%";
+  const box = $("sInput"); box.innerHTML = "";
+  [["auto", "자동"], ["mouse", "마우스"], ["touch", "터치"]].forEach(([k, t]) => { const b = document.createElement("button"); b.className = "btn " + (SET.input === k ? "" : "ghost"); b.textContent = t; b.onclick = () => { SET.input = k; saveSet(); if (k !== "auto") useTouch(k === "touch"); showSet(); }; box.appendChild(b); });
+}
+$("sSens").oninput = () => { SET.sens = +$("sSens").value; saveSet(); showSet(); };
+$("sVol").oninput = () => { SET.vol = +$("sVol").value; saveSet(); showSet(); };
+$("bSet0").onclick = openSet; $("mSet").onclick = () => { $("menuOv").hidden = true; openSet(); };
+$("setClose").onclick = () => { $("setOv").hidden = true; if (mode !== "none" && !anyOv()) openMenu(); };
+$("setReset").onclick = () => { if (!confirm("임무 별과 노트 기록을 모두 지울까요?")) return; PROG.stars = {}; PROG.done = {}; delete PROG.ohm; saveProg(); renderLevels(); };
+
+// 시작 화면 뒤 배경: 마을
+clearWorld(); house(10, 28, 7, 7); house(30, 28, 7, 7); put(13, GY, 31, 22, 0); trees(() => false); setSky(true); afterWorld();
+renderLevels();
+requestAnimationFrame(frame);
+// 점검용(테스트 스크립트에서 씀)
+window.__cc = { dbg: () => [dotMesh.count, viewMode, paused, mode], rebuild: () => { rebuildAllParts(); buildAllChunks(); }, LEVELS, startLevel, startSandbox, put, W, FL, ORI, ix, get RES() { return RES; }, recompute: () => { solveDirty = true; recompute(); }, edited, player, get LV() { return LV; }, solve, pv, place, breakIt, rotateIt, get inv() { return inv; }, setView: (v) => { viewMode = v; applyVisuals(); }, pause };
+})();
+</script>
+</body>
+</html>
