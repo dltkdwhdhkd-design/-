@@ -156,7 +156,7 @@ body.touch #keysHelp { display: none; }
 <div class="hud click" id="hotbar" hidden></div>
 <div class="hud" id="hotName" hidden></div>
 <div class="hud" id="keysHelp" hidden>
-  <kbd>WASD</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>F</kbd> 날기<br>
+  <kbd>WASD</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>F</kbd> 날기 · <kbd>C</kbd> 엎드리기<br>
   왼쪽 클릭 빼기 · 오른쪽 클릭 놓기/스위치<br>
   <kbd>R</kbd> 부품 방향 돌리기 · <kbd>V</kbd> 전류 보기<br>
   <kbd>E</kbd> 부품 상자 · <kbd>N</kbd> 노트 · <kbd>Esc</kbd> 메뉴
@@ -170,7 +170,7 @@ body.touch #keysHelp { display: none; }
   <button id="tBreak">빼기</button>
   <button id="tJump">점프</button>
   <button id="tDown" hidden>내려</button>
-  <div id="tTop"><button id="tRot">돌리기</button><button id="tView">보기</button><button id="tFly">날기</button><button id="tInv">부품</button><button id="tEsc">메뉴</button></div>
+  <div id="tTop"><button id="tRot">돌리기</button><button id="tView">보기</button><button id="tFly">날기</button><button id="tProne">엎드려</button><button id="tInv">부품</button><button id="tEsc">메뉴</button></div>
 </div>
 
 <!-- 시작 화면 -->
@@ -1248,7 +1248,7 @@ let inv = {}; // 임무에서 남은 부품 수
 let hot = [], sel = 0;
 let paused = true;
 const stats = { acc: 0 };
-const player = { x: 24, y: GY, z: 20, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, fly: false, ground: false };
+const player = { x: 24, y: GY, z: 20, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, fly: false, ground: false, h: 1.8, eye: 1.62 }; // h: 키(엎드리면 0.8)
 
 function startLevel(k) {
   LVi = k; const D = LEVELS[k]; mode = "level";
@@ -1365,7 +1365,7 @@ function probeTick() {
 
 /* ═════════════ 조준·놓기·빼기 ═════════════ */
 function raycast(max) {
-  const ox = player.x, oy = player.y + 1.62, oz = player.z;
+  const ox = player.x, oy = player.y + player.eye, oz = player.z;
   const dx = -Math.sin(player.yaw) * Math.cos(player.pitch), dy = Math.sin(player.pitch), dz = -Math.cos(player.yaw) * Math.cos(player.pitch);
   let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
   const sx = Math.sign(dx), sy = Math.sign(dy), sz = Math.sign(dz);
@@ -1389,7 +1389,7 @@ function edited(i) {
   for (let k = 0; k < NN; k++) if (FL[k] & 4) { FL[k] &= ~4; rebuildPart(k); } // 회로를 고치면 과열이 풀려요
   solveDirty = true; if (mode === "sandbox") sbT = 1.5;
 }
-function playerHits(x, y, z) { return x + 1 > player.x - .3 && x < player.x + .3 && z + 1 > player.z - .3 && z < player.z + .3 && y + 1 > player.y && y < player.y + 1.8; }
+function playerHits(x, y, z) { return x + 1 > player.x - .3 && x < player.x + .3 && z + 1 > player.z - .3 && z < player.z + .3 && y + 1 > player.y && y < player.y + player.h; }
 function place() {
   const h = raycast(7); if (!h) return;
   const b = W[h.i];
@@ -1553,6 +1553,7 @@ addEventListener("keydown", (e) => {
   if (e.code === "KeyR") rotateIt();
   if (e.code === "KeyV") cycleView();
   if (e.code === "KeyF") toggleFly();
+  if (e.code === "KeyC") toggleProne();
   if (e.code === "KeyT" && mode === "sandbox") { setSky(!night); PROG.sbNight = night; saveProg(); }
   if (isTouch && SET.input === "auto" && /^Key[WASD]$/.test(e.code)) useTouch(false);
 });
@@ -1591,30 +1592,36 @@ const stickEnd = (e) => { if (e.pointerId !== stickId) return; stickId = null; s
 stick.addEventListener("pointerup", stickEnd); stick.addEventListener("pointercancel", stickEnd);
 const tb = (id, down, up) => { const b = $(id); b.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); ac(); if (!paused) down(); }); if (up) { b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("pointerleave", up); } };
 tb("tPlace", place); tb("tBreak", breakIt); tb("tJump", () => { tJump = true; }, () => { tJump = false; }); tb("tDown", () => { tDown = true; }, () => { tDown = false; });
-tb("tRot", rotateIt); tb("tView", cycleView); tb("tFly", toggleFly); tb("tInv", openInv); tb("tEsc", openMenu);
-function toggleFly() { player.fly = !player.fly; player.vy = 0; $("tDown").hidden = !player.fly; toast(player.fly ? "날기 켬 (Space 위로, Shift 아래로)" : "날기 끔", 1100); }
+tb("tRot", rotateIt); tb("tView", cycleView); tb("tFly", toggleFly); tb("tProne", toggleProne); tb("tInv", openInv); tb("tEsc", openMenu);
+// 엎드리기: 키가 0.8칸이 되어 한 칸 높이 틈으로 기어 들어가 밑면에 부품을 달 수 있어요
+function toggleProne() {
+  if (player.h > 1) { player.h = .8; player.fly = false; $("tDown").hidden = true; toast("엎드림: 한 칸 틈으로 기어 들어가 위쪽 밑면을 볼 수 있어요 (C로 일어나기)", 1800); }
+  else { player.h = 1.8; if (hits(player.x, player.y, player.z)) { player.h = .8; toast("위가 막혀서 일어설 수 없어요. 틈 밖으로 기어 나와요.", 1400, "bad"); return; } toast("일어섰어요", 800); }
+  const b = $("tProne"); if (b) b.textContent = player.h > 1 ? "엎드려" : "일어나";
+}
+function toggleFly() { if (player.h < 1) toggleProne(); if (player.h < 1) return; player.fly = !player.fly; player.vy = 0; $("tDown").hidden = !player.fly; toast(player.fly ? "날기 켬 (Space 위로, Shift 아래로)" : "날기 끔", 1100); }
 
 /* ═════════════ 물리 ═════════════ */
 function solidAt(x, y, z) { if (x < 0 || z < 0 || x >= SX || z >= SZ) return true; if (y < 0) return true; if (y >= SY) return false; return isSolid(W[ix(x, y, z)]); }
 function hits(px, py, pz) {
-  for (let x = Math.floor(px - .3); x <= Math.floor(px + .3); x++) for (let y = Math.floor(py); y <= Math.floor(py + 1.79); y++) for (let z = Math.floor(pz - .3); z <= Math.floor(pz + .3); z++) if (solidAt(x, y, z)) return true;
+  for (let x = Math.floor(px - .3); x <= Math.floor(px + .3); x++) for (let y = Math.floor(py); y <= Math.floor(py + player.h - .01); y++) for (let z = Math.floor(pz - .3); z <= Math.floor(pz + .3); z++) if (solidAt(x, y, z)) return true;
   return false;
 }
 function physics(dt) {
   const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - stickV.y, s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + stickV.x;
-  const sp = player.fly ? 7 : (keys.ShiftLeft ? 2.2 : 4.3);
+  const sp = player.fly ? 7 : player.h < 1 ? 1.6 : (keys.ShiftLeft ? 2.2 : 4.3);
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
   let mx = fx * f + rx * s, mz = fz * f + rz * s; const m = Math.hypot(mx, mz); if (m > 1) { mx /= m; mz /= m; }
   player.vx = mx * sp + windV.x; player.vz = mz * sp + windV.z;
   const up = keys.Space || tJump;
   if (player.fly) player.vy = (up ? 6 : 0) - ((keys.ShiftLeft || keys.ShiftRight || tDown) ? 6 : 0);
-  else { player.vy -= 24 * dt; if (up && player.ground) player.vy = 7.6; player.vy = Math.max(player.vy, -30); }
+  else { player.vy -= 24 * dt; if (up && player.ground && player.h > 1) player.vy = 7.6; player.vy = Math.max(player.vy, -30); }
   const steps = Math.ceil(dt / .02), h = dt / steps;
   for (let k = 0; k < steps; k++) {
     let nx = player.x + player.vx * h; if (hits(nx, player.y, player.z)) { nx = player.vx > 0 ? Math.floor(nx + .3) - .3 - 1e-3 : Math.floor(nx - .3) + 1.3 + 1e-3; if (hits(nx, player.y, player.z)) nx = player.x; player.vx = 0; } player.x = nx;
     let nz = player.z + player.vz * h; if (hits(player.x, player.y, nz)) { nz = player.vz > 0 ? Math.floor(nz + .3) - .3 - 1e-3 : Math.floor(nz - .3) + 1.3 + 1e-3; if (hits(player.x, player.y, nz)) nz = player.z; player.vz = 0; } player.z = nz;
     let ny = player.y + player.vy * h; player.ground = false;
-    if (hits(player.x, ny, player.z)) { if (player.vy < 0) { ny = Math.floor(ny) + 1; player.ground = true; } else ny = Math.floor(ny + 1.8) - 1.8 - 1e-3; if (hits(player.x, ny, player.z)) ny = player.y; player.vy = 0; }
+    if (hits(player.x, ny, player.z)) { if (player.vy < 0) { ny = Math.floor(ny) + 1; player.ground = true; } else ny = Math.floor(ny + player.h) - player.h - 1e-3; if (hits(player.x, ny, player.z)) ny = player.y; player.vy = 0; }
     player.y = Math.min(SY + 6, ny);
   }
 }
@@ -1628,7 +1635,7 @@ function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   if (!paused && mode !== "none") physics(dt);
   if (solveDirty && mode !== "none") recompute();
-  camera.position.set(player.x, player.y + 1.62, player.z); camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
+  player.eye += ((player.h > 1 ? 1.62 : .55) - player.eye) * Math.min(1, dt * 12); camera.position.set(player.x, player.y + player.eye, player.z); camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
   if (mode !== "none") { if (!paused) { machineTick(dt); windTick(dt); } else spinning.clear(); dotTick(dt); liveTick(dt, t); fxTick(dt); }
   if (hudOn && (probeT -= dt) < 0) { probeT = .12; probeTick(); }
   if (LV && (liveT -= dt) < 0) { liveT = .3; goalTick(false); }
@@ -1673,7 +1680,7 @@ renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
 // 새 버전 확인: 브라우저가 예전 페이지를 기억해도(최대 10분) 새 버전이 있으면 알려 줘요. 진행 기록은 그대로예요
-const VERSION = "2026-11-02-drone";
+const VERSION = "2026-11-02-prone";
 function checkVersion() {
   try { fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.text() : "").then(h => { const m = h.match(/const VERSION = "([^"]+)"/); if (m && m[1] !== VERSION) { $("newVer").hidden = false; $("newVerGo").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); } }).catch(() => {}); } catch (e) {}
 }
