@@ -535,6 +535,9 @@ function shapeAxis(i) { // 축으로 이어진 쪽(바퀴축·전동기 회전�
 let wheelPhase = 0;
 function makeShaped(i) {
   const g = new THREE.Group(), ax = shapeAxis(i);
+  // 바퀴·톱니바퀴·날개: 축(바퀴축·전동기 회전축·옆 바퀴)이 이어진 쪽으로 쇠막대가 칸 끝까지 뚫고 나가 서로 맞물려요
+  const shaftTo = (sgn) => { const X = cx(i) + (ax === 0 ? sgn : 0), Z = cz(i) + (ax === 1 ? sgn : 0); if (X < 0 || Z < 0 || X >= SX || Z >= SZ) return false; const j = ix(X, cy(i), Z), b = W[j]; return b === 15 || b === 14 || b === 16 || b === 18 || (b === 28 && shaftAxis(j) === ax); };
+  const thru = (parent) => { for (const sgn of [1, -1]) if (shaftTo(sgn)) { const r = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .5, 10), mat(0x8d939e)); r.position.y = sgn * .25 * (ax === 0 ? -1 : 1); parent.add(r); } };
   const turn = (o) => { if (ax === 0) o.rotation.z = Math.PI / 2; else o.rotation.x = Math.PI / 2; };
   if (W[i] === 14) {
     const spin = new THREE.Group(); turn(spin); g.add(spin);
@@ -542,13 +545,13 @@ function makeShaped(i) {
     wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(.49, .49, .42, 22), mat(0x1c1d21)));
     const tread = new THREE.Mesh(new THREE.TorusGeometry(.47, .04, 4, 22), mat(0x2c2d33)); tread.rotation.x = Math.PI / 2; wheel.add(tread);
     wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(.27, .27, .44, 16), mat(0xb9bec8)));
-    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .5, 10), mat(0x55585f)));
+    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .5, 10), mat(0x55585f))); thru(wheel);
     for (let k = 0; k < 5; k++) { const sp = bx(.05, .45, .24, mat(0x8a8f99), 0, 0, 0); sp.rotation.y = k * Math.PI * 2 / 5; sp.position.set(Math.cos(k * 1.2566) * .14, 0, Math.sin(k * 1.2566) * .14); sp.rotation.y = -k * 1.2566; wheel.add(sp); }
   } else if (W[i] === 16) { // 톱니바퀴
     const spin = new THREE.Group(); turn(spin); g.add(spin);
     const gear = new THREE.Group(); gear.rotation.y = wheelPhase; spin.add(gear); g.userData.spin = gear;
     gear.add(new THREE.Mesh(new THREE.CylinderGeometry(.38, .38, .3, 20), mat(0xc9a227)));
-    gear.add(new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .34, 10), mat(0x6b5a1e)));
+    gear.add(new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .34, 10), mat(0x6b5a1e))); thru(gear);
     for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, t = bx(.14, .3, .1, mat(0xb8921c), Math.cos(a) * .43, 0, Math.sin(a) * .43); t.rotation.y = -a; gear.add(t); }
   } else if (W[i] === 17) { // 톱니 기둥(랙): 땅에 박혀 움직이지 않아요
     bx(.26, 1, .26, mat(0x5d626b), 0, 0, 0, g);
@@ -556,7 +559,7 @@ function makeShaped(i) {
   } else if (W[i] === 18) { // 선풍기 날개
     const spin = new THREE.Group(); turn(spin); g.add(spin);
     const fan = new THREE.Group(); spin.add(fan); g.userData.spin = fan;
-    fan.add(new THREE.Mesh(new THREE.CylinderGeometry(.1, .1, .22, 12), mat(0xe8e8e8)));
+    fan.add(new THREE.Mesh(new THREE.CylinderGeometry(.1, .1, .22, 12), mat(0xe8e8e8))); thru(fan);
     for (let a = 0; a < 3; a++) { const bl = bx(.4, .03, .2, mat(0x4aa3ff), .27, 0, 0); bl.rotation.x = .4; const h = new THREE.Group(); h.rotation.y = a * Math.PI * 2 / 3; h.add(bl); fan.add(h); }
     const ring = new THREE.Mesh(new THREE.TorusGeometry(.48, .02, 4, 24), mat(0xbfc5cf)); ring.rotation.x = Math.PI / 2; spin.add(ring);
   } else { // 바퀴축: 노란 줄이 있어 도는 게 보여요
@@ -1648,7 +1651,7 @@ renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
 // 새 버전 확인: 브라우저가 예전 페이지를 기억해도(최대 10분) 새 버전이 있으면 알려 줘요. 진행 기록은 그대로예요
-const VERSION = "2026-11-02-drivetrain";
+const VERSION = "2026-11-02-drivetrain2";
 function checkVersion() {
   try { fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.text() : "").then(h => { const m = h.match(/const VERSION = "([^"]+)"/); if (m && m[1] !== VERSION) { $("newVer").hidden = false; $("newVerGo").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); } }).catch(() => {}); } catch (e) {}
 }
