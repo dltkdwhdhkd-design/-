@@ -52,6 +52,9 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 #mission .live:empty { display: none; }
 #mission .row { display: flex; gap: 6px; flex-wrap: wrap; }
 #mission .row button { border: 1px solid var(--line); background: #ffffff0d; border-radius: 8px; padding: 3px 10px; font-size: .85em; }
+.prods { display: flex; flex-wrap: wrap; gap: 4px; }
+.prods button { border: 1px solid var(--line); background: #ffffff0a; border-radius: 8px; padding: 2px 7px; font-size: .82em; color: var(--dim); }
+.prods button.ok { border-color: var(--good); color: var(--good); background: #6fe39a1a; }
 #hint { font-size: .9em; color: var(--ohm); line-height: 1.5; }
 #graph { width: 100%; height: 120px; background: #0006; border-radius: 8px; }
 
@@ -117,6 +120,7 @@ label.rng { display: grid; grid-template-columns: 7em 1fr 3em; gap: 8px; align-i
 #tTop button { position: static; border-radius: 10px; width: 64px; height: 40px; font-size: .8em; }
 @media (max-width: 900px), (max-height: 520px) {
   #tTop { top: calc(env(safe-area-inset-top, 0px) + 8px); display: flex; }
+  body.touch #mission { max-height: max(120px, calc(100vh - 240px)); overflow-y: auto; pointer-events: auto; }
   #tTop button { width: 54px; height: 36px; }
   body.touch #probe { top: calc(env(safe-area-inset-top, 0px) + 52px); bottom: auto; left: 50%; right: auto; transform: translateX(-50%); width: 210px; font-size: .8em; padding: 6px 10px; }
   body.touch #probe .f { display: none; }
@@ -174,7 +178,7 @@ body.touch #keysHelp { display: none; }
     <h2>이야기 모드: 정전된 마을 살리기</h2>
     <div class="levels" id="lvGrid"></div>
     <div class="rowb">
-      <button class="btn big" id="bSandbox">🔧 자유 실험실</button>
+      <button class="btn big" id="bSandbox">🔧 발명 공방 (자유 실험실)</button>
       <button class="btn ghost big" id="bNotes0">📘 개념 노트</button>
       <button class="btn ghost big" id="bSet0">⚙ 설정</button>
     </div>
@@ -255,7 +259,7 @@ const $ = (id) => document.getElementById(id);
 const BL = {
   1: { n: "풀", t: [0, 1, 2] }, 2: { n: "흙", t: [2, 2, 2] }, 3: { n: "돌", t: [3, 3, 3] }, 4: { n: "나무판", t: [4, 4, 4] },
   5: { n: "통나무", t: [6, 5, 6] }, 6: { n: "벽돌", t: [7, 7, 7] }, 7: { n: "유리", t: [8, 8, 8], see: true }, 8: { n: "흰 벽", t: [9, 9, 9] },
-  9: { n: "지붕", t: [10, 10, 10] }, 10: { n: "나뭇잎", t: [11, 11, 11], see: true }, 11: { n: "바닥돌", t: [12, 12, 12], hard: true }, 12: { n: "고무 매트", t: [13, 13, 13] },
+  9: { n: "지붕", t: [10, 10, 10] }, 10: { n: "나뭇잎", t: [11, 11, 11], see: true }, 11: { n: "바닥돌", t: [12, 12, 12], hard: true }, 12: { n: "고무 매트", t: [13, 13, 13] }, 13: { n: "철 블록", t: [14, 14, 14], iron: true }, 14: { n: "바퀴", t: [15, 15, 15] },
 };
 // R: 저항(Ω). 전지는 전압 V와 내부 저항 r. 전선은 거의 0Ω(0.01Ω)
 const PT = {
@@ -267,10 +271,17 @@ const PT = {
   25: { n: "스위치", k: "sw", d: "오른쪽 클릭으로 열고 닫아요. 열리면 회로가 끊겨요." },
   26: { n: "전류계", k: "amm", R: 0.01, max: 3, d: "회로에 직렬로 끼워 전류(A)를 재요. 빨간 단자가 (+)." },
   27: { n: "전압계", k: "vm", R: 1e6, d: "재고 싶은 부품의 양 끝에 병렬로 대어 전압(V)을 재요. 빨간 단자가 (+)." },
-  28: { n: "전동기(선풍기)", k: "mot", R: 4, d: "저항 4Ω. 전류가 셀수록 빨리 돌고, 전류 방향을 바꾸면 반대로 돌아요." },
+  28: { n: "전동기(선풍기)", k: "mot", R: 4, d: "저항 4Ω. 전류가 셀수록 빨리 돌고, 전류 방향을 바꾸면 반대로 돌아요. 그냥 놓으면 위로 바람을 보내는 선풍기, 바퀴 블록과 붙어 있으면 자동차처럼 굴러가고(전류 방향을 바꾸면 후진), 위아래로 세우면(R) 엘리베이터처럼 붙은 블록을 통째로 올리고 내려요." },
   29: { n: "퓨즈 2A", k: "fuse", R: 0.01, max: 2, d: "전류가 2A를 넘으면 끊어져 회로를 지켜요. 오른쪽 클릭으로 새 퓨즈로 갈아요." },
   30: { n: "버저", k: "buz", R: 10, d: "저항 10Ω. 전류가 흐르면 삐 소리가 나요. 전류가 셀수록 크고 높아요." },
+  31: { n: "가변 저항", k: "var", R: 10, d: "오른쪽 클릭으로 저항을 2→5→10→20Ω으로 바꿔요. 밝기·속도 조절기의 원리예요." },
+  32: { n: "빨간 전구", k: "bulb", R: 5, col: 0xff5040, d: "저항 5Ω. 빨간빛을 내요." },
+  33: { n: "노란 전구", k: "bulb", R: 5, col: 0xffc830, d: "저항 5Ω. 노란빛을 내요." },
+  34: { n: "초록 전구", k: "bulb", R: 5, col: 0x40ff70, d: "저항 5Ω. 초록빛을 내요." },
+  35: { n: "전열선", k: "heat", R: 2, d: "저항 2Ω. 전기 에너지를 열로 바꿔요. 전력(전압×전류)이 클수록 빨갛게 달아올라요. 토스터·전기난로의 원리." },
+  36: { n: "전자석", k: "mag", R: 3, d: "저항 3Ω. 코일에 전류가 흐르면 자석이 돼요. 전류가 셀수록 세져서 아래쪽 더 먼 곳의 철 블록까지 끌어당겨요." },
 };
+const VAR_R = [2, 5, 10, 20];
 const isPart = (id) => id >= 21 && !!PT[id];
 const isCond = (id) => id >= 20 && !!PT[id];
 const isSolid = (id) => id > 0 && id < 20;
@@ -281,7 +292,7 @@ const G_WIRE = 1000; // 전선 이음 0.001Ω
 
 /* ═════════════ 세계 ═════════════ */
 const SX = 48, SY = 24, SZ = 48, NN = SX * SY * SZ;
-const W = new Uint8Array(NN), ORI = new Uint8Array(NN), LOCK = new Uint8Array(NN), FL = new Uint8Array(NN);
+const W = new Uint8Array(NN), ORI = new Uint8Array(NN), LOCK = new Uint8Array(NN), FL = new Uint8Array(NN), VAL = new Uint8Array(NN); // VAL: 가변 저항 단계
 // FL: 1 스위치 닫힘, 2 망가짐(전구·퓨즈·전류계), 4 전지 과열(합선)
 const ix = (x, y, z) => x + SX * (z + SZ * y);
 const inb = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < SX && y < SY && z < SZ;
@@ -323,7 +334,9 @@ const atlasC = document.createElement("canvas"); atlasC.width = TILE * ATN; atla
   fillN(10, "#8e3b2c", .14, 11); for (let y = 3; y < 16; y += 4) for (let x = 0; x < 16; x++) px(10, x, y, "#5e241a");
   g.clearRect(11 * TILE, 0, TILE, TILE); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (hash(x, y, 12) > .22) px(11, x, y, shade("#3f8a3a", (hash(x, y, 13) - .5) * .5));
   fillN(12, "#55585f", .3, 14);
-  fillN(13, "#2a2c33", .12, 15); for (let y = 2; y < 16; y += 4) for (let x = 0; x < 16; x++) px(13, x, y, "#3a3d46");
+  fillN(14, "#a3acb8", .07, 16); for (let k = 0; k < 16; k++) { px(14, k, 0, "#7d8692"); px(14, 0, k, "#7d8692"); px(14, k, 15, "#6a727d"); px(14, 15, k, "#6a727d"); } [[3, 3], [12, 3], [3, 12], [12, 12]].forEach(([a, b]) => px(14, a, b, "#5b636e"));
+  fillN(13, "#2a2c33", .12, 15);
+  fillN(15, "#1d1e22", .1, 17); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7.5); if (d < 4.2) px(15, x, y, d < 1.6 ? "#e2e4ea" : "#a9adb6"); else if (d > 7.2) px(15, x, y, "#0d0d10"); } for (let y = 2; y < 16; y += 4) for (let x = 0; x < 16; x++) px(13, x, y, "#3a3d46");
 })();
 const atlasTex = new THREE.CanvasTexture(atlasC); atlasTex.magFilter = THREE.NearestFilter; atlasTex.minFilter = THREE.NearestFilter;
 const terrMat = new THREE.MeshLambertMaterial({ map: atlasTex, vertexColors: true, alphaTest: .5 });
@@ -401,11 +414,11 @@ function makePart(id, i) {
     bx(.1, .22, .22, mat(COPPER), .45, 0, 0, g); bx(.1, .22, .22, mat(COPPER), -.45, 0, 0, g);
     cylX(.025, .7, mat(0x555555), 0, -.18, 0, g, 6);
     const base = new THREE.Mesh(new THREE.CylinderGeometry(.13, .13, .16, 14), mat(0xaaaaaa)); base.position.y = -.22; g.add(base);
-    const glass = new THREE.Mesh(new THREE.SphereGeometry(.24, 18, 14), new THREE.MeshBasicMaterial({ color: 0x777766, transparent: true, opacity: .55 }));
+    const glass = new THREE.Mesh(new THREE.SphereGeometry(.24, 18, 14), new THREE.MeshBasicMaterial({ color: PT[id].col ? new THREE.Color(PT[id].col).multiplyScalar(.45) : 0x777766, transparent: true, opacity: .55 }));
     glass.position.y = .06; g.add(glass); u.glass = glass;
     const fil = bx(.14, .03, .03, new THREE.MeshBasicMaterial({ color: fl & 2 ? 0x222222 : 0x885522 }), 0, .02, 0, g); u.fil = fil;
     if (fl & 2) { fil.scale.x = .4; fil.position.x = .05; glass.material.color.setHex(0x333333); }
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffd47a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: PT[id].col || 0xffd47a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
     halo.position.y = .06; g.add(halo); u.halo = halo;
   } else if (k === "res") {
     cylX(.03, .9, mat(0xbbbbbb), 0, 0, 0, g, 6); terminals(g);
@@ -443,6 +456,22 @@ function makePart(id, i) {
     cylX(.125, .08, mat(0xbbbbbb), .33, 0, 0, g); cylX(.125, .08, mat(0xbbbbbb), -.33, 0, 0, g);
     if (fl & 2) { cylX(.015, .2, mat(0x222222), -.2, 0, 0, g, 5); cylX(.015, .2, mat(0x222222), .2, 0, 0, g, 5); }
     else cylX(.015, .62, mat(0xeeeeee), 0, 0, 0, g, 5);
+  } else if (k === "var") {
+    bx(.96, .12, .5, mat(0x3a3f4a), 0, -.34, 0, g); terminals(g);
+    cylX(.03, .9, mat(0xbbbbbb), 0, -.12, 0, g, 6);
+    bx(.7, .2, .3, mat(0x6a4a2a), 0, -.18, 0, g);
+    for (let a = -.3; a <= .31; a += .05) bx(.02, .21, .31, mat(0xb08850), a, -.18, 0, g);
+    const kn = bx(.1, .22, .36, mat(0xd8342c), -.3 + .2 * VAL[i], .0, 0, g); bx(.06, .1, .06, mat(0x222222), kn.position.x, .14, 0, g);
+  } else if (k === "heat") {
+    bx(.96, .12, .5, mat(0xe9e1cf), 0, -.34, 0, g); terminals(g);
+    const cm = new THREE.MeshLambertMaterial({ color: 0x6b6b70, emissive: 0x000000 }); u.coil = cm;
+    for (let a = -.36; a <= .36; a += .08) { const z = (Math.round((a + .36) / .08) % 2 ? .16 : -.16); bx(.03, .03, .36, cm, a, -.18, 0, g); bx(.08, .03, .03, cm, a + .04, -.18, z, g); }
+    bx(.03, .2, .03, cm, -.42, -.08, 0, g); bx(.03, .2, .03, cm, .42, -.08, 0, g);
+  } else if (k === "mag") {
+    terminals(g);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(.14, .14, .9, 14), new THREE.MeshLambertMaterial({ color: 0x8b929c, emissive: 0x000000 })); core.position.y = 0; g.add(core); u.core = core.material;
+    for (let a = -.3; a <= .31; a += .06) { const r = new THREE.Mesh(new THREE.TorusGeometry(.17, .035, 5, 14), mat(COPPER)); r.rotation.x = Math.PI / 2; r.position.y = a; g.add(r); }
+    cylX(.03, .9, mat(COPPER), 0, .32, 0, g, 6);
   } else if (k === "buz") {
     terminals(g); cylX(.03, .9, mat(0x777777), 0, -.15, 0, g, 6);
     const d = new THREE.Mesh(new THREE.CylinderGeometry(.26, .28, .25, 18), mat(0x222428)); d.position.y = -.1; g.add(d);
@@ -459,7 +488,7 @@ function labelSprite() {
 function setLabel(s, txt, col) {
   const u = s.userData; if (u.txt === txt + col) return; u.txt = txt + col;
   const g = u.c.getContext("2d"); g.clearRect(0, 0, 192, 64); g.fillStyle = "#0b0f1ecc"; g.beginPath(); g.roundRect ? g.roundRect(2, 2, 188, 60, 14) : g.rect(2, 2, 188, 60); g.fill();
-  g.fillStyle = col; g.font = "700 38px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, 96, 34); u.t.needsUpdate = true;
+  g.fillStyle = col; let fs = 38; g.font = `700 ${fs}px sans-serif`; while (g.measureText(txt).width > 176 && fs > 14) { fs -= 2; g.font = `700 ${fs}px sans-serif`; } g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, 96, 34); u.t.needsUpdate = true;
 }
 function orient(o, d) {
   o.rotation.set(0, 0, 0);
@@ -496,15 +525,18 @@ function rebuildAllParts() { partObj.forEach((o) => partGroup.remove(o)); partOb
 // 칸 i의 k 방향 면이 전기를 주고받는 단자인지. 전선은 여섯 면 모두, 부품은 양 끝 두 면만
 function termAt(i, k) { const b = W[i]; if (b === 20) return true; if (!isPart(b)) return false; return ORI[i] === k || (ORI[i] ^ 1) === k; }
 let RES = null; // 마지막 계산 결과
-function partEdge(i, open) {
-  // 부품 안쪽 길: g(전도도 = 1/R), s(전지가 A→B로 밀어 주는 전류)
+const lifted = new Set(); // 전자석이 들어 올린 철 블록 칸
+const rOf = (i, rOver) => PT[W[i]].k === "var" ? (rOver && rOver.has(i) ? rOver.get(i) : VAR_R[VAL[i] & 3]) : PT[W[i]].R;
+function partEdge(i, open, rOver) {
+  // 부품 안쪽 길: g(전도도 = 1/R), s(전지가 A→B로 밀어 주는 전류). open: 끊어 보고 싶은 부품들(확인용)
   const P = PT[W[i]], f = FL[i];
+  if (open && open.has(i)) return null;
   if (P.k === "bat") return f & 4 ? null : { g: 1 / P.r, s: P.V / P.r };
   if (P.k === "sw") return (f & 1) && !(open && open.has(i)) ? { g: G_WIRE, s: 0 } : null;
   if (f & 2) return null; // 망가진 전구·퓨즈·전류계는 끊긴 길
-  return { g: 1 / P.R, s: 0 };
+  return { g: 1 / rOf(i, rOver), s: 0 };
 }
-function solve(open) {
+function solve(open, rOver) {
   const nodeA = new Int32Array(NN).fill(-1), nodeB = new Int32Array(NN).fill(-1); // 전선은 A만 사용
   const pos = [], cells = []; let n = 0;
   for (let i = 0; i < NN; i++) {
@@ -523,7 +555,7 @@ function solve(open) {
       const a = nodeOf(i, k), b = nodeOf(j, k ^ 1); if (a < 0 || b < 0) continue;
       E.push({ a, b, g: G_WIRE, s: 0, cell: -1, wi: W[i] === 20 ? i : -1, wj: W[j] === 20 ? j : -1 });
     }
-    if (W[i] !== 20) { const pe = partEdge(i, open); if (pe) E.push({ a: nodeA[i], b: nodeB[i], g: pe.g, s: pe.s, cell: i }); }
+    if (W[i] !== 20) { const pe = partEdge(i, open, rOver); if (pe) E.push({ a: nodeA[i], b: nodeB[i], g: pe.g, s: pe.s, cell: i }); }
   }
   // 이어진 덩어리 나누기
   const par = new Int32Array(n); for (let k = 0; k < n; k++) par[k] = k;
@@ -600,7 +632,9 @@ function recompute() {
   for (const [what, i] of news) { rebuildPart(i); accident(what, i); }
   if (r.tooBig) toast("회로가 너무 커서 계산을 쉬어요. 마디를 900개보다 적게 만들어 주세요.", 2400, "bad");
   applyVisuals();
+  magTick();
   if (LV) goalTick(true);
+  if (mode === "sandbox" && !solveDirty) productTick();
 }
 function accident(what, i) {
   const x = cx(i) + .5, y = cy(i) + .5, z = cz(i) + .5;
@@ -608,6 +642,139 @@ function accident(what, i) {
   else if (what === "fuse") { if (LV) LV.blown = true; sparks(x, y, z, 0xffcc55, 20); sfx.pop(); toast("퓨즈가 끊어졌어요! 2A보다 센 전류가 흘렀어요.\n전기 기구를 줄이고 오른쪽 클릭으로 퓨즈를 갈아요.", 3200, "bad"); }
   else if (what === "amm") { sparks(x, y, z, 0xffffff, 18); sfx.pop(); toast("전류계가 고장 났어요! 너무 센 전류(3A 넘음)가 흘렀어요.\n전류계는 꼭 전구와 '직렬'로 끼워야 해요. (오른쪽 클릭: 고치기)", 3600, "bad"); stats.acc++; }
   else if (what === "bat") { sparks(x, y, z, 0xff7a3a, 30); smoke(x, y, z); sfx.fizz(); toast("합선! 전구나 저항을 거치지 않는 지름길로 전류가 한꺼번에 흘러 전지가 뜨거워졌어요.\n지름길 전선을 빼면 다시 작동해요.", 4000, "bad"); stats.acc++; }
+}
+
+/* ═════════════ 전자석: 전류가 셀수록 아래쪽 먼 철 블록까지 끌어당겨요 ═════════════ */
+const magReach = (I) => Math.min(5, Math.floor(Math.abs(I) * 4)); // 0.5A → 2칸, 1A → 4칸
+function moveBlock(a, b) { W[b] = W[a]; W[a] = 0; rebuildAround(cx(a), cz(a)); if (cx(a) !== cx(b) || cz(a) !== cz(b)) rebuildAround(cx(b), cz(b)); solveDirty = true; }
+function magTick() {
+  if (!RES) return; let clank = false;
+  for (const [i] of RES.part) {
+    if (W[i] !== 36 || (FL[i] & 2)) continue;
+    const x = cx(i), y = cy(i), z = cz(i), reach = magReach(pv(i).i); if (y < 1 || reach < 1) continue;
+    const below = ix(x, y - 1, z);
+    if (W[below] === 13) { lifted.add(below); continue; }
+    if (W[below] !== 0) continue;
+    for (let d = 2; d <= reach + 1 && y - d >= 0; d++) { const j = ix(x, y - d, z); if (W[j] === 13) { moveBlock(j, below); lifted.add(below); clank = true; break; } if (W[j] !== 0) break; }
+  }
+  for (const j of [...lifted]) {
+    if (W[j] !== 13) { lifted.delete(j); continue; }
+    const up = cy(j) + 1 < SY ? ix(cx(j), cy(j) + 1, cz(j)) : -1;
+    if (up >= 0 && W[up] === 36 && !(FL[up] & 2) && Math.abs(pv(up).i) >= .2) continue;
+    lifted.delete(j); let y = cy(j); while (y - 1 >= 0 && W[ix(cx(j), y - 1, cz(j))] === 0) y--;
+    if (y !== cy(j)) { moveBlock(j, ix(cx(j), y, cz(j))); sfx.brk(); }
+  }
+  if (clank) { sfx.clank(); if (mode === "sandbox") sbT = 1.5; }
+}
+
+/* ═════════════ 움직이는 기계: 자동차·엘리베이터·선풍기 바람 ═════════════ */
+// 전동기에 붙어 있는 블록 덩어리(땅 위)를 통째로 한 칸씩 옮겨요. 전류가 셀수록 빨리(초당 칸 = 전류 × 3)
+const machAcc = new Map(), mstat = { car: 0, carAt: -1, lift: 0, liftAt: -1, ride: 0, rideAt: -1 };
+let fans = []; // 바람: {i, I}
+function structOf(start, cap = 400) {
+  const seen = new Set([start]), q = [start];
+  while (q.length) { const c = q.pop(), x = cx(c), y = cy(c), z = cz(c);
+    for (const [dx, dy, dz] of DIRS) { const X = x + dx, Y = y + dy, Z = z + dz; if (!inb(X, Y, Z) || Y < GY) continue; const j = ix(X, Y, Z); if (!W[j] || seen.has(j) || (BL[W[j]] && BL[W[j]].hard)) continue; seen.add(j); q.push(j); if (seen.size > cap) return null; } }
+  return seen;
+}
+const below = (c) => cy(c) > 0 ? c - SX * SZ : -1;
+function shiftStruct(S, d) {
+  const [dx, dy, dz] = DIRS[d], off = dx + SX * dz + SX * SZ * dy;
+  for (const c of S) { const X = cx(c) + dx, Y = cy(c) + dy, Z = cz(c) + dz; if (!inb(X, Y, Z) || Y < GY) return false; const j = c + off; if (!S.has(j) && W[j]) return false; }
+  const foot = ix(Math.floor(player.x), Math.floor(player.y - .01), Math.floor(player.z)), riding = player.ground && S.has(foot);
+  const data = [...S].map(c => [c, W[c], ORI[c], FL[c], VAL[c], LOCK[c], lifted.has(c), machAcc.get(c)]);
+  for (const [c] of data) { W[c] = 0; lifted.delete(c); machAcc.delete(c); }
+  for (const [c, b, o, f, v, l, lf, ma] of data) { const j = c + off; W[j] = b; ORI[j] = o; FL[j] = f; VAL[j] = v; LOCK[j] = l; if (lf) lifted.add(j); if (ma != null) machAcc.set(j, ma); }
+  for (const [c] of data) { ORI[c] = W[c] ? ORI[c] : 0; }
+  const keys = new Set();
+  for (const [c] of data) for (const k of [c, c + off]) { rebuildPart(k); for (const [ax, az] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = cx(k) + ax, Z = cz(k) + az; if (X >= 0 && Z >= 0 && X < SX && Z < SZ) keys.add(Math.floor(X / CH) + "," + Math.floor(Z / CH)); } }
+  keys.forEach(k => { const [a, b] = k.split(",").map(Number); buildChunk(a, b); });
+  if (riding || hits(player.x, player.y, player.z)) { player.x += dx; player.y += dy; player.z += dz; }
+  solveDirty = true; sbT = 1.5; return true;
+}
+function machineTick(dt) {
+  fans = []; if (mode !== "sandbox" || !RES || solveDirty) return;
+  for (const m of cellsOf("mot")) {
+    const I = pv(m).i; if (Math.abs(I) < .3 || (FL[m] & 2)) { machAcc.delete(m); continue; }
+    const d0 = ORI[m], vert = d0 === 2 || d0 === 3, S = structOf(m); if (!S) continue;
+    const wheels = vert ? [] : [...S].filter(c => W[c] === 14 && below(c) >= 0 && isSolid(W[below(c)]) && !S.has(below(c)));
+    if (!vert && !wheels.length) { fans.push({ i: m, I: Math.abs(I) }); continue; }
+    const a = (machAcc.get(m) || 0) + dt * Math.min(4, Math.abs(I) * 3); if (a < 1) { machAcc.set(m, a); continue; }
+    machAcc.set(m, 0);
+    const d = I > 0 ? d0 : d0 ^ 1, [dx, , dz] = DIRS[d];
+    if (!vert && !wheels.every(w => { const j = below(w) + dx + SX * dz; return inb(cx(w) + dx, cy(w) - 1, cz(w) + dz) && (isSolid(W[j]) && !S.has(j)); })) continue; // 낭떠러지에선 멈춰요
+    const off = DIRS[d][0] + SX * DIRS[d][2] + SX * SZ * DIRS[d][1];
+    if (shiftStruct(S, d)) { sfx.step(); if (vert) { if (d === 2) { mstat.lift++; mstat.liftAt = m + off; } } else { mstat.car++; mstat.carAt = m + off; } }
+    break; // 칸 번호가 바뀌었으니 다음 번에 다시
+  }
+}
+// 선풍기 바람: 위로 불어요. 전류가 셀수록 높이·세기가 커져요
+let windY = 0;
+function windTick(dt) {
+  windY = 0;
+  for (const f of fans) {
+    const x = cx(f.i) + .5, y = cy(f.i) + .5, z = cz(f.i) + .5, reach = Math.min(9, 2 + f.I * 6);
+    if (Math.random() < dt * 14) sparks(x + (Math.random() - .5) * .6, y + .4, z + (Math.random() - .5) * .6, 0xdff4ff, 1);
+    if (Math.abs(player.x - x) < 1 && Math.abs(player.z - z) < 1 && player.y > y - 1 && player.y < y + reach) { windY = Math.max(windY, 20 + 14 * Math.min(1.5, f.I)); if (player.y > y + 1.5) { mstat.ride = Math.max(mstat.ride, player.y - y); mstat.rideAt = f.i; } }
+  }
+  fx.forEach(e => { if (e.m.material.color && e.m.material.color.getHex() === 0xdff4ff) { e.v.set(0, 5, 0); e.g = 0; } });
+}
+
+/* ═════════════ 발명 공방: 회로로 전기 제품 만들기 ═════════════ */
+// 지금 '작동 중'인지: 전구는 밝기 0.3배 넘게, 전동기 0.3A, 버저 0.1W, 전열선 3W, 전자석 0.4A
+const RUN = { bulb: (p) => (p.v * p.v / 5) / BULB_REF > .3, mot: (p) => Math.abs(p.i) > .3, buz: (p) => Math.abs(p.v * p.i) > .1, heat: (p) => Math.abs(p.v * p.i) >= 3, mag: (p) => Math.abs(p.i) >= .4 };
+function running(i, part) { const P = PT[W[i]]; if (!P || !RUN[P.k] || (FL[i] & 2)) return false; const p = (part || (RES && RES.part) || new Map()).get(i); return !!p && RUN[P.k](p); }
+const DEV_K = Object.keys(RUN);
+let PX = null; // 확인용 계산 모음
+function ctrlBy(i) { return PX.closed.filter(s => !running(i, PX.off.get(s))); } // 열면 i가 꺼지는 스위치들
+function varEffect(i, f) { // 가변 저항을 2Ω↔20Ω으로 바꾸면 i의 값이 달라지는지
+  return cellsOf("var").some(v => { const a = solve(null, new Map([[v, 2]])).part.get(i), b = solve(null, new Map([[v, 20]])).part.get(i); return a && b && Math.abs(f(a)) > 1.4 * Math.abs(f(b)) + .005; });
+}
+const devices = () => DEV_K.flatMap(k => cellsOf(k)).filter(i => running(i));
+const PRODUCTS = [
+  { id: "car", e: "🚗", n: "전기 자동차", en: "운동", how: "바퀴 블록을 땅에 2개 이상 놓고, 그 위에 나무판 등으로 차체를 붙여요. 차체 위에 전지·스위치·전동기 회로를 실어요. 전동기를 눕혀 두면 전동기가 향한 쪽(R로 돌려요)으로 굴러가요. 전지를 늘리면 빨라지고, 전지를 뒤집어 전류 방향을 바꾸면 후진!",
+    ok: () => mstat.car >= 4 && W[mstat.carAt] === 28 ? mstat.carAt : null },
+  { id: "lift", e: "🛗", n: "엘리베이터", en: "운동", how: "나무판으로 발판을 만들고 회로를 실어요. 전동기를 위아래로 세우면(R) 붙어 있는 블록이 통째로 올라가요. 발판에 올라타 봐요! 전지 방향을 바꾸면 내려가요.",
+    ok: () => mstat.lift >= 3 && W[mstat.liftAt] === 28 ? mstat.liftAt : null },
+  { id: "wind", e: "🌬", n: "바람 타기 선풍기", en: "운동", how: "전동기를 바퀴 없이 눕혀 놓으면 위로 바람을 보내요. 전류를 세게(전지 여러 개) 해서 선풍기 위에 서면 둥실 떠올라요.",
+    ok: () => mstat.ride >= 1.6 && W[mstat.rideAt] === 28 ? mstat.rideAt : null },
+  { id: "torch", e: "🔦", n: "손전등", en: "빛", how: "전지 2개를 직렬로 잇고, 스위치와 전구를 한 고리로. 전구 전압이 2.6V를 넘게, 스위치로 켜고 꺼요.",
+    ok: () => cellsOf("bulb").find(i => running(i) && Math.abs(pv(i).v) > 2.6 && ctrlBy(i).length) },
+  { id: "bell", e: "🔔", n: "초인종", en: "소리", how: "전지 + 스위치(누름 단추) + 버저를 한 고리로.",
+    ok: () => cellsOf("buz").find(i => running(i) && ctrlBy(i).length) },
+  { id: "fan", e: "🌀", n: "속도 조절 선풍기", en: "운동", how: "전동기와 가변 저항을 직렬로 잇고 스위치를 달아요. 가변 저항(오른쪽 클릭)을 바꾸면 선풍기 속도가 바뀌어요.",
+    ok: () => cellsOf("mot").find(i => running(i) && ctrlBy(i).length && varEffect(i, p => p.i)) },
+  { id: "lamp", e: "🛋", n: "밝기 조절 스탠드", en: "빛", how: "전구와 가변 저항을 직렬로. 저항을 크게 하면 전류가 줄어 어두워져요.",
+    ok: () => cellsOf("bulb").find(i => running(i) && varEffect(i, p => p.v * p.i)) },
+  { id: "toast", e: "🍞", n: "토스터", en: "열", how: "전열선에 3W 넘는 전력(전압 × 전류)이 걸리게 전지를 여러 개 직렬로 이어요. 스위치로 켜고 꺼요.",
+    ok: () => cellsOf("heat").find(i => running(i) && ctrlBy(i).length) },
+  { id: "crane", e: "🧲", n: "전자석 기중기", en: "자기", how: "전자석 바로 아래 몇 칸 떨어진 곳에 철 블록을 두고, 스위치로 전류를 흘려 들어 올려요. 전류가 셀수록 더 멀리서 끌어당겨요.",
+    ok: () => cellsOf("mag").find(i => cy(i) > 0 && lifted.has(ix(cx(i), cy(i) - 1, cz(i))) && ctrlBy(i).length) },
+  { id: "signal", e: "🚦", n: "신호등", en: "빛", how: "빨강·노랑·초록 전구를 병렬로 잇고 전구마다 자기 스위치를 달아요. 셋을 모두 켜 두면, 스위치마다 자기 전구만 끄는지 확인해요.",
+    ok: () => { const pick = [32, 33, 34].map(id => cellsOf("bulb").filter(i => W[i] === id && running(i))); if (pick.some(a => !a.length)) return null; const all = pick.flat();
+      for (const grp of pick) if (!grp.some(i => PX.closed.some(s => { const P = PX.off.get(s); return !running(i, P) && all.filter(j => W[j] !== W[i]).every(j => running(j, P)); }))) return null; return pick[1][0]; } },
+  { id: "alarm", e: "🚨", n: "도난 경보기", en: "소리 + 빛", how: "스위치 하나로 버저와 전구가 함께 켜지고 꺼지게(버저와 전구를 병렬로).",
+    ok: () => { for (const s of PX.closed) { const P = PX.off.get(s); const bz = cellsOf("buz").find(i => running(i) && !running(i, P)), bl = cellsOf("bulb").find(i => running(i) && !running(i, P)); if (bz != null && bl != null) return bz; } return null; } },
+  { id: "tap", e: "🔌", n: "안전 멀티탭", en: "여러 기구", how: "퓨즈를 지나 전기 기구 3개 이상(전구·선풍기·버저·전열선…)을 병렬로 켜요. 퓨즈가 끊어지지 않게 기구를 골라요.",
+    ok: () => cellsOf("fuse").find(f => { if (FL[f] & 2) return false; const P = solve(new Set([f])).part; return devices().filter(i => !running(i, P)).length >= 3; }) },
+  { id: "tree", e: "🎄", n: "장식 전구줄", en: "빛", how: "전구 4개 이상을 한 줄(직렬)로 이어 모두 켜요. 전지를 넉넉히 직렬로.",
+    ok: () => { const L = cellsOf("bulb").filter(lit); for (const b of L) { const P = solve(new Set([b])).part; const grp = L.filter(j => j !== b && lit(j) && !((P.get(j) || { v: 0 }).v ** 2 / 5 / BULB_REF > .07)); if (grp.length >= 3) return b; } return null; } },
+];
+const prodLabels = new THREE.Group(); scene.add(prodLabels);
+function productTick() {
+  if (!RES || RES.cells.length > 600) return;
+  const closed = cellsOf("sw").filter(i => FL[i] & 1).slice(0, 16);
+  PX = { closed, off: new Map(closed.map(s => [s, solve(new Set([s])).part])) };
+  prodLabels.children.slice().forEach(o => prodLabels.remove(o));
+  PROG.made = PROG.made || {}; let fresh = null;
+  for (const P of PRODUCTS) {
+    let at = null; try { at = P.ok(); } catch (e) { at = null; }
+    if (at == null || at === false) continue;
+    const lab = labelSprite(); lab.scale.set(1.8, .6, 1); setLabel(lab, P.e + " " + P.n, "#ffffff"); lab.position.set(cx(at) + .5, cy(at) + 1.6, cz(at) + .5); prodLabels.add(lab);
+    if (!PROG.made[P.id]) { PROG.made[P.id] = true; fresh = P; }
+  }
+  if (fresh) { saveProg(); sfx.win(); toast(`🎉 발명 완성: ${fresh.e} ${fresh.n}!\n전기 에너지 → ${fresh.en} 에너지`, 3200, "good"); }
+  renderMission();
 }
 
 /* ═════════════ 보이는 효과: 전구 밝기·선풍기·계기·전류 점 ═════════════ */
@@ -619,13 +786,15 @@ function applyVisuals() {
   for (const [i, pv] of RES.part) {
     const o = partObj.get(i); if (!o) continue; const P = PT[W[i]], u = o.userData;
     if (P.k === "bulb") {
-      const b = (FL[i] & 2) ? 0 : (pv.v * pv.v / P.R) / BULB_REF; u.b = b;
+      const b = (FL[i] & 2) ? 0 : (pv.v * pv.v / P.R) / BULB_REF; u.b = b; const lc = P.col || 0xfff4c8;
       const s = Math.min(1.8, Math.sqrt(b));
-      if (u.glass) { const c = new THREE.Color(0x666655).lerp(new THREE.Color(0xfff4c8), Math.min(1, s)); u.glass.material.color.copy(c); u.glass.material.opacity = .55 + .4 * Math.min(1, s); }
+      if (u.glass) { const c = new THREE.Color(P.col ? new THREE.Color(P.col).multiplyScalar(.45) : 0x666655).lerp(new THREE.Color(lc), Math.min(1, s)); u.glass.material.color.copy(c); u.glass.material.opacity = .55 + .4 * Math.min(1, s); }
       if (u.fil && !(FL[i] & 2)) u.fil.material.color.setHex(s > .05 ? 0xffffff : 0x885522);
       if (u.halo) { u.halo.material.opacity = Math.min(1, s * .9); const sc = .4 + 1.6 * s; u.halo.scale.set(sc, sc, 1); }
-      if (b > .02) bulbs.push({ i, b });
+      if (b > .02) bulbs.push({ i, b, col: P.col || 0xffd890 });
     }
+    if (P.k === "heat" && u.coil) { const w = Math.abs(pv.v * pv.i), t = Math.min(1, w / 4.5); u.coil.color.setHex(0x6b6b70).lerp(new THREE.Color(0xff5a1a), t); u.coil.emissive.setHex(0xff3300).multiplyScalar(t * .9); if (t > .3) bulbs.push({ i, b: t * .5, col: 0xff6a2a }); }
+    if (P.k === "mag" && u.core) { const t = Math.min(1, Math.abs(pv.i) / 1.2); u.core.emissive.setHex(0x3a7bff).multiplyScalar(t * .6); }
     if (u.label) {
       if (P.k === "amm") setLabel(u.label, FL[i] & 2 ? "고장" : fmt(pv.i, 2) + " A", pv.i < -.005 ? "#ff9a9a" : "#ffd65a");
       else setLabel(u.label, fmt(pv.v, 2) + " V", pv.v < -.005 ? "#ff9a9a" : "#ff8a5c");
@@ -686,7 +855,7 @@ function liveTick(dt, t) {
   // 가까운 밝은 전구에 진짜 빛 넣기
   const px = player.x, py = player.y, pz = player.z;
   const cand = bulbs.map(b => ({ b, d: Math.hypot(cx(b.i) + .5 - px, cy(b.i) - py, cz(b.i) + .5 - pz) })).sort((a, b) => a.d - b.d);
-  LIGHTS.forEach((l, k) => { const c = cand[k]; if (!c) { l.intensity = 0; return; } const i = c.b.i; l.position.set(cx(i) + .5, cy(i) + .6, cz(i) + .5); const s = Math.min(1.8, Math.sqrt(c.b.b)); l.intensity = 1.6 * s; l.distance = 6 + 6 * Math.min(1.5, s); });
+  LIGHTS.forEach((l, k) => { const c = cand[k]; if (!c) { l.intensity = 0; return; } const i = c.b.i; l.position.set(cx(i) + .5, cy(i) + .6, cz(i) + .5); const s = Math.min(1.8, Math.sqrt(c.b.b)); l.color.setHex(c.b.col); l.intensity = 1.6 * s; l.distance = 6 + 6 * Math.min(1.5, s); });
 }
 
 /* ═════════════ 파편·연기 ═════════════ */
@@ -717,7 +886,7 @@ function setSky(n) {
 
 /* ═════════════ 세계 만들기 ═════════════ */
 const GY = 4; // 땅 위 첫 칸
-function clearWorld() { W.fill(0); ORI.fill(0); LOCK.fill(0); FL.fill(0); for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) { W[ix(x, 0, z)] = 11; W[ix(x, 1, z)] = 3; W[ix(x, 2, z)] = 2; W[ix(x, 3, z)] = 1; } }
+function clearWorld() { W.fill(0); ORI.fill(0); LOCK.fill(0); FL.fill(0); VAL.fill(0); lifted.clear(); for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) { W[ix(x, 0, z)] = 11; W[ix(x, 1, z)] = 3; W[ix(x, 2, z)] = 2; W[ix(x, 3, z)] = 1; } }
 function put(x, y, z, id, d = 0, lock = true, fl = 0) { if (!inb(x, y, z)) return -1; const i = ix(x, y, z); W[i] = id; ORI[i] = d; LOCK[i] = lock ? 1 : 0; FL[i] = fl; return i; }
 function tree(x, z) { for (let y = GY; y < GY + 4; y++) put(x, y, z, 5); for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 3; dy <= 5; dy++) { if (Math.abs(dx) + Math.abs(dz) + (dy === 5 ? 2 : 0) > 3) continue; if (!dx && !dz && dy < 4) continue; put(x + dx, GY + dy, z + dz, 10); } }
 function trees(avoid) { for (let k = 0; k < 40; k++) { const x = 2 + Math.floor(hash(k, 1, 77) * (SX - 4)), z = 2 + Math.floor(hash(k, 2, 77) * (SZ - 4)); if (avoid(x, z)) continue; tree(x, z); } }
@@ -740,7 +909,7 @@ function pad(x0, z0, w, d, id = 12) { for (let x = x0; x < x0 + w; x++) for (let
 // 계산 결과로 확인해요. lit = 불이 켜짐(밝기 0.07 넘음)
 const pv = (i) => (RES && RES.part.get(i)) || { v: 0, i: 0 };
 const cellsOf = (k) => { const out = []; if (!RES) return out; for (const i of RES.cells) if (PT[W[i]] && PT[W[i]].k === k) out.push(i); return out; };
-const bright = (i) => W[i] === 22 && !(FL[i] & 2) ? (pv(i).v ** 2 / 5) / BULB_REF : 0;
+const bright = (i) => PT[W[i]] && PT[W[i]].k === "bulb" && !(FL[i] & 2) ? (pv(i).v ** 2 / 5) / BULB_REF : 0;
 const lit = (i) => bright(i) > .07;
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 const batTotal = () => cellsOf("bat").reduce((a, i) => a + Math.abs(pv(i).i), 0);
@@ -919,6 +1088,7 @@ const NOTES = {
 const NOTE_FREE = [
   { t: "물로 생각하기", p: "<b>전압</b> = 물탱크의 높이 차이, <b>전류</b> = 흐르는 물의 양, <b>저항</b> = 좁은 관. 높이 차가 클수록, 관이 넓을수록 물이 많이 흘러요. 게임에서 <kbd>V</kbd>를 세 번 누르면 전압을 색(빨강 = 높음)으로 볼 수 있어요." },
   { t: "부품 설명서", p: Object.keys(PT).map(id => `<b>${PT[id].n}</b>: ${PT[id].d}`).join("<br>") },
+  { t: "전기 에너지의 전환", p: "전기 기구는 전기 에너지를 다른 에너지로 바꿔요. <b>전구</b> → 빛, <b>전동기(선풍기)</b> → 운동, <b>전열선(토스터)</b> → 열, <b>버저</b> → 소리, <b>전자석</b> → 자기(물체를 끌어당김). 1초 동안 쓰는 전기 에너지가 <b>전력 = 전압 × 전류</b>(단위 W)예요. 발명 공방에서 직접 만들어 봐요." },
   { t: "회로도 기호", sym: true, p: "부품 칸의 그림이 회로도 기호예요. 전지의 긴 선이 (+)극, 짧은 선이 (−)극이에요." },
 ];
 
@@ -946,10 +1116,11 @@ function startLevel(k) {
   const [x, y, z, yaw] = D.spawn; Object.assign(player, { x: x + .5, y, z: z + .5, vx: 0, vy: 0, vz: 0, yaw, pitch: -.35, fly: false });
   showHud(true); renderMission(); renderHot();
 }
-const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 4, 6, 7, 8, 3, 12, 5, 9];
+const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 13, 4, 6, 7, 8, 3, 12, 5, 9];
 function startSandbox(fresh) {
-  mode = "sandbox"; LV = null; LVi = -1; clearWorld();
-  if (!fresh && !loadSandbox()) { /* 빈 실험실 */ }
+  Object.assign(mstat, { car: 0, carAt: -1, lift: 0, liftAt: -1, ride: 0, rideAt: -1 }); machAcc.clear();
+  mode = "sandbox"; LV = null; LVi = -1; clearWorld(); $("hint").hidden = true;
+  if (fresh || !loadSandbox()) { for (const [x, z] of [[21, 34], [22, 34], [23, 34]]) put(x, GY, z, 13, 0, false); } // 처음엔 철 블록 몇 개
   hot = [20, 21, 22, 23, 24, 25, 26, 27, 28]; sel = 0; inv = {};
   setSky(PROG.sbNight ?? false); afterWorld();
   Object.assign(player, { x: 24.5, y: GY, z: 30.5, vx: 0, vy: 0, vz: 0, yaw: Math.PI * 0, pitch: -.3, fly: false });
@@ -959,18 +1130,22 @@ function afterWorld() { buildAllChunks(); rebuildAllParts(); recompute(); }
 let sbT = 0;
 function saveSandbox() {
   if (mode !== "sandbox") return;
-  const L = []; for (let i = 0; i < NN; i++) { if (cy(i) < GY && W[i] === (cy(i) === 0 ? 11 : cy(i) === 1 ? 3 : cy(i) === 2 ? 2 : 1)) continue; if (cy(i) >= GY && !W[i]) continue; L.push([i, W[i], ORI[i], FL[i] & 1]); }
+  const L = []; for (let i = 0; i < NN; i++) { if (cy(i) < GY && W[i] === (cy(i) === 0 ? 11 : cy(i) === 1 ? 3 : cy(i) === 2 ? 2 : 1)) continue; if (cy(i) >= GY && !W[i]) continue; L.push([i, W[i], ORI[i], FL[i] & 1, VAL[i]]); }
   try { localStorage.setItem("circuitcraft-sandbox", JSON.stringify(L)); } catch (e) {}
 }
-function loadSandbox() { try { const L = JSON.parse(localStorage.getItem("circuitcraft-sandbox") || "null"); if (!L) return false; for (const [i, b, o, f] of L) if (i >= 0 && i < NN && (BL[b] || PT[b] || b === 0)) { W[i] = b; ORI[i] = o & 7; FL[i] = f; } return true; } catch (e) { return false; } }
+function loadSandbox() { try { const L = JSON.parse(localStorage.getItem("circuitcraft-sandbox") || "null"); if (!L) return false; for (const [i, b, o, f, v] of L) if (i >= 0 && i < NN && (BL[b] || PT[b] || b === 0)) { W[i] = b; ORI[i] = o & 7; FL[i] = f & 1; VAL[i] = (v || 0) & 3; } return true; } catch (e) { return false; } }
 
 /* ═════════════ 임무 진행 화면 ═════════════ */
 function renderMission() {
   const el = $("mission");
   if (mode === "sandbox") {
-    $("mLv").textContent = "자유 실험실"; $("mT").textContent = "마음껏 회로 만들기";
-    $("mSteps").innerHTML = ""; $("hint").hidden = true; $("bHint").hidden = true; $("graph").hidden = true;
-    $("mLive").innerHTML = "부품을 바라보면 오른쪽 위에 전압·전류·저항이 보여요. <kbd>E</kbd> 부품 상자, <kbd>V</kbd> 보기 바꾸기."; el.hidden = false; return;
+    const made = PROG.made || {}, n = PRODUCTS.filter(P => made[P.id]).length;
+    $("mLv").textContent = "발명 공방 · 자유 실험실"; $("mT").textContent = `전기 제품 발명 ${n} / ${PRODUCTS.length}`;
+    $("mSteps").innerHTML = ""; $("bHint").hidden = true; $("graph").hidden = true;
+    const box = document.createElement("div"); box.className = "prods click";
+    PRODUCTS.forEach(P => { const b = document.createElement("button"); b.className = made[P.id] ? "ok" : ""; b.textContent = P.e + " " + P.n; b.onclick = () => { $("hint").innerHTML = `<b>${P.e} ${P.n}</b> (전기 → ${P.en})<br>${P.how}`; $("hint").hidden = false; }; box.appendChild(b); });
+    $("mSteps").appendChild(box);
+    $("mLive").innerHTML = "제품을 눌러 설계 힌트를 봐요. 회로가 제품처럼 작동하면 자동으로 완성돼요. <kbd>E</kbd> 부품 상자"; el.hidden = false; return;
   }
   const D = LV.D; $("bHint").hidden = false;
   $("mLv").textContent = `임무 ${LVi + 1} / ${LEVELS.length}`; $("mT").textContent = D.t;
@@ -1031,7 +1206,10 @@ function probeTick() {
   else if (P.k === "amm") html += `<div class="vals"><span>읽은 값</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">전류계는 저항이 거의 0이라서 반드시 <b>직렬</b>로 끼워요.</div>`;
   else if (P.k === "vm") html += `<div class="vals"><span>읽은 값</span><span class="V">${fmt(v, 2)} V</span></div><div class="f">전압계는 저항이 아주 커서(1,000,000Ω) 전류를 거의 안 받아요. <b>병렬</b>로 대요.</div>`;
   else {
-    const R = P.R; html += `<div class="vals"><span>저항</span><span class="O">${R} Ω</span><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span>` + (P.k === "bulb" ? `<span>밝기</span><span>${fmt(bright(i), 2)}배</span>` : "") + `</div>`;
+    const R = rOf(i); html += `<div class="vals"><span>저항</span><span class="O">${R} Ω</span><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span>` + (P.k === "bulb" ? `<span>밝기</span><span>${fmt(bright(i), 2)}배</span>` : "") + `</div>`;
+    if (P.k === "heat") html += `<div class="vals"><span>전력</span><span>${fmt(Math.abs(v * I), 2)} W</span><span>온도</span><span>약 ${Math.round(20 + 60 * Math.abs(v * I))} ℃</span></div>`;
+    if (P.k === "mag") html += `<div class="vals"><span>자석 힘</span><span>${magReach(I) ? `아래 ${magReach(I)}칸 거리까지 끌어당김` : "약함 (0.25A 넘어야)"}</span></div>`;
+    if (P.k === "var") html += `<div class="f">오른쪽 클릭: 2 → 5 → 10 → 20 Ω</div>`;
     if (Math.abs(I) > .002 && P.k !== "fuse") html += `<div class="f">V = I × R → ${fmt(Math.abs(v), 2)} V = ${fmt(Math.abs(I), 3)} A × ${R} Ω</div>`;
   }
   if (FL[i] & 2) html += `<div class="warn">망가졌어요. 오른쪽 클릭으로 새것으로 갈아요.</div>`;
@@ -1073,6 +1251,7 @@ function place() {
   // 부품을 바라보며 놓기 버튼 = 사용하기
   if (PT[b]) {
     const k = PT[b].k;
+    if (k === "var") { VAL[h.i] = (VAL[h.i] + 1) & 3; rebuildPart(h.i); solveDirty = true; sfx.click(true); toast(`가변 저항 ${VAR_R[VAL[h.i]]} Ω`, 900); if (mode === "sandbox") sbT = 1.5; return; }
     if (k === "sw") { FL[h.i] ^= 1; rebuildPart(h.i); solveDirty = true; if (LV) LV.tog = performance.now(); sfx.click(FL[h.i] & 1); if (mode === "sandbox") sbT = 1.5; return; }
     if (FL[h.i] & 2) { FL[h.i] &= ~2; rebuildPart(h.i); solveDirty = true; sfx.click(true); toast("새것으로 갈았어요.", 1200); return; }
   }
@@ -1112,11 +1291,14 @@ function icon(id) {
   const k = PT[id].k;
   if (k === "wire") { g.strokeStyle = "#e3934f"; g.lineWidth = 4; line(3, 16, 29, 16); line(16, 6, 16, 26); }
   else if (k === "bat") { line(2, 16, 12, 16); line(20, 16, 30, 16); g.strokeStyle = "#ff6b6b"; line(12, 6, 12, 26); g.strokeStyle = "#f1f3ff"; g.lineWidth = 4; line(20, 11, 20, 21); g.fillStyle = "#ff6b6b"; g.font = "700 10px sans-serif"; g.fillText("+", 4, 10); }
-  else if (k === "bulb") { line(2, 16, 8, 16); line(24, 16, 30, 16); g.beginPath(); g.arc(16, 16, 8, 0, 7); g.stroke(); line(10, 10, 22, 22); line(22, 10, 10, 22); }
+  else if (k === "bulb") { if (PT[id].col) { g.fillStyle = "#" + PT[id].col.toString(16).padStart(6, "0") + "88"; g.beginPath(); g.arc(16, 16, 8, 0, 7); g.fill(); } line(2, 16, 8, 16); line(24, 16, 30, 16); g.beginPath(); g.arc(16, 16, 8, 0, 7); g.stroke(); line(10, 10, 22, 22); line(22, 10, 10, 22); }
   else if (k === "res" || k === "nic") { line(2, 16, 7, 16); line(25, 16, 30, 16); g.strokeRect(7, 11, 18, 10); if (k === "nic") { g.fillStyle = "#9a9aa6"; g.fillRect(9, 13, 14, 6); } }
   else if (k === "sw") { line(2, 20, 9, 20); line(23, 20, 30, 20); g.beginPath(); g.arc(9, 20, 2, 0, 7); g.fill(); g.beginPath(); g.arc(23, 20, 2, 0, 7); g.fill(); line(9, 20, 22, 10); }
   else if (k === "amm" || k === "vm" || k === "mot") { line(2, 16, 7, 16); line(25, 16, 30, 16); g.beginPath(); g.arc(16, 16, 9, 0, 7); g.stroke(); g.font = "700 13px sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = k === "amm" ? "#ffd65a" : k === "vm" ? "#ff8a5c" : "#8fe3ff"; g.fillText(k === "amm" ? "A" : k === "vm" ? "V" : "M", 16, 17); }
   else if (k === "fuse") { line(2, 16, 30, 16); g.strokeRect(8, 12, 16, 8); }
+  else if (k === "var") { line(2, 16, 7, 16); line(25, 16, 30, 16); g.strokeRect(7, 11, 18, 10); line(8, 26, 24, 6); line(24, 6, 19, 7); line(24, 6, 23, 11); }
+  else if (k === "heat") { line(2, 16, 6, 16); line(26, 16, 30, 16); g.strokeStyle = "#ff7a3a"; g.beginPath(); g.moveTo(6, 16); for (let k2 = 0; k2 < 5; k2++) { g.lineTo(8 + k2 * 4, k2 % 2 ? 22 : 10); } g.lineTo(26, 16); g.stroke(); }
+  else if (k === "mag") { line(2, 22, 7, 22); line(25, 22, 30, 22); g.strokeStyle = "#e3934f"; for (let k2 = 0; k2 < 4; k2++) { g.beginPath(); g.arc(10 + k2 * 4, 22, 3, Math.PI, 0); g.stroke(); } g.strokeStyle = "#9aa"; line(6, 14, 26, 14); }
   else if (k === "buz") { line(2, 20, 10, 20); line(22, 20, 30, 20); line(10, 20, 10, 12); line(22, 20, 22, 12); g.beginPath(); g.arc(16, 12, 6, Math.PI, 0); g.stroke(); }
   return iconCache[id] = c;
 }
@@ -1191,6 +1373,8 @@ const sfx = {
   pop: () => { noiseB(.25, .8, 3000); tone(1400, .1, "sawtooth", .05, 300); },
   fizz: () => { noiseB(.8, .5, 5000); },
   ding: () => { tone(880, .12, "sine", .1); setTimeout(() => tone(1320, .18, "sine", .1), 90); },
+  step: () => { tone(90, .07, "sawtooth", .05, 60); },
+  clank: () => { tone(180, .12, "square", .07, 90); noiseB(.12, .4, 600); },
   win: () => { [523, 659, 784, 1047].forEach((f, k) => setTimeout(() => tone(f, .25, "triangle", .1), k * 120)); },
 };
 
@@ -1268,7 +1452,7 @@ function physics(dt) {
   player.vx = mx * sp; player.vz = mz * sp;
   const up = keys.Space || tJump;
   if (player.fly) player.vy = (up ? 6 : 0) - ((keys.ShiftLeft || keys.ShiftRight || tDown) ? 6 : 0);
-  else { player.vy -= 24 * dt; if (up && player.ground) player.vy = 7.6; player.vy = Math.max(player.vy, -30); }
+  else { player.vy -= 24 * dt; if (up && player.ground) player.vy = 7.6; if (windY) player.vy = Math.min(4, player.vy + windY * dt); player.vy = Math.max(player.vy, -30); }
   const steps = Math.ceil(dt / .02), h = dt / steps;
   for (let k = 0; k < steps; k++) {
     let nx = player.x + player.vx * h; if (hits(nx, player.y, player.z)) { nx = player.vx > 0 ? Math.floor(nx + .3) - .3 - 1e-3 : Math.floor(nx - .3) + 1.3 + 1e-3; if (hits(nx, player.y, player.z)) nx = player.x; player.vx = 0; } player.x = nx;
@@ -1289,7 +1473,7 @@ function frame(now) {
   if (!paused && mode !== "none") physics(dt);
   if (solveDirty && mode !== "none") recompute();
   camera.position.set(player.x, player.y + 1.62, player.z); camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
-  if (mode !== "none") { dotTick(dt); liveTick(dt, t); fxTick(dt); }
+  if (mode !== "none") { if (!paused) { machineTick(dt); windTick(dt); } dotTick(dt); liveTick(dt, t); fxTick(dt); }
   if (hudOn && (probeT -= dt) < 0) { probeT = .12; probeTick(); }
   if (LV && (liveT -= dt) < 0) { liveT = .3; goalTick(false); }
   if (sbT > 0 && (sbT -= dt) <= 0) saveSandbox();
@@ -1332,7 +1516,7 @@ clearWorld(); house(10, 28, 7, 7); house(30, 28, 7, 7); put(13, GY, 31, 22, 0); 
 renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
-window.__cc = { dbg: () => [dotMesh.count, viewMode, paused, mode], rebuild: () => { rebuildAllParts(); buildAllChunks(); }, LEVELS, startLevel, startSandbox, put, W, FL, ORI, ix, get RES() { return RES; }, recompute: () => { solveDirty = true; recompute(); }, edited, player, get LV() { return LV; }, solve, pv, place, breakIt, rotateIt, get inv() { return inv; }, setView: (v) => { viewMode = v; applyVisuals(); }, pause };
+window.__cc = { VAL, get lifted() { return lifted; }, PRODUCTS, PROG, dbg: () => [dotMesh.count, viewMode, paused, mode], rebuild: () => { rebuildAllParts(); buildAllChunks(); }, LEVELS, startLevel, startSandbox, put, W, FL, ORI, ix, get RES() { return RES; }, recompute: () => { solveDirty = true; recompute(); }, edited, player, get LV() { return LV; }, solve, pv, place, breakIt, rotateIt, get inv() { return inv; }, setView: (v) => { viewMode = v; applyVisuals(); }, pause };
 })();
 </script>
 </body>
