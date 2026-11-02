@@ -74,6 +74,8 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 #hotbar .s.on { border-color: var(--amp); background: #ffd65a22; }
 #hotbar .s canvas { width: 38px; height: 38px; image-rendering: pixelated; }
 #hotbar .s b { position: absolute; right: 3px; bottom: 1px; font-size: .78em; text-shadow: 0 1px 2px #000; }
+#hotbar .s.box { cursor: pointer; font-size: 1.4em; border-color: var(--line); }
+#hotbar .s.box i { left: 0; right: 0; text-align: center; top: auto; bottom: 1px; font-size: .45em; color: var(--ink); }
 #hotbar .s i { position: absolute; left: 4px; top: 1px; font-size: .62em; color: var(--dim); font-style: normal; }
 #hotName { left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); background: var(--panel); border-radius: 8px; padding: 3px 10px; font-weight: 700; font-size: .95em; white-space: nowrap; }
 #viewTag { left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 10px); background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 4px 14px; font-size: .9em; white-space: nowrap; }
@@ -221,7 +223,7 @@ body.touch #keysHelp { display: none; }
 <div class="ov" id="invOv" hidden>
   <div class="card">
     <h2>부품 상자</h2>
-    <p>고른 부품이 아래쪽 지금 칸(<span id="invSlot"></span>번)에 들어가요.</p>
+    <p>고른 부품이 아래 칸에 들어가요(칸이 꽉 차면 지금 고른 <span id="invSlot"></span>번 칸과 바뀌어요). 바퀴·철 블록·전자석·전열선도 여기 있어요.</p>
     <div class="inv" id="invGrid"></div>
     <div class="rowb"><button class="btn" id="invClose">닫기</button></div>
   </div>
@@ -760,6 +762,8 @@ const PRODUCTS = [
   { id: "tree", e: "🎄", n: "장식 전구줄", en: "빛", how: "전구 4개 이상을 한 줄(직렬)로 이어 모두 켜요. 전지를 넉넉히 직렬로.",
     ok: () => { const L = cellsOf("bulb").filter(lit); for (const b of L) { const P = solve(new Set([b])).part; const grp = L.filter(j => j !== b && lit(j) && !((P.get(j) || { v: 0 }).v ** 2 / 5 / BULB_REF > .07)); if (grp.length >= 3) return b; } return null; } },
 ];
+// 발명품마다 필요한 부품: 이름을 누르면 아래 칸에 꺼내 줘요
+const KITS = { car: [20, 14, 4, 21, 25, 28], lift: [20, 4, 21, 25, 28], wind: [20, 21, 25, 28], torch: [20, 21, 25, 22], bell: [20, 21, 25, 30], fan: [20, 21, 25, 31, 28], lamp: [20, 21, 31, 22, 25], toast: [20, 21, 25, 35], crane: [20, 21, 25, 36, 13, 4], signal: [20, 21, 25, 32, 33, 34], alarm: [20, 21, 25, 30, 22], tap: [20, 21, 29, 22, 28, 30, 35], tree: [20, 21, 22] };
 const prodLabels = new THREE.Group(); scene.add(prodLabels);
 function productTick() {
   if (!RES || RES.cells.length > 600) return;
@@ -1143,9 +1147,9 @@ function renderMission() {
     $("mLv").textContent = "발명 공방 · 자유 실험실"; $("mT").textContent = `전기 제품 발명 ${n} / ${PRODUCTS.length}`;
     $("mSteps").innerHTML = ""; $("bHint").hidden = true; $("graph").hidden = true;
     const box = document.createElement("div"); box.className = "prods click";
-    PRODUCTS.forEach(P => { const b = document.createElement("button"); b.className = made[P.id] ? "ok" : ""; b.textContent = P.e + " " + P.n; b.onclick = () => { $("hint").innerHTML = `<b>${P.e} ${P.n}</b> (전기 → ${P.en})<br>${P.how}`; $("hint").hidden = false; }; box.appendChild(b); });
+    PRODUCTS.forEach(P => { const b = document.createElement("button"); b.className = made[P.id] ? "ok" : ""; b.textContent = P.e + " " + P.n; b.onclick = () => { const kit = KITS[P.id] || []; hot = kit.slice(0, 9); sel = 0; renderHot(); $("hint").innerHTML = `<b>${P.e} ${P.n}</b> (전기 → ${P.en})<br>${P.how}<br><span style="color:var(--good)">필요한 부품 ${kit.length}가지를 아래 칸에 꺼냈어요: ${kit.map(itemName).join(", ")}</span>`; $("hint").hidden = false; toast(`${P.e} ${P.n} 부품을 아래 칸에 꺼냈어요`, 1600, "good"); }; box.appendChild(b); });
     $("mSteps").appendChild(box);
-    $("mLive").innerHTML = "제품을 눌러 설계 힌트를 봐요. 회로가 제품처럼 작동하면 자동으로 완성돼요. <kbd>E</kbd> 부품 상자"; el.hidden = false; return;
+    $("mLive").innerHTML = "👆 만들고 싶은 제품을 누르면 <b>필요한 부품이 아래 칸에</b> 들어오고 만드는 법이 보여요. 다른 부품은 📦(<kbd>E</kbd>) 부품 상자에 있어요."; el.hidden = false; return;
   }
   const D = LV.D; $("bHint").hidden = false;
   $("mLv").textContent = `임무 ${LVi + 1} / ${LEVELS.length}`; $("mT").textContent = D.t;
@@ -1316,6 +1320,7 @@ function renderHot() {
     s.onpointerdown = (e) => { e.stopPropagation(); sel = k; renderHot(); };
     el.appendChild(s);
   });
+  if (mode === "sandbox") { const b = document.createElement("div"); b.className = "s box"; b.innerHTML = "<span>📦</span><i>부품</i>"; b.title = "부품 상자 (E)"; b.onpointerdown = (e) => { e.stopPropagation(); openInv(); }; el.appendChild(b); }
   const id = hot[sel]; $("hotName").textContent = id ? itemName(id) + (PT[id] && PT[id].R ? ` · ${PT[id].R >= 1e5 ? "아주 큰" : PT[id].R} Ω` : "") : "";
 }
 let toastT = 0;
@@ -1339,7 +1344,7 @@ function openNotes() {
 function openInv() {
   if (mode !== "sandbox") { toast("임무에서는 받은 부품만 써요. 1~9로 골라요.", 1500); return; }
   pause(true); $("invSlot").textContent = sel + 1; const box = $("invGrid"); box.innerHTML = "";
-  SB_ITEMS.forEach(id => { const b = document.createElement("button"); b.className = hot[sel] === id ? "on" : ""; const c = icon(id).cloneNode(); c.getContext("2d").drawImage(icon(id), 0, 0); b.appendChild(c); b.append(itemName(id)); b.onclick = () => { const j = hot.indexOf(id); if (j >= 0 && j !== sel) hot[j] = hot[sel]; hot[sel] = id; renderHot(); closeOv("invOv"); }; box.appendChild(b); });
+  SB_ITEMS.forEach(id => { const b = document.createElement("button"); b.className = hot[sel] === id ? "on" : ""; const c = icon(id).cloneNode(); c.getContext("2d").drawImage(icon(id), 0, 0); b.appendChild(c); b.append(itemName(id)); b.onclick = () => { const j = hot.indexOf(id); if (j >= 0) sel = j; else if (hot.length < 9) { hot.push(id); sel = hot.length - 1; } else hot[sel] = id; renderHot(); closeOv("invOv"); }; box.appendChild(b); });
   $("invOv").hidden = false;
 }
 function closeOv(id) { $(id).hidden = true; if (mode !== "none" && $("startOv").hidden && $("winOv").hidden && $("briefOv").hidden) resume(); }
