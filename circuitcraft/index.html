@@ -162,6 +162,7 @@ body.touch #keysHelp { display: none; }
   <kbd>E</kbd> 부품 상자 · <kbd>N</kbd> 노트 · <kbd>Esc</kbd> 메뉴
 </div>
 <div class="hud" id="toast" hidden></div>
+<div id="newVer" hidden style="position:fixed;z-index:30;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 120px);background:#1b2a1f;border:1px solid var(--good);border-radius:12px;padding:8px 14px;display:flex;gap:10px;align-items:center;font-weight:700">새 버전이 나왔어요 <button class="btn" id="newVerGo" style="padding:.3em .9em">지금 바꾸기</button></div>
 
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
@@ -261,7 +262,7 @@ const $ = (id) => document.getElementById(id);
 const BL = {
   1: { n: "풀", t: [0, 1, 2] }, 2: { n: "흙", t: [2, 2, 2] }, 3: { n: "돌", t: [3, 3, 3] }, 4: { n: "나무판", t: [4, 4, 4] },
   5: { n: "통나무", t: [6, 5, 6] }, 6: { n: "벽돌", t: [7, 7, 7] }, 7: { n: "유리", t: [8, 8, 8], see: true }, 8: { n: "흰 벽", t: [9, 9, 9] },
-  9: { n: "지붕", t: [10, 10, 10] }, 10: { n: "나뭇잎", t: [11, 11, 11], see: true }, 11: { n: "바닥돌", t: [12, 12, 12], hard: true }, 12: { n: "고무 매트", t: [13, 13, 13] }, 13: { n: "철 블록", t: [14, 14, 14], iron: true }, 14: { n: "바퀴", t: [15, 15, 15] },
+  9: { n: "지붕", t: [10, 10, 10] }, 10: { n: "나뭇잎", t: [11, 11, 11], see: true }, 11: { n: "바닥돌", t: [12, 12, 12], hard: true }, 12: { n: "고무 매트", t: [13, 13, 13] }, 13: { n: "철 블록", t: [14, 14, 14], iron: true }, 14: { n: "바퀴", t: [15, 15, 15], see: true, shaped: true }, 15: { n: "바퀴축", t: [14, 14, 14], see: true, shaped: true },
 };
 // R: 저항(Ω). 전지는 전압 V와 내부 저항 r. 전선은 거의 0Ω(0.01Ω)
 const PT = {
@@ -357,7 +358,7 @@ function buildChunk(kx, kz) {
   const key = kx + "," + kz; if (chunks[key]) { scene.remove(chunks[key]); chunks[key].geometry.dispose(); delete chunks[key]; }
   const pos = [], uv = [], col = [], idxs = []; let n = 0;
   for (let y = 0; y < SY; y++) for (let z = kz * CH; z < kz * CH + CH; z++) for (let x = kx * CH; x < kx * CH + CH; x++) {
-    const b = W[ix(x, y, z)]; if (!isSolid(b)) continue; const B = BL[b];
+    const b = W[ix(x, y, z)]; if (!isSolid(b)) continue; const B = BL[b]; if (B.shaped) continue; // 바퀴·축은 따로 둥글게 그려요
     for (const f of FACES) {
       const nb = get(x + f.d[0], y + f.d[1], z + f.d[2]);
       if (isSolid(nb) && (!BL[nb].see || nb === b)) continue;
@@ -514,14 +515,40 @@ function makeWire(i) {
 }
 function rebuildPart(i) {
   const old = partObj.get(i); if (old) { partGroup.remove(old); old.traverse(o => { if (o.geometry && o.geometry !== wireGeoHub && o.geometry !== wireGeoArm) o.geometry.dispose(); }); partObj.delete(i); }
-  const id = W[i]; if (!isCond(id)) return;
-  const o = id === 20 ? makeWire(i) : makePart(id, i);
-  o.position.set(cx(i) + .5, cy(i) + .5, cz(i) + .5); if (id !== 20) orient(o, ORI[i]);
+  const id = W[i]; const shaped = BL[id] && BL[id].shaped; if (!isCond(id) && !shaped) return;
+  const o = shaped ? makeShaped(i) : id === 20 ? makeWire(i) : makePart(id, i);
+  o.position.set(cx(i) + .5, cy(i) + .5, cz(i) + .5); if (id !== 20 && !shaped) orient(o, ORI[i]);
   o.userData.cell = i; partGroup.add(o); partObj.set(i, o);
   if (o.userData.label) o.userData.label.material.rotation = 0;
 }
-function rebuildPartsNear(i) { rebuildPart(i); const x = cx(i), y = cy(i), z = cz(i); for (const [dx, dy, dz] of DIRS) { const X = x + dx, Y = y + dy, Z = z + dz; if (inb(X, Y, Z) && W[ix(X, Y, Z)] === 20) rebuildPart(ix(X, Y, Z)); } }
-function rebuildAllParts() { partObj.forEach((o) => partGroup.remove(o)); partObj.clear(); for (let i = 0; i < NN; i++) if (isCond(W[i])) rebuildPart(i); }
+function rebuildPartsNear(i) { rebuildPart(i); const x = cx(i), y = cy(i), z = cz(i); for (const [dx, dy, dz] of DIRS) { const X = x + dx, Y = y + dy, Z = z + dz; if (!inb(X, Y, Z)) continue; const b = W[ix(X, Y, Z)]; if (b === 20 || b === 14 || b === 15) rebuildPart(ix(X, Y, Z)); } }
+function rebuildAllParts() { partObj.forEach((o) => partGroup.remove(o)); partObj.clear(); for (let i = 0; i < NN; i++) if (isCond(W[i]) || W[i] === 14 || W[i] === 15) rebuildPart(i); }
+// 바퀴·바퀴축: 옆에 있는 축(없으면 차체) 쪽으로 축 방향을 정해요. 0 = x축, 1 = z축
+function shapeAxis(i) {
+  const x = cx(i), y = cy(i), z = cz(i), at = (X, Z) => (X >= 0 && Z >= 0 && X < SX && Z < SZ) ? W[ix(X, y, Z)] : 0;
+  const xs = [at(x - 1, z), at(x + 1, z)], zs = [at(x, z - 1), at(x, z + 1)];
+  const axle = (L) => L.some(b => b === 15 || (W[i] === 15 && b === 14));
+  if (axle(xs)) return 0; if (axle(zs)) return 1;
+  if (xs.some(b => isSolid(b) && b !== 14)) return 0; if (zs.some(b => isSolid(b) && b !== 14)) return 1; return 0;
+}
+let wheelPhase = 0;
+function makeShaped(i) {
+  const g = new THREE.Group(), ax = shapeAxis(i);
+  const turn = (o) => { if (ax === 0) o.rotation.z = Math.PI / 2; else o.rotation.x = Math.PI / 2; };
+  if (W[i] === 14) {
+    const spin = new THREE.Group(); turn(spin); g.add(spin);
+    const wheel = new THREE.Group(); wheel.rotation.y = wheelPhase; spin.add(wheel); g.userData.spin = wheel;
+    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(.49, .49, .42, 22), mat(0x1c1d21)));
+    const tread = new THREE.Mesh(new THREE.TorusGeometry(.47, .04, 4, 22), mat(0x2c2d33)); tread.rotation.x = Math.PI / 2; wheel.add(tread);
+    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(.27, .27, .44, 16), mat(0xb9bec8)));
+    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .5, 10), mat(0x55585f)));
+    for (let k = 0; k < 5; k++) { const sp = bx(.05, .45, .24, mat(0x8a8f99), 0, 0, 0); sp.rotation.y = k * Math.PI * 2 / 5; sp.position.set(Math.cos(k * 1.2566) * .14, 0, Math.sin(k * 1.2566) * .14); sp.rotation.y = -k * 1.2566; wheel.add(sp); }
+  } else {
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, 1, 10), mat(0x8d939e)); turn(rod); g.add(rod);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, .2, 12), mat(0x5d626b)); turn(hub); g.add(hub);
+  }
+  return g;
+}
 
 /* ═════════════ 회로 계산 (옴의 법칙 + 키르히호프 법칙) ═════════════ */
 // 칸 i의 k 방향 면이 전기를 주고받는 단자인지. 전선은 여섯 면 모두, 부품은 양 끝 두 면만
@@ -699,14 +726,19 @@ function machineTick(dt) {
   for (const m of cellsOf("mot")) {
     const I = pv(m).i; if (Math.abs(I) < .3 || (FL[m] & 2)) { machAcc.delete(m); continue; }
     const d0 = ORI[m], vert = d0 === 2 || d0 === 3, S = structOf(m); if (!S) continue;
-    const wheels = vert ? [] : [...S].filter(c => W[c] === 14 && below(c) >= 0 && isSolid(W[below(c)]) && !S.has(below(c)));
-    if (!vert && !wheels.length) { fans.push({ i: m, I: Math.abs(I) }); continue; }
+    const onAxle = (c) => [1, -1, SX, -SX].some(o => S.has(c + o) && W[c + o] === 15);
+    const allWheels = vert ? [] : [...S].filter(c => W[c] === 14);
+    const wheels = allWheels.filter(c => below(c) >= 0 && isSolid(W[below(c)]) && !S.has(below(c)) && onAxle(c));
+    if (!vert && !allWheels.length) { fans.push({ i: m, I: Math.abs(I) }); continue; }
+    if (!vert && !wheels.length) { if (performance.now() - (machineTick.warn || 0) > 4000) { machineTick.warn = performance.now(); toast("바퀴가 헛돌아요! 바퀴를 바퀴축(막대)에 끼우고, 바퀴가 땅에 닿게 해요.", 2600, "bad"); } continue; }
     const a = (machAcc.get(m) || 0) + dt * Math.min(4, Math.abs(I) * 3); if (a < 1) { machAcc.set(m, a); continue; }
     machAcc.set(m, 0);
     const d = I > 0 ? d0 : d0 ^ 1, [dx, , dz] = DIRS[d];
+    if (!vert && !wheels.some(w => shapeAxis(w) === (dx ? 1 : 0))) { if (performance.now() - (machineTick.warn || 0) > 4000) { machineTick.warn = performance.now(); toast("바퀴는 축과 직각 방향으로만 굴러요. 전동기를 R로 돌려 바퀴가 굴러갈 방향을 보게 해요.", 2600, "bad"); } continue; }
     if (!vert && !wheels.every(w => { const j = below(w) + dx + SX * dz; return inb(cx(w) + dx, cy(w) - 1, cz(w) + dz) && (isSolid(W[j]) && !S.has(j)); })) continue; // 낭떠러지에선 멈춰요
     const off = DIRS[d][0] + SX * DIRS[d][2] + SX * SZ * DIRS[d][1];
-    if (shiftStruct(S, d)) { sfx.step(); if (vert) { if (d === 2) { mstat.lift++; mstat.liftAt = m + off; } } else { mstat.car++; mstat.carAt = m + off; } }
+    wheelPhase += (d === 0 || d === 5 ? -1 : 1) * Math.PI / 3;
+    if (shiftStruct(S, d)) { sfx.step(); partObj.forEach(o => { if (o.userData.spin) { o.userData.spinT = 1 / Math.max(.5, Math.min(4, Math.abs(I) * 3)); o.userData.spinV = (d === 0 || d === 5 ? -1 : 1) * Math.PI / 3 * Math.min(4, Math.abs(I) * 3); } }); if (vert) { if (d === 2) { mstat.lift++; mstat.liftAt = m + off; } } else { mstat.car++; mstat.carAt = m + off; } }
     break; // 칸 번호가 바뀌었으니 다음 번에 다시
   }
 }
@@ -734,7 +766,7 @@ function varEffect(i, f) { // 가변 저항을 2Ω↔20Ω으로 바꾸면 i의 �
 }
 const devices = () => DEV_K.flatMap(k => cellsOf(k)).filter(i => running(i));
 const PRODUCTS = [
-  { id: "car", e: "🚗", n: "전기 자동차", en: "운동", how: "바퀴 블록을 땅에 2개 이상 놓고, 그 위에 나무판 등으로 차체를 붙여요. 차체 위에 전지·스위치·전동기 회로를 실어요. 전동기를 눕혀 두면 전동기가 향한 쪽(R로 돌려요)으로 굴러가요. 전지를 늘리면 빨라지고, 전지를 뒤집어 전류 방향을 바꾸면 후진!",
+  { id: "car", e: "🚗", n: "전기 자동차", en: "운동", how: "① 땅에 바퀴 - 바퀴축 - 바퀴축 - 바퀴를 한 줄로 놓아 바퀴 한 쌍을 만들고, 몇 칸 떨어진 곳에 한 쌍을 더 만들어요. ② 두 축 위에 나무판으로 차체를 얹어요. ③ 차체 위에 전지·스위치·전동기를 한 고리로 이어요. ④ 전동기는 바퀴가 굴러가는 방향(축과 직각)을 보게 R로 돌려요. 전지를 늘리면 빨라지고, 전지를 뒤집으면 후진!",
     ok: () => mstat.car >= 4 && W[mstat.carAt] === 28 ? mstat.carAt : null },
   { id: "lift", e: "🛗", n: "엘리베이터", en: "운동", how: "나무판으로 발판을 만들고 회로를 실어요. 전동기를 위아래로 세우면(R) 붙어 있는 블록이 통째로 올라가요. 발판에 올라타 봐요! 전지 방향을 바꾸면 내려가요.",
     ok: () => mstat.lift >= 3 && W[mstat.liftAt] === 28 ? mstat.liftAt : null },
@@ -763,7 +795,7 @@ const PRODUCTS = [
     ok: () => { const L = cellsOf("bulb").filter(lit); for (const b of L) { const P = solve(new Set([b])).part; const grp = L.filter(j => j !== b && lit(j) && !((P.get(j) || { v: 0 }).v ** 2 / 5 / BULB_REF > .07)); if (grp.length >= 3) return b; } return null; } },
 ];
 // 발명품마다 필요한 부품: 이름을 누르면 아래 칸에 꺼내 줘요
-const KITS = { car: [20, 14, 4, 21, 25, 28], lift: [20, 4, 21, 25, 28], wind: [20, 21, 25, 28], torch: [20, 21, 25, 22], bell: [20, 21, 25, 30], fan: [20, 21, 25, 31, 28], lamp: [20, 21, 31, 22, 25], toast: [20, 21, 25, 35], crane: [20, 21, 25, 36, 13, 4], signal: [20, 21, 25, 32, 33, 34], alarm: [20, 21, 25, 30, 22], tap: [20, 21, 29, 22, 28, 30, 35], tree: [20, 21, 22] };
+const KITS = { car: [20, 14, 15, 4, 21, 25, 28], lift: [20, 4, 21, 25, 28], wind: [20, 21, 25, 28], torch: [20, 21, 25, 22], bell: [20, 21, 25, 30], fan: [20, 21, 25, 31, 28], lamp: [20, 21, 31, 22, 25], toast: [20, 21, 25, 35], crane: [20, 21, 25, 36, 13, 4], signal: [20, 21, 25, 32, 33, 34], alarm: [20, 21, 25, 30, 22], tap: [20, 21, 29, 22, 28, 30, 35], tree: [20, 21, 22] };
 const prodLabels = new THREE.Group(); scene.add(prodLabels);
 function productTick() {
   if (!RES || RES.cells.length > 600) return;
@@ -846,6 +878,7 @@ function liveTick(dt, t) {
     if (k === "bat" && (FL[i] & 4) && Math.random() < dt * 3) smoke(cx(i) + .5, cy(i) + .7, cz(i) + .5, 1);
     if (k === "bulb" && o.userData.halo && o.userData.b > 0) o.userData.halo.material.rotation = Math.sin(t * 3 + i) * .05;
   }
+  partObj.forEach(o => { const u = o.userData; if (u.spin && u.spinT > 0) { u.spinT -= dt; u.spin.rotation.y += u.spinV * dt; } });
   // 소리: 버저·전동기
   if (actx) {
     const vol = SET.vol;
@@ -1120,7 +1153,7 @@ function startLevel(k) {
   const [x, y, z, yaw] = D.spawn; Object.assign(player, { x: x + .5, y, z: z + .5, vx: 0, vy: 0, vz: 0, yaw, pitch: -.35, fly: false });
   showHud(true); renderMission(); renderHot();
 }
-const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 13, 4, 6, 7, 8, 3, 12, 5, 9];
+const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 15, 13, 4, 6, 7, 8, 3, 12, 5, 9];
 function startSandbox(fresh) {
   Object.assign(mstat, { car: 0, carAt: -1, lift: 0, liftAt: -1, ride: 0, rideAt: -1 }); machAcc.clear();
   mode = "sandbox"; LV = null; LVi = -1; clearWorld(); $("hint").hidden = true;
@@ -1289,6 +1322,8 @@ const iconCache = {};
 function icon(id) {
   if (iconCache[id]) return iconCache[id];
   const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d");
+  if (id === 14) { g.fillStyle = "#1c1d21"; g.beginPath(); g.arc(16, 16, 14, 0, 7); g.fill(); g.fillStyle = "#b9bec8"; g.beginPath(); g.arc(16, 16, 7, 0, 7); g.fill(); g.fillStyle = "#55585f"; g.beginPath(); g.arc(16, 16, 2.5, 0, 7); g.fill(); return iconCache[id] = c; }
+  if (id === 15) { g.fillStyle = "#8d939e"; g.fillRect(2, 13, 28, 6); g.fillStyle = "#5d626b"; g.fillRect(12, 10, 8, 12); return iconCache[id] = c; }
   if (BL[id]) { g.imageSmoothingEnabled = false; g.drawImage(atlasC, BL[id].t[1] * TILE, 0, TILE, TILE, 2, 2, 28, 28); return iconCache[id] = c; }
   g.strokeStyle = "#f1f3ff"; g.fillStyle = "#f1f3ff"; g.lineWidth = 2; g.lineCap = "round";
   const line = (a, b, c2, d) => { g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d); g.stroke(); };
@@ -1521,6 +1556,12 @@ clearWorld(); house(10, 28, 7, 7); house(30, 28, 7, 7); put(13, GY, 31, 22, 0); 
 renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
+// 새 버전 확인: 브라우저가 예전 페이지를 기억해도(최대 10분) 새 버전이 있으면 알려 줘요. 진행 기록은 그대로예요
+const VERSION = "2026-11-02-wheels";
+function checkVersion() {
+  try { fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.text() : "").then(h => { const m = h.match(/const VERSION = "([^"]+)"/); if (m && m[1] !== VERSION) { $("newVer").hidden = false; $("newVerGo").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); } }).catch(() => {}); } catch (e) {}
+}
+checkVersion(); setInterval(checkVersion, 5 * 60 * 1000);
 window.__cc = { VAL, get lifted() { return lifted; }, PRODUCTS, PROG, dbg: () => [dotMesh.count, viewMode, paused, mode], rebuild: () => { rebuildAllParts(); buildAllChunks(); }, LEVELS, startLevel, startSandbox, put, W, FL, ORI, ix, get RES() { return RES; }, recompute: () => { solveDirty = true; recompute(); }, edited, player, get LV() { return LV; }, solve, pv, place, breakIt, rotateIt, get inv() { return inv; }, setView: (v) => { viewMode = v; applyVisuals(); }, pause };
 })();
 </script>
