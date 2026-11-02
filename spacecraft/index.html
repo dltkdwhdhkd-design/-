@@ -5307,7 +5307,7 @@ const net = (() => {
   }
   function closeChat() { $("chatBox").hidden = true; $("chat").classList.remove("open"); $("chatIn").blur(); $("chatIn").value = ""; if (!paused && $("startOv").hidden) lockMouse(); }
   function setChat(v) {
-    if (!CHATM[v]) return; chatMode = v; if (host) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode }); }
+    if (!CHATM[v]) return; chatMode = v; if (host) sendClock();
     toast(`채팅: ${CHATM[v]}`, 2000); $("tChatMode").textContent = `채팅: ${CHATM[v]}`; if (!$("chatBox").hidden) renderChatBox();
   }
   $("chatSend").onclick = () => { const v = $("chatIn").value; $("chatIn").value = ""; say(v); closeChat(); };
@@ -5374,7 +5374,7 @@ const net = (() => {
     if (!window.Peer) { tries++; return; }
     peer = new Peer(PREFIX + code, peerOpts());
     peer.on("open", ready);
-    peer.on("connection", (c) => { c.on("open", () => { conns.push(c); c.send({ t: "welcome", code }); }); c.on("data", (d) => onData(d, c)); c.on("close", () => { conns = conns.filter(x => x !== c); dropBy(c); }); });
+    peer.on("connection", (c) => { c.on("open", () => { conns.push(c); c.send({ t: "welcome", code }); c.send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode, from: me.id }); }); c.on("data", (d) => onData(d, c)); c.on("close", () => { conns = conns.filter(x => x !== c); dropBy(c); }); });
     peer.on("error", (e) => { if (!opened && !mqs.length) { if (String(e && e.type) === "unavailable-id") fail(e); else gaveUp(); } });
     peer.on("disconnected", () => { try { peer.reconnect(); } catch (e) {} });
   }
@@ -5428,6 +5428,10 @@ const net = (() => {
     const now = performance.now(), h = Object.assign({ _h: 1 }, d);
     mqs.forEach(m => { if (m !== from && now - m.seen < 15000) pub(m, h); }); // 학생이 있는 중계 서버에만
   }
+  // 방장 시계(모두 같은 낮·밤): 2초마다, 그리고 새 친구가 들어오면 바로 보내요.
+  // 방장 화면이 다른 탭 뒤에 숨어 있으면 그림 그리기(tick)가 멈추므로, 그때는 따로 도는 타이머가 대신 보내요
+  function sendClock() { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode }); }
+  setInterval(() => { if (host && live && document.hidden) sendClock(); }, 2000);
   function send(d) { if (!live) return; d.from = me.id; if (host) relay(d, null); else if (mqJoin) pub(mqJoin, d); else if (hostConn && hostConn.open) hostConn.send(d); }
   function onData(d, c) {
     if (!d || typeof d !== "object") return;
@@ -5435,6 +5439,7 @@ const net = (() => {
     if (d.t === "chat") { const now = performance.now(); if (!d.from || d.from === me.id || !chatOK(d) || now - (chatLast[d.from] || 0) < 200) return; chatLast[d.from] = now; }
     if (host && d.t !== "welcome") { relay(d, c); if (d.from) c._pid = d.from; }
     if (d.t === "state" && d.from && d.from !== me.id) {
+      if (host && !others[d.from]) sendClock();
       const o = others[d.from] = others[d.from] || { mesh: null };
       Object.assign(o, { name: String(d.name || "?").slice(0, 10), color: /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "#ffffff", pk: String(d.pk), x: +d.x || 0, y: +d.y || 0, z: +d.z || 0, yaw: +d.yaw || 0, pitch: +d.pitch || 0, done: +d.done || 0, dex: +d.dex || 0, hp: +d.hp || 0, look: cleanLook(d.look), sw: +d.sw || 0, seen: performance.now(),
         mission: String(d.mission || "").slice(0, 40), o2: +d.o2 || 0, pw: +d.pw || 0, T: +d.T || 0, party: typeof d.party === "string" ? d.party.slice(0, 16) : "", plead: typeof d.plead === "string" ? d.plead.slice(0, 10) : "", pln: String(d.pln || "").slice(0, 10),
@@ -5472,7 +5477,7 @@ const net = (() => {
   function tick(dt) {
     if (!live) return;
     sendT += dt;
-    if (host && (clockT += dt) > 2) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode }); }
+    if (host && (clockT += dt) > 2) sendClock();
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
     if (teacher) { tickOthers(dt); return; }
     $("chat").hidden = !hudOn; $("tChat").hidden = false;
@@ -5595,7 +5600,7 @@ const net = (() => {
     $("rosterOv").hidden = false;
   }
   function setPvp(v) {
-    pvp = !!v; if (host) { clockT = 0; send({ t: "clock", c: (performance.now() - roomT0) / 1000, pvp, chat: chatMode }); }
+    pvp = !!v; if (host) sendClock();
     toast(pvp ? "플레이어끼리 대결을 켰어요. 기지 코어 6칸 안은 안전 구역이에요" : "대결을 껐어요", 2600);
     $("tPvp").textContent = `플레이어 대결: ${pvp ? "켜짐" : "꺼짐"}`; $("tPvp").classList.toggle("on", pvp);
   }
