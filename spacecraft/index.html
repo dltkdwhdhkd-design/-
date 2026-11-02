@@ -238,7 +238,7 @@ td.unk { color: #4e5786; }
 .tNotice { display: flex; gap: 8px; flex-wrap: wrap; }
 .tNotice input { flex: 1 1 260px; font: inherit; color: var(--ink); background: #0a0d1c; border: 1.5px solid var(--line); border-radius: 8px; padding: .55em .8em; }
 #notice { left: 50%; top: 32%; transform: translateX(-50%); background: rgba(40, 30, 6, .92); border: 2px solid var(--ore); border-radius: 12px; padding: .7em 1.2em; font-weight: 700; font-size: 1.15em; text-align: center; max-width: min(620px, 92vw); z-index: 9; }
-#fact { left: 50%; top: 14%; transform: translateX(-50%); background: rgba(10, 30, 40, .92); border: 2px solid #5fe0c8; border-radius: 12px; padding: .6em 1.1em; max-width: min(560px, 92vw); z-index: 9; font-size: .95em; line-height: 1.5; }
+#fact { left: 50%; top: 14%; transform: translateX(-50%); background: rgba(10, 30, 40, .92); border: 2px solid #5fe0c8; border-radius: 12px; padding: .6em 1.1em; max-width: min(560px, 92vw); z-index: 11; font-size: .95em; line-height: 1.5; }
 #fact b { color: #5fe0c8; display: block; }
 .ctabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .ctabs button { background: #ffffff0a; border: 1px solid var(--line); color: inherit; border-radius: 999px; padding: 4px 12px; font: inherit; font-weight: 700; cursor: pointer; }
@@ -656,6 +656,15 @@ SLAB(200, 213, 43, "나무", "wood", 200); SLAB(201, 214, 47, "돌벽돌", "ston
 SLAB(216, 217, 209, "대리석", "stone", 209); SLAB(218, 219, 161, "조약돌", "stone", 161); SLAB(220, 221, 162, "사암", "stone", 162);
 SLAB(222, 223, 48, "붉은 벽돌", "stone", 48); SLAB(224, 225, 166, "진한 나무", "wood", 166); SLAB(226, 227, 211, "대리석 벽돌", "stone", 211);
 SLAB(252, 253, 165, "기와", "stone", 165);
+// 11차: 암석 가공. 사암·진흙을 화로에서 구워 변성암을 흉내 내거나, 서로 다른 암석을 섞어 새 블록을 만들어요
+DECO_ADD(13, { n: "규암", c: ["#e6d8cc", "#f6eee6", "#c2b0a2"], h: 1.3, mat: "stone", style: "quartzite" });
+DECO_ADD(46, { n: "점판암", c: ["#4a505c", "#5e6674", "#343842"], h: 1.1, mat: "stone", style: "slate" });
+DECO_ADD(95, { n: "콘크리트", c: ["#9a9a96", "#b0b0ac", "#7e7e7a"], h: 1.2, mat: "stone", style: "concrete" });
+DECO_ADD(96, { n: "테라조", c: ["#d6d2ca", "#e8e5de", "#aaa59c"], h: 1.1, mat: "stone", style: "terrazzo" });
+DECO_ADD(97, { n: "아스팔트 길", c: ["#2c2d31", "#3c3d42", "#1c1d20"], h: .9, mat: "stone", style: "asphalt", road: true });
+DECO_ADD(98, { n: "흑백 모자이크", c: ["#e8e6e0", "#faf9f6", "#2c2d32"], h: 1.0, mat: "stone", style: "mosaic" });
+DECO_ADD(254, { n: "흑요석", c: ["#1c1626", "#3a2e52", "#0c0a12"], h: 2, tier: 2, mat: "glass", style: "obsidian" });
+SLAB(99, 255, 46, "점판암", "stone", 46);
 [[228, "대리석", 209, "stone"], [232, "조약돌", 161, "stone"], [236, "사암", 162, "stone"], [240, "붉은 벽돌", 48, "stone"], [244, "진한 나무", 166, "wood"], [248, "대리석 벽돌", 211, "stone"]]
   .forEach(([id, n, f, mat]) => DECO_ROT(id, { n: `${n} 계단`, c: BLOCKS[f].c, top: BLOCKS[f].top, h: BLOCKS[f].h, mat }, STAIR.map(q => q.concat([f]))));
 const isPad = (b) => b === 34 || b === 75;
@@ -890,6 +899,20 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
       for (let i = 2; i < 14; i++) { put(ox, oy, i, 2, P[1]); put(ox, oy, i, 13, P[1]); put(ox, oy, 2, i, P[1]); put(ox, oy, 13, i, P[1]); }
       for (let y = 3; y < 13; y++) for (let x = 3; x < 13; x++) { const dx = x - 7.5, dy = y - 7.5, r = Math.hypot(dx, dy), a = Math.atan2(dx, -dy), t = ((a / (Math.PI * 2) * 5) % 1 + 1) % 1, tri = Math.abs(t - .5) * 2, Rs = 1.8 + 3.4 * tri * tri;
         if (r < Rs) put(ox, oy, x, y, r > Rs - .9 ? Gd : dx + dy < 0 ? mix(G, [255, 255, 255], .3) : G); } },
+    // 11차: 암석 가공 블록 무늬
+    quartzite(ox, oy, c) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, R() < .06 ? [255, 255, 255] : pick(P, .5 + R() * .45 - ((x * 3 + y * 5) % 7 === 0 ? .2 : 0))); },
+    slate(ox, oy, c, b, row) { const P = pal(c), ly = [0, 1, 2, 3].map(() => .4 + R() * .3);
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, row === 1 ? pick(P, .45 + R() * .25 - (x % 8 === 0 || y % 8 === 0 ? .3 : 0)) : y % 4 === 3 ? P[0] : y % 4 === 0 ? mix(P[2], P[3], .4) : pick(P, ly[y >> 2] + (R() - .5) * .15)); },
+    concrete(ox, oy, c) { const P = pal(c), N = vnoise(5); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, R() < .04 ? P[0] : pick(P, .5 + N(x, y) * .2 + R() * .1)); },
+    terrazzo(ox, oy, c) { const P = pal(c), CH = [[250, 250, 246], [120, 122, 130], [60, 62, 70], [184, 92, 70], [86, 140, 110], [214, 184, 120]];
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) put(ox, oy, x, y, pick(P, .55 + R() * .2));
+      for (let i = 0; i < 26; i++) { const x = Math.floor(R() * 16), y = Math.floor(R() * 16), col = CH[Math.floor(R() * CH.length)]; put(ox, oy, x, y, col); if (R() < .5) put(ox, oy, (x + 1) % 16, y, col); if (R() < .35) put(ox, oy, x, (y + 1) % 16, mul(col, .85)); } },
+    asphalt(ox, oy, c) { const P = pal(c); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const r = R(); put(ox, oy, x, y, r < .08 ? [118, 118, 124] : r < .14 ? [84, 84, 90] : pick(P, .3 + R() * .5)); } },
+    mosaic(ox, oy, c) { const Wt = rgb(c[1]), K = rgb(c[2]), G = [150, 148, 140];
+      for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const tx = x >> 2, ty = y >> 2, dark = (tx + ty) % 2 === 0 ? (tx * 7 + ty * 3) % 5 !== 0 : (tx * 5 + ty) % 7 === 0;
+        put(ox, oy, x, y, x % 4 === 3 || y % 4 === 3 ? G : mix(dark ? K : Wt, dark ? [70, 72, 80] : [214, 210, 200], R() * .25 + (x % 4 === 0 || y % 4 === 0 ? .2 : 0))); } },
+    obsidian(ox, oy, c) { const P = pal(c), N = vnoise(3); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = N(x, y); put(ox, oy, x, y, v > .78 ? mix(P[3], [150, 120, 210], .4) : pick(P, .15 + v * .5 + R() * .1)); }
+      for (let i = 0; i < 4; i++) { const x = Math.floor(R() * 13), y = Math.floor(R() * 13); put(ox, oy, x, y, [200, 190, 240]); put(ox, oy, x + 1, y + 1, [140, 120, 200]); } },
     pad(ox, oy, c) { S.metal(ox, oy, ["#3a4054", "#4c5470", "#262a38"]); for (let x = 0; x < 16; x++) for (let y of [0, 1, 14, 15]) put(ox, oy, x, y, (x + y) % 4 < 2 ? rgb("#ffb347") : [30, 30, 34]); },
   };
   const tile = (ox, oy, c, b, top, row, id) => {
@@ -1956,6 +1979,7 @@ function physics(dt) {
   if (swim && Math.hypot(P.vel.x, P.vel.z) > .8 && (P.swA = (P.swA || 0) + dt) > .75) { P.swA = 0; sfx.swim(); }
   let sp = 4.6 * (inWater ? .62 : 1) * (slowT > 0 ? .5 : 1);
   if (S.planet === "venus" && P.pos.y < VENUS_BASE - 3) sp *= .7;
+  if (P.ground && (BLOCKS[get(bx, Math.floor(P.pos.y - .05), bz)] || {}).road) sp *= 1.3; // 아스팔트 길은 평평하고 단단해서 빨리 걸어요
   const s = Math.sin(P.yaw), c = Math.cos(P.yaw);
   let wx = (fx * c + fz * s) * sp, wz = (-fx * s + fz * c) * sp;
   const cur = flowPush(P.pos.x, P.pos.y + .2, P.pos.z); if (cur) { wx += cur[0]; wz += cur[1]; }
@@ -2535,6 +2559,23 @@ const STAIR_TIP = "뛰지 않고 걸어서 올라가요. 내가 바라보는 쪽
   [155, "양동이로 호수 물고기 뜨기"], [156, "양동이로 호수 물고기 뜨기"], [157, "양동이로 호수 물고기 뜨기"], [179, "지구 들판의 빨간 꽃"], [180, "지구 들판의 노란 꽃"], [181, "지구 들판의 파란 꽃"], [165, "기와로 제작(흙+석탄, 화로)"], [161, "암석으로 제작"], [160, "조약돌을 화로에 구워 제작"], [163, "제작(암석·규소·물)"], [168, "양털+양귀비"], [169, "양털+민들레"], [170, "양털+수레국화"], [171, "양털+민들레+수레국화"], [172, "양털+석탄"], [85, "나뭇잎을 캐면 가끔 나와요"]]
   .forEach(([id, w]) => { if (!WHERE[id]) WHERE[id] = w; });
 RECIPES.forEach(r => { if (!r.cat) r.cat = r.gear ? "gear" : "block"; });
+// 11차: 암석 가공. 처음 만들 때 그 암석이 어떻게 생기는지 알려 줘요(sci)
+[[13, "규암 ×2", { 162: 2, 108: 1 }, 2, "사암을 화로의 높은 열로 구워 만든 단단한 변성암. 밝은 분홍빛 벽과 바닥에 좋아요.", true,
+    "사암이 땅속 깊은 곳에서 높은 열과 압력을 받으면 모래 알갱이(석영)가 서로 녹아 붙어 규암이 돼요. 퇴적암이 변성암으로 바뀌는 변성 작용이에요. 규암은 사암보다 훨씬 단단해요."],
+  [46, "점판암 ×4", { 3: 2, 4: 2, 108: 1 }, 4, "흙(진흙)과 암석을 함께 구운 얇은 판 모양 돌. 빗물이 스며들지 않아 지붕에 좋아요.", true,
+    "진흙이 쌓여 굳은 퇴적암(이암·셰일)이 열과 압력을 받으면 얇은 판으로 잘 쪼개지는 점판암(변성암)이 돼요. 물이 스며들지 않아 옛날부터 지붕돌과 칠판으로 썼어요."],
+  [99, "점판암 반 블록 ×6", { 46: 3 }, 6, "반 칸 높이 점판암. 완만한 지붕에 좋아요. 블록 윗면을 누르면 아래쪽 반, 아랫면이나 옆면 위쪽을 누르면 위쪽 반에 붙어요."],
+  [95, "콘크리트 ×4", { 161: 2, 101: 1, 208: 1, 103: 1 }, 4, "조약돌(자갈)·모래(규소)·대리석 가루·물을 섞어 굳힌 인공 암석. 튼튼한 벽과 바닥에.", false,
+    "대리석·석회암 가루를 구우면 시멘트가 돼요. 시멘트에 모래·자갈과 물을 섞으면 시멘트가 물과 반응하면서 단단하게 굳어 콘크리트가 돼요. 사람이 여러 암석을 섞어 만든 '인공 암석'이에요."],
+  [96, "테라조 ×2", { 95: 2, 208: 1 }, 2, "콘크리트에 대리석 조각을 박고 겉을 갈아 낸 알록달록한 바닥.", false,
+    "테라조는 굳기 전의 콘크리트에 대리석 같은 여러 암석 조각을 섞고, 굳은 뒤 겉을 매끈하게 갈아 만든 바닥이에요. 단면에 서로 다른 암석 알갱이가 보여요. 학교 복도 바닥에서 흔히 볼 수 있어요."],
+  [97, "아스팔트 길 ×4", { 161: 2, 108: 2 }, 4, "자갈을 검은 타르로 붙인 길. 위를 걸으면 조금 더 빨리 걸어요.", true,
+    "석탄을 공기 없이 가열하면 끈적한 검은 타르가 나와요. 옛날에는 이 타르로 자갈을 붙여 길을 만들었어요. 요즘 도로의 아스팔트는 석유를 정제하고 남은 것을 써요."],
+  [98, "흑백 모자이크 ×2", { 208: 1, 11: 1 }, 2, "지구의 흰 대리석과 달의 검은 현무암을 잘라 번갈아 붙인 타일. 달에 다녀와야 만들어요.", false,
+    "흰 대리석은 석회암이 열과 압력을 받아 변한 변성암이고, 검은 현무암은 용암이 땅 위에서 빨리 식은 화성암이에요. 빨리 식어서 알갱이가 아주 작고 어두운 색이에요. 달의 어두운 '바다'도 현무암이에요."],
+  [254, "흑요석", { 11: 2, 103: 1 }, 1, "현무암을 녹여 물로 갑자기 식힌 검은 유리 같은 돌. 철 곡괭이 이상으로 캐요.", true,
+    "뜨거운 마그마가 땅속에서 천천히 식으면 결정이 크게 자라 알갱이가 큰 화강암이 되고, 땅 위에서 빨리 식으면 알갱이가 작은 현무암이 돼요. 물에 닿아 아주 빨리 식으면 결정이 자랄 틈이 없어 유리처럼 매끈한 흑요석이 돼요."],
+].forEach(([id, n, need, count, use, fire, sci]) => RECIPES.push({ id, n, need, out: id, count, cat: "rock", hand: !fire, fire: !!fire, use, sci }));
 // 굽는 시간(초)
 const COOK = { 114: 6, 118: 8, 119: 8, 130: 5, 48: 6 };
 RECIPES.forEach(r => { if (r.fire) r.cook = COOK[r.out] || 6; });
@@ -2553,6 +2594,8 @@ const canHere = (r) => r.fire ? nearFire() : r.hand || nearTable();
 function canMake(r) { return hasAll(r) && !owned(r) && canHere(r); }
 function maxMake(r) { if (!r.out) return canMake(r) ? 1 : 0; let k = 0; while (k < 64 && hasAll(r, k + 1)) k++; return canHere(r) ? k : 0; }
 function makeIt(r, k) {
+  // 암석 가공: 처음 만들 때 그 암석이 생기는 까닭을 보여 줘요
+  if (r.sci) { S.sciSeen = S.sciSeen || {}; if (!S.sciSeen[r.out]) { S.sciSeen[r.out] = 1; setTimeout(() => showFact(r.n.replace(/ ×\d+$/, ""), r.sci), 50); } }
   // 굽기: 화로에 넣고 시간이 지나야 나와요
   if (r.fire) {
     const f = nearFire(); if (!f) return;
@@ -2576,7 +2619,7 @@ function makeIt(r, k) {
   sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save();
 }
 let craftTab = "all";
-const CTABS = [["all", "전체"], ["block", "블록"], ["build", "건축"], ["deco", "꾸미기"], ["food", "음식"], ["tool", "도구"], ["gear", "장비"]];
+const CTABS = [["all", "전체"], ["block", "블록"], ["build", "건축"], ["deco", "꾸미기"], ["rock", "암석 가공"], ["food", "음식"], ["tool", "도구"], ["gear", "장비"]];
 function drillIcon() { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d");
   g.fillStyle = "#3a3c44"; g.fillRect(1, 9, 5, 6); g.fillStyle = "#ffb347"; g.fillRect(2, 5, 8, 6); g.fillStyle = "#d8862a"; g.fillRect(2, 9, 8, 2);
   g.fillStyle = "#c7c9d1"; g.fillRect(10, 6, 2, 4); g.fillRect(12, 7, 2, 2); g.fillRect(14, 7, 2, 1); return c; }
@@ -3713,7 +3756,7 @@ function loopSet(k, v, x, y, z) {
   if (!L && v > 0) { try { const src = actx.createBufferSource(), g = actx.createGain(), p = actx.createStereoPanner ? actx.createStereoPanner() : null; src.buffer = LOOPS[k](); src.loop = true; g.gain.value = 0;
     src.connect(g); if (p) g.connect(p).connect(master); else g.connect(master); src.start(); L = LB[k] = { src, g, p }; } catch (e) { return; } }
   if (!L) return; const t = actx.currentTime; let vol = v;
-  if (v > 0 && x != null) { const dx = x - camera.position.x, dz = z - camera.position.z, dist = Math.hypot(dx, y - camera.position.y, dz); vol = v * Math.max(0, Math.pow(1 - dist / 14, 1.6));
+  if (v > 0 && x != null) { const dx = x - camera.position.x, dz = z - camera.position.z, dist = Math.hypot(dx, y - camera.position.y, dz); vol = v * Math.pow(Math.max(0, 1 - dist / 14), 1.6);
     if (L.p) { camera.getWorldDirection(_fw); const fl = Math.hypot(_fw.x, _fw.z) || 1; L.p.pan.setTargetAtTime(dist > .5 ? Math.max(-.7, Math.min(.7, (dx * -_fw.z + dz * _fw.x) / fl / (Math.hypot(dx, dz) || 1) * .7)) : 0, t, .1); } }
   L.g.gain.setTargetAtTime(paused ? 0 : vol, t, .15);
 }
