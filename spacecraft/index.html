@@ -3992,7 +3992,9 @@ function box(w, h, d, m, x, y, z, parent) { const b = new THREE.Mesh(new THREE.B
 // 블록 사람 모양 우주인. 팔다리는 어깨·엉덩이를 축으로 돌아요.
 function buildAvatar(look) {
   look = cleanLook(look);
-  const g = new THREE.Group(), suit = lam(LOOK_OPT.suit[look.suit]), dark = lam(new THREE.Color(LOOK_OPT.suit[look.suit]).multiplyScalar(.7)), pk = lam(LOOK_OPT.pack[look.pack]);
+  // root는 서 있는 자리, g(몸통 무리)는 헤엄칠 때 가슴을 축으로 앞으로 엎드려요
+  const root = new THREE.Group(), g = new THREE.Group(); root.add(g);
+  const suit = lam(LOOK_OPT.suit[look.suit]), dark = lam(new THREE.Color(LOOK_OPT.suit[look.suit]).multiplyScalar(.7)), pk = lam(LOOK_OPT.pack[look.pack]);
   const visor = new THREE.MeshBasicMaterial({ color: LOOK_OPT.visor[look.visor] });
   const limb = (x, y, w, h) => { const p = new THREE.Group(); p.position.set(x, y, 0); box(w, h, w, dark, 0, -h / 2, 0, p); g.add(p); return p; };
   const legL = limb(-.15, .75, .26, .75), legR = limb(.15, .75, .26, .75);
@@ -4006,12 +4008,37 @@ function buildAvatar(look) {
   if (look.hat === 3) for (let i = 0; i < 4; i++) box(.08, .12 + (i % 2) * .06, .12, hm, 0, .62 + (i % 2) * .03, -.18 + i * .12, head);
   if (look.hat === 4) { box(.1, .1, .1, lam(0xffe066), .2, .64, -.1, head); [[.08, 0], [-.08, 0], [0, .08], [0, -.08]].forEach(([a, b]) => box(.08, .06, .08, hm, .2 + a, .63, -.1 + b, head)); }
   if (look.hat === 5) { box(.5, .1, .5, lam(0xffd23f), 0, .63, 0, head); [[-.2, -.2], [.2, -.2], [-.2, .2], [.2, .2], [0, -.2]].forEach(([a, b]) => box(.08, .14, .08, lam(0xffd23f), a, .74, b, head)); }
-  g.userData = { legL, legR, armL, armR, head, look: JSON.stringify(look) };
-  return g;
+  root.userData = { legL, legR, armL, armR, head, body: g, look: JSON.stringify(look) };
+  return root;
 }
-function animAvatar(g, speed, t, swingK) {
-  const u = g.userData, a = Math.sin(t * 9) * Math.min(1, speed / 4) * .7;
-  u.legL.rotation.x = a; u.legR.rotation.x = -a; u.armL.rotation.x = -a * .8; u.armR.rotation.x = a * .8 - (swingK || 0) * 1.6;
+// 물속(가슴까지 잠기거나 발밑이 비어 떠 있으면)이면 그 자리 물의 수면 높이를, 아니면 false를 돌려줘요
+const swimPose = (x, y, z) => { const X = Math.floor(x), Z = Math.floor(z);
+  if (!LIQ(get(X, Math.floor(y + 1), Z)) && !(LIQ(get(X, Math.floor(y + .4), Z)) && !SOLID(get(X, Math.floor(y - .15), Z)))) return false;
+  let t = Math.floor(y + .4); if (!LIQ(get(X, t, Z))) t++; for (let i = 0; i < 6 && LIQ(get(X, t + 1, Z)); i++) t++; return t + .9; };
+// 걷기·헤엄치기 동작. swim(수면 높이)이 있으면 빠를수록 엎드려 자유형(팔을 번갈아 크게 돌리고 발장구), 느리면 서서 팔을 옆으로 젓고 다리를 굴러요(입영)
+function animAvatar(g, speed, t, swingK, swim, dt) {
+  const u = g.userData, a = Math.sin(t * 9) * Math.min(1, speed / 4) * .7, B = u.body; dt = Math.min(.1, dt || .016);
+  u.swK = (u.swK || 0) + ((swim ? 1 : 0) - (u.swK || 0)) * Math.min(1, dt * 5); if (swim) u.ws = swim;
+  const k = u.swK > .01 ? u.swK : 0;
+  let lL = a, lR = -a, aL = -a * .8, aR = a * .8, zL = 0, zR = 0, tilt = 0, dy = 0;
+  if (k) {
+    u.runK = (u.runK || 0) + (Math.min(1, speed / 2.2) - (u.runK || 0)) * Math.min(1, dt * 4);
+    const run = u.runK, st = u.swT = ((u.swT || 0) + dt * (2.4 + run * 2.4)) % (Math.PI * 2);
+    // 자유형: 팔이 머리 위 → 배 밑 → 엉덩이 → 등 위로 한 바퀴. 두 팔은 반 바퀴 어긋나요
+    const cL = Math.atan2(Math.sin(-st), Math.cos(-st)), cR = Math.atan2(Math.sin(Math.PI - st), Math.cos(Math.PI - st)), kick = Math.sin(st * 3) * .38;
+    // 입영: 팔을 옆으로 벌려 앞뒤로 젓고, 다리는 번갈아 굴러요
+    const sc = Math.sin(st * 1.6) * .5, eg = Math.sin(st * 1.3) * .45;
+    const mix = (w, c, tr) => w * (1 - k) + (c * run + tr * (1 - run)) * k;
+    aL = mix(aL, cL, sc); aR = mix(aR, cR, -sc); lL = mix(lL, kick, eg); lR = mix(lR, -kick, -eg);
+    zL = -1.05 * (1 - run) * k; zR = 1.05 * (1 - run) * k;
+    // 가슴이 수면 바로 아래에 오게 몸을 내려요(물 위로 떠올라도 몸이 물 밖에 뜨지 않게). 깊이 잠수하면 그대로
+    tilt = -1.3 * run * k; dy = Math.max(-1.4, Math.min(0, (u.ws || 0) - .22 - (g.position.y + 1))) * k;
+    u.head.rotation.x += -tilt * .75; // 엎드려도 앞을 봐요
+  }
+  u.legL.rotation.x = lL; u.legR.rotation.x = lR; u.armL.rotation.x = aL; u.armR.rotation.x = aR - (swingK || 0) * 1.6;
+  u.armL.rotation.z = zL; u.armR.rotation.z = zR;
+  // 가슴(높이 1)을 축으로 기울여요
+  if (B) { B.rotation.x = tilt; B.position.set(0, 1 - Math.cos(tilt) + dy, -Math.sin(tilt)); }
 }
 function nameTag(name, color) {
   const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64; const x = cv.getContext("2d");
@@ -4822,42 +4849,116 @@ const ANIMT = {
     fact: "양털은 꼬불꼬불해서 사이사이에 공기를 많이 품어요. 공기는 열을 잘 전달하지 않아서 양털 옷과 이불이 따뜻해요." },
 };
 let animals = [], aniT = 0;
+// 같은 무리(몸통·머리·다리·꼬리) 안의 상자를 색을 꼭짓점에 담아 한 덩어리로 합쳐요.
+// 얼굴을 자세히 그려도 동물 하나를 그리는 횟수는 무리 수(6~7번)뿐이에요. 밝기·맞을 때 빨개지는 건 하나뿐인 재질 색으로 해요
+function mergeBoxes(root) {
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }), gs = [root];
+  root.traverse(o => { if (o !== root && o.isGroup) gs.push(o); });
+  for (const G of gs) {
+    const L = G.children.filter(c => c.isMesh && c.geometry && c.geometry.isBufferGeometry); if (!L.length) continue;
+    const pos = [], nor = [], col = [];
+    for (const c of L) { c.updateMatrix(); const q = c.geometry.index ? c.geometry.toNonIndexed() : c.geometry.clone(); q.applyMatrix4(c.matrix); const k = c.material.color;
+      for (const v of q.attributes.position.array) pos.push(v); for (const v of q.attributes.normal.array) nor.push(v); for (let i = 0; i < q.attributes.position.count; i++) col.push(k.r, k.g, k.b);
+      G.remove(c); c.geometry.dispose(); c.material.dispose(); q.dispose(); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    G.add(new THREE.Mesh(geo, mat));
+  }
+}
 function buildAnimal(type) {
-  const T = ANIMT[type], g = new THREE.Group(), a = lam(T.col[0]), b = lam(T.col[1]), dk = lam("#22201e"), legs = [];
-  const leg = (x, z, h, w, m) => { const p = new THREE.Group(); p.position.set(x, h, z); box(w, h, w, m, 0, -h / 2, 0, p); g.add(p); legs.push(p); };
+  const T = ANIMT[type], g = new THREE.Group(), a = lam(T.col[0]), b = lam(T.col[1]), dk = lam("#22201e"), wh = lam("#fbfaf6"), legs = [];
+  // 다리: 엉덩이를 축으로 돌아요. cuff=[색, 높이 비율, 위(true)/아래]로 발굽·털 양말을 붙여요
+  const leg = (x, z, h, w, m, cuff) => { const p = new THREE.Group(); p.position.set(x, h, z); box(w, h, w, m, 0, -h / 2, 0, p);
+    if (cuff) { const ch = h * cuff[1]; box(w + (cuff[2] ? .06 : .012), ch, w + (cuff[2] ? .06 : .012), cuff[0], 0, cuff[2] ? -ch / 2 : -h + ch / 2, 0, p); }
+    g.add(p); legs.push(p); };
+  // 눈: 흰자 위에 검은 눈동자(안쪽으로 살짝). 어두운 얼굴에서도 눈이 보여요
+  const eyes = (x, y, z, w, h, iris, p, pupil) => { for (const s of [-1, 1]) { box(w, h, .02, iris || wh, s * x, y, z, p); box(w * (pupil ? .3 : .5), h * (pupil ? 1 : .9), .02, dk, s * (x - w * (pupil ? 0 : .25)), y - (pupil ? 0 : h * .05), z - .006, p); } };
+  const rot = (o, x, y, z) => { o.rotation.set(x || 0, y || 0, z || 0); return o; };
   let head;
   if (type === "cat" || type === "wolf") {
-    const W = type === "wolf", L = W ? .42 : .2, bw = W ? .34 : .24, bh = W ? .36 : .24, bl = W ? .82 : .52;
-    box(bw, bh, bl, a, 0, L + bh / 2, 0, g); if (W) box(bw + .04, bh + .06, .3, a, 0, L + bh / 2 + .02, -bl / 2 + .14, g);
+    const W = type === "wolf", L = W ? .42 : .2, bw = W ? .34 : .24, bh = W ? .36 : .24, bl = W ? .82 : .52, pink = lam("#f0a0b0");
+    box(bw, bh, bl, a, 0, L + bh / 2, 0, g);
+    if (W) { box(bw + .06, bh + .08, .32, a, 0, L + bh / 2 + .02, -bl / 2 + .16, g); box(bw - .06, .06, bl * .7, b, 0, L + .01, .02, g); } // 늑대: 목덜미 갈기, 밝은 배
     head = new THREE.Group(); head.position.set(0, L + bh * .9, -bl / 2 - .08); g.add(head);
-    box(W ? .3 : .24, W ? .28 : .22, W ? .26 : .2, a, 0, 0, -.02, head); box(W ? .14 : .1, W ? .12 : .08, W ? .18 : .06, b, 0, -.06, W ? -.2 : -.13, head);
-    box(.05, .05, .02, W ? lam("#e8c040") : lam("#60c060"), -.07, .05, W ? -.16 : -.13, head); box(.05, .05, .02, W ? lam("#e8c040") : lam("#60c060"), .07, .05, W ? -.16 : -.13, head);
-    box(.07, .1, .04, a, -.09, W ? .18 : .14, 0, head); box(.07, .1, .04, a, .09, W ? .18 : .14, 0, head);
-    if (!W) { for (const z of [-.12, .02, .16]) box(bw + .01, .04, .05, b, 0, L + bh * .85, z, g); box(.12, .02, .02, lam("#f0f0f0"), 0, -.04, -.14, head); }
-    const tail = new THREE.Group(); tail.position.set(0, L + bh * .8, bl / 2); g.add(tail); box(.07, .07, W ? .38 : .34, W ? b : a, 0, W ? -.06 : .08, .16, tail); tail.rotation.x = W ? .5 : -.7;
+    const hw = W ? .3 : .24, hh = W ? .28 : .22, hd = W ? .26 : .2, fz = -.02 - hd / 2;
+    box(hw, hh, hd, a, 0, 0, -.02, head);
+    // 주둥이(밝은 털)와 코
+    const mw = W ? .16 : .12, mh = W ? .12 : .08, md = W ? .18 : .06, mz = fz - md / 2 + .01;
+    box(mw, mh, md, b, 0, -.06, mz, head); box(W ? .08 : .05, W ? .05 : .035, .03, W ? dk : pink, 0, -.06 + mh / 2 - (W ? .02 : .015), mz - md / 2 - .005, head);
+    if (W) box(.1, .02, .02, dk, 0, -.105, mz - md / 2 + .005, head); // 늑대 입선
+    // 눈: 늑대는 노란 눈, 고양이는 초록 눈에 세로로 가는 눈동자
+    eyes(.07, .045, fz - .005, .06, .055, W ? lam("#e8c040") : lam("#7ad060"), head, !W);
+    // 귀(안쪽은 분홍·짙은 색)
+    for (const s of [-1, 1]) { box(.08, .11, .04, a, s * .085, hh / 2 + .045, -.01, head); box(.04, .06, .01, W ? lam("#4a4448") : pink, s * .085, hh / 2 + .035, -.035, head); }
+    if (!W) { for (const z of [-.12, .02, .16]) box(bw + .01, .04, .05, lam("#c07a30"), 0, L + bh * .85, z, g); box(.06, .04, .01, lam("#c07a30"), 0, hh / 2 - .02, fz - .006, head);
+      for (const s of [-1, 1]) for (const dy of [-.045, -.075]) rot(box(.1, .008, .008, lam("#f8f8f8"), s * .1, dy, mz - .02, head), 0, 0, s * (dy < -.06 ? -.15 : .1)); } // 고양이 줄무늬·이마 무늬·수염
+    const tail = new THREE.Group(); tail.position.set(0, L + bh * .8, bl / 2); g.add(tail);
+    if (W) { box(.09, .09, .3, a, 0, -.06, .14, tail); box(.1, .1, .1, b, 0, -.06, .32, tail); } else { box(.06, .06, .34, a, 0, .08, .16, tail); box(.065, .065, .06, lam("#c07a30"), 0, .08, .3, tail); }
+    tail.rotation.x = W ? .5 : -.7;
     const lw = W ? .1 : .07, lx = bw / 2 - lw / 2, lz = bl / 2 - lw / 2 - .03;
-    leg(-lx, -lz, L, lw, a); leg(lx, -lz, L, lw, a); leg(-lx, lz, L, lw, W ? a : b); leg(lx, lz, L, lw, W ? a : b);
+    const paw = [W ? b : lam("#f8f2ea"), .2, false];
+    leg(-lx, -lz, L, lw, a, paw); leg(lx, -lz, L, lw, a, paw); leg(-lx, lz, L, lw, W ? a : b, paw); leg(lx, lz, L, lw, W ? a : b, paw);
   } else if (type === "chicken") {
     box(.34, .3, .44, a, 0, .42, .02, g); head = new THREE.Group(); head.position.set(0, .62, -.2); g.add(head);
-    box(.2, .26, .2, a, 0, .06, 0, head); box(.1, .06, .1, lam("#e8a020"), 0, .04, -.14, head); box(.05, .1, .12, lam("#e03030"), 0, .24, 0, head); box(.06, .1, .06, lam("#d02828"), 0, -.06, -.11, head);
-    box(.04, .04, .02, dk, -.08, .1, -.1, head); box(.04, .04, .02, dk, .08, .1, -.1, head);
-    box(.06, .2, .3, a, -.2, .44, .04, g); box(.06, .2, .3, a, .2, .44, .04, g);
-    leg(-.08, .02, .27, .05, lam("#e8a020")); leg(.08, .02, .27, .05, lam("#e8a020"));
+    box(.2, .26, .2, a, 0, .06, 0, head);
+    box(.12, .06, .1, lam("#e8a020"), 0, .05, -.14, head); box(.1, .03, .06, lam("#c8801a"), 0, .015, -.13, head); // 부리(윗부리·아랫부리)
+    for (let i = 0; i < 3; i++) box(.05, .07 + (i % 2) * .04, .05, lam("#e03030"), 0, .22 + (i % 2) * .02, -.06 + i * .05, head); // 볏
+    box(.06, .1, .05, lam("#d02828"), 0, -.06, -.11, head); // 턱 볏
+    eyes(.06, .11, -.102, .045, .045, wh, head);
+    box(.06, .2, .3, b, -.2, .44, .04, g); box(.06, .2, .3, b, .2, .44, .04, g); // 날개(노란 깃)
+    rot(box(.22, .22, .08, a, 0, .62, .26, g), -.5); rot(box(.16, .14, .06, b, 0, .7, .3, g), -.6); // 꽁지깃
+    const toe = [lam("#e8a020"), .12, false];
+    leg(-.08, .02, .27, .05, lam("#e8a020"), toe); leg(.08, .02, .27, .05, lam("#e8a020"), toe);
+    legs.forEach(l => box(.12, .03, .14, lam("#e8a020"), 0, -.255, -.03, l)); // 발가락
   } else {
-    const L = type === "cow" ? .62 : type === "sheep" ? .5 : .34, bw = type === "cow" ? .66 : type === "sheep" ? .7 : .58, bh = type === "pig" ? .5 : .58, bl = type === "cow" ? 1.15 : .95;
-    const legM = type === "sheep" ? b : type === "pig" ? a : a;
+    const cow = type === "cow", pig = type === "pig", sheep = type === "sheep";
+    const L = cow ? .62 : sheep ? .5 : .34, bw = cow ? .66 : sheep ? .7 : .58, bh = pig ? .5 : .58, bl = cow ? 1.15 : .95;
     box(bw, bh, bl, a, 0, L + bh / 2, 0, g);
     head = new THREE.Group(); head.position.set(0, L + bh * .75, -bl / 2 - .12); g.add(head);
-    const hm = type === "sheep" ? b : a;
-    box(type === "pig" ? .46 : .42, .42, .38, hm, 0, 0, -.06, head);
-    box(.06, .06, .02, dk, -.12, .06, -.26, head); box(.06, .06, .02, dk, .12, .06, -.26, head);
-    if (type === "pig") box(.22, .14, .06, b, 0, -.06, -.28, head);
-    if (type === "cow") { box(.24, .14, .06, lam("#d8b8a8"), 0, -.12, -.27, head); box(.06, .12, .06, lam("#e8e0c8"), -.2, .24, -.04, head); box(.06, .12, .06, lam("#e8e0c8"), .2, .24, -.04, head);
-      box(bw + .01, .26, .3, b, 0, L + bh * .6, .15, g); box(.2, .2, bl * .5, b, bw / 2 - .05, L + bh * .45, -.2, g); }
-    if (type === "sheep") box(bw + .06, bh + .06, bl + .04, a, 0, L + bh / 2, 0, g);
-    const lw = type === "cow" ? .17 : .14, lx = bw / 2 - lw / 2 - .02, lz = bl / 2 - lw / 2 - .04;
-    leg(-lx, -lz, L, lw, legM); leg(lx, -lz, L, lw, legM); leg(-lx, lz, L, lw, legM); leg(lx, lz, L, lw, legM);
+    const lw = cow ? .17 : .14, lx = bw / 2 - lw / 2 - .02, lz = bl / 2 - lw / 2 - .04;
+    if (sheep) {
+      // 양: 북슬북슬한 흰 털 몸통 + 털 밖으로 나온 까만 얼굴. 머리 위·뒤는 털모자처럼 덮여요
+      const wool2 = lam("#e4e0d6");
+      // 털 뭉치: 몸통 겉에 크기가 다른 털 덩어리를 박아 구름처럼 울퉁불퉁하게
+      for (const [x, y, z, c] of [[-.18, .27, -.28, .22], [.16, .29, -.06, .24], [-.12, .28, .18, .2], [.18, .26, .32, .2], [.02, .3, .38, .16], [.33, .08, -.3, .2], [.34, -.06, .1, .22], [.32, .12, .3, .18], [-.33, .1, -.16, .22], [-.34, -.08, .2, .2], [-.32, .14, .36, .16], [.1, -.04, .46, .22], [-.12, .1, .46, .18], [0, .16, -.46, .2]])
+        box(c, c, c, (x * 7 + z * 5) % .2 > .08 ? wool2 : a, x, L + bh / 2 + y, z, g);
+      box(.3, .3, .3, b, 0, -.03, -.1, head); // 까만 얼굴(앞면이 -0.25)
+      box(.38, .2, .3, a, 0, .1, -.02, head); box(.38, .22, .14, a, 0, -.02, .09, head); // 머리 털모자·뒤통수
+      box(.32, .07, .05, wool2, 0, .14, -.18, head); // 앞머리 털
+      eyes(.075, .03, -.255, .08, .06, wh, head);
+      box(.12, .05, .02, lam("#8a6a68"), 0, -.08, -.255, head); box(.02, .05, .02, lam("#5a4440"), 0, -.115, -.255, head); // 코와 입
+      for (const s of [-1, 1]) rot(box(.14, .05, .08, b, s * .2, .02, -.1, head), 0, 0, s * -.35); // 옆으로 처진 귀
+      box(.14, .14, .1, a, 0, L + bh * .7, bl / 2 + .06, g); // 짧은 꼬리
+      const sock = [a, .45, true]; // 다리 위쪽은 털, 아래쪽은 까만 다리
+      leg(-lx, -lz, L, lw, b, sock); leg(lx, -lz, L, lw, b, sock); leg(-lx, lz, L, lw, b, sock); leg(lx, lz, L, lw, b, sock);
+    } else if (cow) {
+      // 소: 갈색 바탕에 흰 얼룩, 흰 이마, 분홍 코에 콧구멍, 구부러진 뿔, 젖과 꼬리
+      const horn = lam("#ece4cc"), nose = lam("#e0b4a8"), hoof = lam("#2e2420");
+      box(.42, .42, .38, a, 0, 0, -.06, head);
+      box(.14, .24, .02, b, 0, .08, -.255, head); // 흰 이마
+      box(.32, .16, .08, nose, 0, -.12, -.28, head); for (const s of [-1, 1]) box(.045, .04, .02, dk, s * .075, -.1, -.325, head); box(.16, .02, .02, lam("#a07868"), 0, -.175, -.325, head);
+      eyes(.14, .07, -.255, .07, .06, wh, head);
+      for (const s of [-1, 1]) { box(.1, .06, .06, horn, s * .25, .2, -.06, head); box(.05, .1, .05, horn, s * .29, .27, -.06, head); // 뿔
+        rot(box(.12, .07, .05, a, s * .26, .07, -.02, head), 0, 0, s * .3); box(.05, .04, .01, nose, s * .27, .065, -.048, head); } // 귀
+      box(bw + .01, .26, .3, b, 0, L + bh * .6, .15, g); box(.2, .2, bl * .5, b, bw / 2 - .05, L + bh * .45, -.2, g); box(.22, .24, .26, b, -bw / 2 + .06, L + bh * .62, -.38, g);
+      box(.22, .1, .24, lam("#f0b0b0"), 0, L - .04, bl * .28, g); for (const s of [-1, 1]) box(.04, .06, .04, lam("#e09090"), s * .06, L - .11, bl * .28, g); // 젖
+      const tail = new THREE.Group(); tail.position.set(0, L + bh - .04, bl / 2 + .02); g.add(tail); box(.05, .5, .05, a, 0, -.25, 0, tail); box(.08, .1, .08, dk, 0, -.52, 0, tail); tail.rotation.x = .12;
+      const hf = [hoof, .14, false];
+      leg(-lx, -lz, L, lw, a, hf); leg(lx, -lz, L, lw, b, hf); leg(-lx, lz, L, lw, b, hf); leg(lx, lz, L, lw, a, hf);
+    } else {
+      // 돼지: 들창코(콧구멍 두 개), 앞으로 접힌 귀, 돌돌 말린 꼬리
+      const pk2 = lam("#e08890"), nost = lam("#7a3040");
+      box(.46, .42, .38, a, 0, 0, -.06, head);
+      box(.24, .15, .07, b, 0, -.06, -.28, head); for (const s of [-1, 1]) box(.05, .06, .02, nost, s * .055, -.06, -.318, head);
+      eyes(.14, .08, -.255, .07, .06, wh, head);
+      box(.14, .02, .02, pk2, 0, -.165, -.255, head);
+      for (const s of [-1, 1]) rot(box(.14, .04, .13, a, s * .15, .2, -.18, head), -.7, 0, s * .15); // 귀
+      const tail = new THREE.Group(); tail.position.set(0, L + bh * .8, bl / 2); g.add(tail);
+      box(.05, .05, .1, a, 0, 0, .05, tail); box(.05, .1, .05, a, .03, .05, .1, tail); box(.08, .05, .05, a, 0, .1, .1, tail);
+      const hf = [lam("#b05a64"), .16, false];
+      leg(-lx, -lz, L, lw, a, hf); leg(lx, -lz, L, lw, a, hf); leg(-lx, lz, L, lw, a, hf); leg(lx, lz, L, lw, a, hf);
+    }
   }
+  mergeBoxes(g);
   const mats = []; g.traverse(o => { if (o.material && !mats.includes(o.material)) mats.push(o.material); });
   g.userData = { legs, head, mats, base: mats.map(m => m.color.clone()) };
   return g;
@@ -5173,7 +5274,7 @@ function animalTick(dt) {
     shadeAnimal(m.g, m.p, m.flash, dayK);
     m.g.position.copy(m.p); m.g.scale.setScalar(k); m.g.rotation.y += (((m.yaw - m.g.rotation.y + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI) * Math.min(1, dt * 8);
     const v = Math.hypot(m.v.x, m.v.z); m.walk += dt * v * 3 / k; legSwing(m.g, m.walk, v);
-    if (u.head) u.head.rotation.x = m.st === "idle" && !sp && Math.sin(gameT * .7 + m.walk) > .5 ? .5 : 0;
+    if (u.head) u.head.rotation.x += ((m.st === "idle" && !sp && Math.sin(gameT * .7 + m.walk) > .5 ? -.55 : 0) - u.head.rotation.x) * Math.min(1, dt * 5); // 가만히 있을 땐 가끔 고개를 숙여 풀을 뜯어요
     return true;
   });
   if (newborn.length) { animals.push(...newborn); newborn = []; saveHerd(); }
@@ -5320,7 +5421,7 @@ function updateHeld() {
   else if (id) { heldMesh = new THREE.Mesh(itemGeo(id), HAND_LV[id] ? itemGlowMat : itemMat); heldMesh.scale.setScalar(.22); heldMesh.position.set(-.04, .14, -.34); heldMesh.rotation.set(.1, .7, 0); handArm.add(heldMesh); }
 }
 rebuildHand();
-let wantPrev = false, swing = 0, walkT = 0, walkAmt = 0, stepAcc = 0, hurtT = 0, lastHurt = -9, third = false;
+let handSwK = 0, handSwT = 0, wantPrev = false, swing = 0, walkT = 0, walkAmt = 0, stepAcc = 0, hurtT = 0, lastHurt = -9, third = false;
 const selfAv = { g: null };
 function ensureSelf() {
   const key = JSON.stringify(cleanLook(LOOK));
@@ -5330,7 +5431,9 @@ function ensureSelf() {
 }
 const eye = new THREE.Vector3(), fwd = new THREE.Vector3();
 function updateCamera(dt) {
-  const hs = Math.hypot(P.vel.x, P.vel.z);
+  const hs = Math.hypot(P.vel.x, P.vel.z), meSwim = !P.sit && swimPose(P.pos.x, P.pos.y, P.pos.z);
+  // 1인칭 손도 물속에서 앞으로 뻗었다 옆으로 밀어내며 헤엄쳐요
+  handSwK += ((meSwim ? Math.min(1, hs / 1.5) : 0) - handSwK) * Math.min(1, dt * 5); if (handSwK > .01) handSwT += dt * 5;
   walkAmt += ((P.ground && hs > .5 ? 1 : 0) - walkAmt) * Math.min(1, dt * 8);
   walkT += dt * hs * 1.25;
   if (P.ground && hs > .5 && !paused) { stepAcc += hs * dt; if (stepAcc > 1.9) { stepAcc = 0; sfx.step(get(Math.floor(P.pos.x), Math.floor(P.pos.y - .1), Math.floor(P.pos.z))); } }
@@ -5345,7 +5448,7 @@ function updateCamera(dt) {
     camera.position.copy(eye).addScaledVector(fwd, -Math.max(.3, d));
   } else camera.position.set(eye.x + Math.cos(P.yaw) * bobX, eye.y + bobY, eye.z - Math.sin(P.yaw) * bobX);
   // 3인칭이면 내 캐릭터를 보여 줘요
-  if (third && !spec.id) { ensureSelf(); selfAv.g.visible = true; selfAv.g.position.set(P.pos.x, P.pos.y, P.pos.z); selfAv.g.rotation.y = P.yaw; selfAv.g.userData.head.rotation.x = -P.pitch * .6; animAvatar(selfAv.g, hs, walkT / 1.25, Math.sin(Math.min(1, swing) * Math.PI)); }
+  if (third && !spec.id) { ensureSelf(); selfAv.g.visible = true; selfAv.g.position.set(P.pos.x, P.pos.y, P.pos.z); selfAv.g.rotation.y = P.yaw; selfAv.g.userData.head.rotation.x = -P.pitch * .6; animAvatar(selfAv.g, hs, walkT / 1.25, Math.sin(Math.min(1, swing) * Math.PI), meSwim, dt); }
   else if (selfAv.g) selfAv.g.visible = false;
   // 손 흔들기
   // 누르는 순간 바로 휘둘러요(캐기 틱이나 공격 판정을 기다리지 않아요)
@@ -5354,8 +5457,9 @@ function updateCamera(dt) {
   if (swing > 0) { swing += dt * 4.2; if (swing >= 1) swing = wantMine && mining && mining.key !== "x" ? .001 : 0; }
   const sw = Math.sin(Math.min(1, swing) * Math.PI);
   handRig.position.copy(camera.position); handRig.quaternion.copy(camera.quaternion);
-  handArm.position.set(.42 + bobX * .6 - sw * .12, -.42 - bobY * .6 + sw * .1, -.55 - sw * .12);
-  handArm.rotation.set(-.15 - sw * 1.0, -.25 + sw * .3, sw * .2);
+  const hk = handSwK * (1 - sw), hs1 = Math.sin(handSwT), hc = Math.cos(handSwT);
+  handArm.position.set(.42 + bobX * .6 - sw * .12 - hk * (.16 + .14 * hs1), -.42 - bobY * .6 + sw * .1 + hk * (.1 + .06 * hc), -.55 - sw * .12 - hk * (.14 - .16 * hc));
+  handArm.rotation.set(-.15 - sw * 1.0 - hk * (.5 - .3 * hc), -.25 + sw * .3 + hk * .35 * hs1, sw * .2 + hk * .3 * hs1);
   handRig.visible = !third && !spec.id && $("startOv").hidden && !xrOn;
   const li = Math.max(.25, Math.min(1, sunLight.intensity + hemi.intensity));
   handHemi.intensity = li * .9; handSun.intensity = li * .5;
@@ -5735,7 +5839,7 @@ const net = (() => {
         o.mesh.position.x += (tx - o.mesh.position.x) * Math.min(1, dt * 10); o.mesh.position.y += (o.y - o.mesh.position.y) * Math.min(1, dt * 10); o.mesh.position.z += (o.z - o.mesh.position.z) * Math.min(1, dt * 10);
         o.mesh.rotation.y = o.yaw; o.mesh.userData.head.rotation.x = -o.pitch * .6;
         const sp = Math.hypot(o.mesh.position.x - px, o.mesh.position.z - pz) / Math.max(dt, .001); o.spd = (o.spd || 0) + (sp - (o.spd || 0)) * Math.min(1, dt * 6); o.walk = (o.walk || 0) + dt * o.spd;
-        animAvatar(o.mesh, o.spd, o.walk, o.sw);
+        animAvatar(o.mesh, o.spd, o.walk, o.sw, swimPose(o.mesh.position.x, o.mesh.position.y, o.mesh.position.z), dt);
       }
     }
   }
