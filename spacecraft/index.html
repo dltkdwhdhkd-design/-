@@ -5977,12 +5977,13 @@ function frameBody(now, xf) {
   // VR 중에는 헤드셋 그림 고리(xf가 있는 호출)만 받아요. 화면 고리가 끼면 시간이 앞뒤로 튀어요
   if (xrOn && !xf) return;
   now = performance.now();
-  const dt = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now;
+  // 움직임은 한 장면에 0.05초까지만 진행하지만, 낮·밤 시계는 실제로 흐른 시간대로 가요(느린 태블릿에서 하루가 길어지지 않게)
+  const realDt = Math.max(0, Math.min(1, (now - last) / 1000)), dt = Math.min(.05, realDt); last = now;
   const PL = PLANETS[S.planet];
   if (xrOn) xrTick(dt);
   if (!paused) {
     gameT += dt;
-    S.time[S.planet] = warpT(S.planet, (unwarpT(S.planet, S.time[S.planet]) + dt / (PL.wrap ? daySec(PL) : cycleSec(PL))) % 1);
+    S.time[S.planet] = warpT(S.planet, (unwarpT(S.planet, S.time[S.planet]) + realDt / (PL.wrap ? daySec(PL) : cycleSec(PL))) % 1);
   }
   // 같은 방이면 방장 시계로 모든 천체의 시각을 맞춰요(누구나 같은 낮·밤)
   const rc = net.clock();
