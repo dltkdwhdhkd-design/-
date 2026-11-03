@@ -37,7 +37,7 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 .A { color: var(--amp); font-weight: 700; } .V { color: var(--volt); font-weight: 700; } .O { color: var(--ohm); font-weight: 700; }
 
 .hud { position: fixed; z-index: 5; pointer-events: none; }
-.hud .click { pointer-events: auto; }
+.hud .click, .hud.click { pointer-events: auto; }
 #mission { top: calc(env(safe-area-inset-top, 0px) + 10px); left: max(10px, env(safe-area-inset-left, 0px)); width: min(340px, calc(100vw - 20px)); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 6px; }
 #mission .lv { font-size: .78em; color: var(--dim); font-weight: 700; letter-spacing: .05em; }
 #mission .t { font-family: var(--font-display); font-size: 1.25em; }
@@ -156,7 +156,7 @@ body.touch #keysHelp { display: none; }
 <div class="hud click" id="hotbar" hidden></div>
 <div class="hud" id="hotName" hidden></div>
 <div class="hud" id="keysHelp" hidden>
-  <kbd>WASD</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>F</kbd> 날기<br>
+  <kbd>WASD</kbd> 이동 · <kbd>Space</kbd> 점프 · <kbd>F</kbd> 날기 · <kbd>C</kbd> 엎드리기<br>
   왼쪽 클릭 빼기 · 오른쪽 클릭 놓기/스위치<br>
   <kbd>R</kbd> 부품 방향 돌리기 · <kbd>V</kbd> 전류 보기<br>
   <kbd>E</kbd> 부품 상자 · <kbd>N</kbd> 노트 · <kbd>Esc</kbd> 메뉴
@@ -170,7 +170,7 @@ body.touch #keysHelp { display: none; }
   <button id="tBreak">빼기</button>
   <button id="tJump">점프</button>
   <button id="tDown" hidden>내려</button>
-  <div id="tTop"><button id="tRot">돌리기</button><button id="tView">보기</button><button id="tFly">날기</button><button id="tInv">부품</button><button id="tEsc">메뉴</button></div>
+  <div id="tTop"><button id="tRot">돌리기</button><button id="tView">보기</button><button id="tFly">날기</button><button id="tProne">엎드려</button><button id="tInv">부품</button><button id="tEsc">메뉴</button></div>
 </div>
 
 <!-- 시작 화면 -->
@@ -263,7 +263,7 @@ const BL = {
   1: { n: "풀", t: [0, 1, 2] }, 2: { n: "흙", t: [2, 2, 2] }, 3: { n: "돌", t: [3, 3, 3] }, 4: { n: "나무판", t: [4, 4, 4] },
   5: { n: "통나무", t: [6, 5, 6] }, 6: { n: "벽돌", t: [7, 7, 7] }, 7: { n: "유리", t: [8, 8, 8], see: true }, 8: { n: "흰 벽", t: [9, 9, 9] },
   9: { n: "지붕", t: [10, 10, 10] }, 10: { n: "나뭇잎", t: [11, 11, 11], see: true }, 11: { n: "바닥돌", t: [12, 12, 12], hard: true }, 12: { n: "고무 매트", t: [13, 13, 13] }, 13: { n: "철 블록", t: [14, 14, 14], iron: true }, 14: { n: "바퀴", t: [15, 15, 15], see: true, shaped: true }, 15: { n: "바퀴축", t: [14, 14, 14], see: true, shaped: true },
-  16: { n: "톱니바퀴", t: [14, 14, 14], see: true, shaped: true }, 17: { n: "톱니 기둥", t: [14, 14, 14], see: true, shaped: true }, 18: { n: "선풍기 날개", t: [14, 14, 14], see: true, shaped: true },
+  16: { n: "톱니바퀴", t: [14, 14, 14], see: true, shaped: true }, 17: { n: "톱니 기둥", t: [14, 14, 14], see: true, shaped: true }, 18: { n: "선풍기 날개", t: [14, 14, 14], see: true, shaped: true }, 19: { n: "핸들", t: [14, 14, 14], see: true, shaped: true },
 };
 // R: 저항(Ω). 전지는 전압 V와 내부 저항 r. 전선은 거의 0Ω(0.01Ω)
 const PT = {
@@ -565,6 +565,11 @@ function makeShaped(i) {
     fan.add(new THREE.Mesh(new THREE.CylinderGeometry(.1, .1, .22, 12), mat(0xe8e8e8))); thru(fan);
     for (let a = 0; a < 3; a++) { const bl = bx(.4, .03, .2, mat(0x4aa3ff), .27, 0, 0); bl.rotation.x = .4; const h = new THREE.Group(); h.rotation.y = a * Math.PI * 2 / 3; h.add(bl); fan.add(h); }
     const ring = new THREE.Mesh(new THREE.TorusGeometry(.48, .02, 4, 24), mat(0xbfc5cf)); ring.rotation.x = Math.PI / 2; spin.add(ring);
+  } else if (W[i] === 19) { // 핸들: 기둥 위 운전대(차에 올라타 옆에 서면 A/D로 꺾어요)
+    bx(.12, .5, .12, mat(0x3a3f4a), 0, -.25, 0, g); bx(.4, .08, .3, mat(0x3a3f4a), 0, -.46, 0, g);
+    const ring = new THREE.Group(); ring.position.y = .1; ring.rotation.x = -.5; g.add(ring); g.userData.ring = ring;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(.3, .045, 8, 24), mat(0x222428)); rim.rotation.x = Math.PI / 2; ring.add(rim);
+    bx(.58, .04, .06, mat(0x55585f), 0, 0, 0, ring); bx(.06, .04, .3, mat(0x55585f), 0, 0, .14, ring); bx(.12, .07, .12, mat(0xd8342c), 0, 0, 0, ring);
   } else { // 바퀴축: 노란 줄이 있어 도는 게 보여요
     const spin = new THREE.Group(); turn(spin); g.add(spin); const rod = new THREE.Group(); spin.add(rod); g.userData.spin = rod;
     rod.add(new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, 1, 10), mat(0x8d939e))); bx(.03, 1.002, .08, mat(0xf2c230), .075, 0, 0, rod);
@@ -773,9 +778,17 @@ function turnStruct(S, sg) { // y축을 중심으로 90° 돌려요. sg = +1: (x
 // 비행: 날개 미는 힘 = THRUST_K × 전류², 무게 = 블록 1, 부품 0.5, 전선 0.25, 바퀴·축·날개 0.3
 const THRUST_K = 20;
 function weightOf(S) { let w = 0; for (const c of S) { const b = W[c]; w += b === 20 ? .25 : isPart(b) ? .5 : BL[b] && BL[b].shaped ? .3 : 1; } return w; }
+// 운전: 차에 올라타 핸들 옆(2칸 안)에 서면 A/D(조이스틱 좌우)로 핸들을 꺾어요. 꺾은 채로 2칸 가면 그쪽으로 90° 돌아요
+let driving = 0, steerRun = 0;
+function steerInput() { return Math.max(-1, Math.min(1, (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + stickV.x)); }
+function driverOf(S) {
+  const foot = ix(Math.floor(player.x), Math.floor(player.y - .01), Math.floor(player.z)); if (!player.ground || !S.has(foot)) return null;
+  for (const c of S) if (W[c] === 19 && Math.abs(cx(c) + .5 - player.x) < 2 && Math.abs(cz(c) + .5 - player.z) < 2 && Math.abs(cy(c) - player.y) < 2.5) return c;
+  return null;
+}
 function warn(msg) { if (performance.now() - (warn.t || 0) > 4000) { warn.t = performance.now(); toast(msg, 2800, "bad"); } }
 function machineTick(dt) {
-  fans = []; spinning = new Map(); if (mode !== "sandbox" || !RES || solveDirty) return;
+  fans = []; spinning = new Map(); const wasDriving = driving; driving = 0; if (mode !== "sandbox" || !RES || solveDirty) { driving = wasDriving; return; }
   const groups = [];
   const groupOf = (m) => { let G = groups.find(g => g.S.has(m)); if (!G) { const S = structOf(m); if (!S) return null; G = { S, drive: [], climb: [], slip: [], key: m, air: false, thrust: 0 }; groups.push(G); } return G; };
   for (const m of cellsOf("mot")) if (shaftAxis(m) === 2) { const G = groupOf(m); if (G) G.air = true; } // 세운 축 전동기가 달린 덩어리 = 비행체(꺼져 있으면 떨어져요)
@@ -796,6 +809,10 @@ function machineTick(dt) {
   }
   for (const G of groups) {
     const S = G.S, key = [...S].filter(c => W[c] === 28).sort((a, b) => a - b)[0];
+    const hd = driverOf(S), steer = hd != null ? steerInput() : 0;
+    if (hd != null) { driving = 1; if (!mstat.driveMsg) { mstat.driveMsg = 1; toast("🛞 운전석이에요! A/D(휴대폰은 조이스틱 좌우)로 핸들을 꺾고, 스위치로 출발·정지해요.", 3000, "good"); }
+      const ho = partObj.get(hd); if (ho && ho.userData.ring) ho.userData.ring.rotation.y = -steer * .9;
+      const drv = new Set(G.drive.map(w => w.c)); for (const c of S) if (W[c] === 14 && !drv.has(c) && !spinning.has(c)) { const o = partObj.get(c); if (o) o.rotation.y = steer * .45; } }
     if (G.slip.length && !G.climb.length) warn("고무바퀴는 톱니 기둥에서 미끄러져요. 회전축에 톱니바퀴를 끼워 톱니끼리 맞물리게 해요.");
     let act = null, rate = 0;
     const wt = G.air ? weightOf(S) : 0, held = G.air && [...S].some(c => below(c) >= 0 && W[below(c)] && !S.has(below(c)));
@@ -824,6 +841,9 @@ function machineTick(dt) {
         if (stuck.length) { warn(shapeAxis(stuck[0]) === along ? "바퀴가 옆으로 끌려요. 바퀴는 축과 직각 방향으로만 굴러가요." : "바퀴가 축에 안 끼워져 있어요. 바퀴를 바퀴축이나 전동기 회전축에 끼워요."); continue; }
         const [dx, , dz] = DIRS[d]; if (!wheels.every(c => inb(cx(c) + dx, cy(c) - 1, cz(c) + dz) && isSolid(W[below(c) + dx + SX * dz]) && !S.has(below(c) + dx + SX * dz))) continue; // 낭떠러지에선 멈춰요
         act = { k: "car", d };
+        if (steer && hd != null && steerRun >= 2) { // 핸들을 꺾은 채 2칸 → 90° 돌기. 앞으로 갈 땐 꺾은 쪽, 후진할 땐 반대로 돌아요
+          const fwd = (-Math.sin(player.yaw)) * dx + (-Math.cos(player.yaw)) * dz > 0; act = { k: "turn", sg: (steer > 0 ? -1 : 1) * (fwd ? 1 : -1), steer: 1 };
+        }
       }
     } else continue;
     const a = (machAcc.get(key) || 0) + dt * rate; if (a < 1) { machAcc.set(key, a); continue; }
@@ -831,7 +851,8 @@ function machineTick(dt) {
     const moved = act.k === "turn" ? turnStruct(S, act.sg) : shiftStruct(S, act.d);
     if (!moved) continue;
     sfx.step(); const nk = moved.get(key);
-    if (act.k === "car") { mstat.car++; mstat.carAt = nk; }
+    if (act.steer) steerRun = 0;
+    if (act.k === "car") { mstat.car++; mstat.carAt = nk; steerRun = steer ? steerRun + 1 : 0; }
     else if (act.k === "turn") { mstat.turn++; mstat.carAt = nk; }
     else if (act.k === "fly") { mstat.fly++; mstat.flyAt = nk; }
     else if (act.k === "lift" && act.d === 2) { mstat.lift++; mstat.liftAt = nk; }
@@ -872,7 +893,7 @@ const devices = () => DEV_K.flatMap(k => cellsOf(k)).filter(i => running(i));
 const PRODUCTS = [
   { id: "car", e: "🚗", n: "전기 자동차", en: "운동", how: "① 땅에 바퀴 - 전동기 - 바퀴를 한 줄로 놓아요(전동기 옆으로 나온 하얀 회전축에 바퀴가 끼워져요. 이게 구동 바퀴). ② 몇 칸 뒤에 바퀴 - 바퀴축 - 바퀴축 - 바퀴로 따라 굴러가는 바퀴를 만들어요. ③ 바퀴 위에 나무판 차체를 얹어 하나로 이어요(차체는 땅에 닿지 않게). ④ 전지 - 스위치 - 전동기를 한 고리로. 전지를 늘리면 빨라지고, 전지를 뒤집으면 후진!",
     ok: () => mstat.car >= 4 && W[mstat.carAt] === 28 ? mstat.carAt : null },
-  { id: "steer", e: "🛞", n: "방향 바꾸는 자동차", en: "운동", how: "앞바퀴 줄을 바퀴 - 전동기 - 전동기 - 바퀴로 만들어 왼쪽·오른쪽 바퀴를 전동기가 하나씩 돌리게 해요. 두 전동기를 병렬로 잇고 가지마다 스위치를 달아요. 둘 다 켜면 직진, 한쪽만 켜면 그쪽 반대로 꺾여요(탱크·로봇청소기 방식). 직렬로 이으면 한쪽만 끌 수 없어요!",
+  { id: "steer", e: "🛞", n: "핸들로 운전하는 자동차", en: "운동", how: "전기 자동차 차체 위에 핸들을 달고 올라타 핸들 옆에 서요. 스위치로 출발한 뒤 A/D(휴대폰은 조이스틱 좌우)로 핸들을 꺾으면 앞바퀴가 꺾이고, 꺾은 채로 2칸 가면 그쪽으로 돌아요. 다른 방법: 앞바퀴 줄을 바퀴 - 전동기 - 전동기 - 바퀴로 만들어 왼쪽·오른쪽 바퀴를 전동기가 하나씩 돌리게 해요. 두 전동기를 병렬로 잇고 가지마다 스위치를 달아요. 둘 다 켜면 직진, 한쪽만 켜면 그쪽 반대로 꺾여요(탱크·로봇청소기 방식). 직렬로 이으면 한쪽만 끌 수 없어요!",
     ok: () => mstat.turn >= 1 && mstat.car >= 2 && W[mstat.carAt] === 28 ? mstat.carAt : null },
   { id: "lift", e: "🛗", n: "엘리베이터", en: "운동", how: "① 땅에 톱니 기둥을 위로 여러 칸 쌓아요. ② 기둥 바로 옆에 톱니바퀴를 놓고, 톱니바퀴 옆에 전동기를 붙여 회전축에 끼워요(기둥 - 톱니바퀴가 전동기와 직각 방향으로 맞물리게 R로 돌려요). ③ 전동기에 나무판 발판을 붙이고 전지·스위치를 실어요. 톱니가 기둥을 타고 올라가요. 전지를 뒤집으면 내려가요.",
     ok: () => mstat.lift >= 3 && W[mstat.liftAt] === 28 ? mstat.liftAt : null },
@@ -903,7 +924,7 @@ const PRODUCTS = [
     ok: () => { const L = cellsOf("bulb").filter(lit); for (const b of L) { const P = solve(new Set([b])).part; const grp = L.filter(j => j !== b && lit(j) && !((P.get(j) || { v: 0 }).v ** 2 / 5 / BULB_REF > .07)); if (grp.length >= 3) return b; } return null; } },
 ];
 // 발명품마다 필요한 부품: 이름을 누르면 아래 칸에 꺼내 줘요
-const KITS = { car: [20, 14, 28, 15, 4, 21, 25], steer: [20, 14, 28, 15, 4, 21, 25], lift: [20, 17, 16, 28, 4, 21, 25], wind: [20, 28, 18, 21, 25], fly: [20, 28, 18, 21, 25, 4], torch: [20, 21, 25, 22], bell: [20, 21, 25, 30], fan: [20, 28, 18, 31, 21, 25], lamp: [20, 21, 31, 22, 25], toast: [20, 21, 25, 35], crane: [20, 21, 25, 36, 13, 4], signal: [20, 21, 25, 32, 33, 34], alarm: [20, 21, 25, 30, 22], tap: [20, 21, 29, 22, 28, 30, 35], tree: [20, 21, 22] };
+const KITS = { car: [20, 14, 28, 15, 4, 21, 25, 19], steer: [20, 14, 28, 15, 4, 21, 25, 19], lift: [20, 17, 16, 28, 4, 21, 25], wind: [20, 28, 18, 21, 25], fly: [20, 28, 18, 21, 25, 4], torch: [20, 21, 25, 22], bell: [20, 21, 25, 30], fan: [20, 28, 18, 31, 21, 25], lamp: [20, 21, 31, 22, 25], toast: [20, 21, 25, 35], crane: [20, 21, 25, 36, 13, 4], signal: [20, 21, 25, 32, 33, 34], alarm: [20, 21, 25, 30, 22], tap: [20, 21, 29, 22, 28, 30, 35], tree: [20, 21, 22] };
 const prodLabels = new THREE.Group(); scene.add(prodLabels);
 function productTick() {
   if (!RES || RES.cells.length > 600) return;
@@ -1248,7 +1269,7 @@ let inv = {}; // 임무에서 남은 부품 수
 let hot = [], sel = 0;
 let paused = true;
 const stats = { acc: 0 };
-const player = { x: 24, y: GY, z: 20, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, fly: false, ground: false };
+const player = { x: 24, y: GY, z: 20, vx: 0, vy: 0, vz: 0, yaw: 0, pitch: 0, fly: false, ground: false, h: 1.8, eye: 1.62 }; // h: 키(엎드리면 0.8)
 
 function startLevel(k) {
   LVi = k; const D = LEVELS[k]; mode = "level";
@@ -1261,9 +1282,9 @@ function startLevel(k) {
   const [x, y, z, yaw] = D.spawn; Object.assign(player, { x: x + .5, y, z: z + .5, vx: 0, vy: 0, vz: 0, yaw, pitch: -.35, fly: false });
   showHud(true); renderMission(); renderHot();
 }
-const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 15, 16, 17, 18, 13, 4, 6, 7, 8, 3, 12, 5, 9];
+const SB_ITEMS = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 14, 15, 16, 17, 18, 19, 13, 4, 6, 7, 8, 3, 12, 5, 9];
 function startSandbox(fresh) {
-  Object.assign(mstat, { car: 0, carAt: -1, turn: 0, lift: 0, liftAt: -1, blow: 0, blowAt: -1, fly: 0, flyAt: -1, flyMsg: 0 }); machAcc.clear();
+  Object.assign(mstat, { car: 0, carAt: -1, turn: 0, lift: 0, liftAt: -1, blow: 0, blowAt: -1, fly: 0, flyAt: -1, flyMsg: 0, driveMsg: 0 }); machAcc.clear();
   mode = "sandbox"; LV = null; LVi = -1; clearWorld(); $("hint").hidden = true;
   if (fresh || !loadSandbox()) { for (const [x, z] of [[21, 34], [22, 34], [23, 34]]) put(x, GY, z, 13, 0, false); } // 처음엔 철 블록 몇 개
   hot = [20, 21, 22, 23, 24, 25, 26, 27, 28]; sel = 0; inv = {};
@@ -1365,7 +1386,7 @@ function probeTick() {
 
 /* ═════════════ 조준·놓기·빼기 ═════════════ */
 function raycast(max) {
-  const ox = player.x, oy = player.y + 1.62, oz = player.z;
+  const ox = player.x, oy = player.y + player.eye, oz = player.z;
   const dx = -Math.sin(player.yaw) * Math.cos(player.pitch), dy = Math.sin(player.pitch), dz = -Math.cos(player.yaw) * Math.cos(player.pitch);
   let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
   const sx = Math.sign(dx), sy = Math.sign(dy), sz = Math.sign(dz);
@@ -1389,7 +1410,7 @@ function edited(i) {
   for (let k = 0; k < NN; k++) if (FL[k] & 4) { FL[k] &= ~4; rebuildPart(k); } // 회로를 고치면 과열이 풀려요
   solveDirty = true; if (mode === "sandbox") sbT = 1.5;
 }
-function playerHits(x, y, z) { return x + 1 > player.x - .3 && x < player.x + .3 && z + 1 > player.z - .3 && z < player.z + .3 && y + 1 > player.y && y < player.y + 1.8; }
+function playerHits(x, y, z) { return x + 1 > player.x - .3 && x < player.x + .3 && z + 1 > player.z - .3 && z < player.z + .3 && y + 1 > player.y && y < player.y + player.h; }
 function place() {
   const h = raycast(7); if (!h) return;
   const b = W[h.i];
@@ -1437,6 +1458,7 @@ function icon(id) {
   const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d");
   if (id === 14) { g.fillStyle = "#1c1d21"; g.beginPath(); g.arc(16, 16, 14, 0, 7); g.fill(); g.fillStyle = "#b9bec8"; g.beginPath(); g.arc(16, 16, 7, 0, 7); g.fill(); g.fillStyle = "#55585f"; g.beginPath(); g.arc(16, 16, 2.5, 0, 7); g.fill(); return iconCache[id] = c; }
   if (id === 16) { g.fillStyle = "#c9a227"; for (let k = 0; k < 12; k++) { g.save(); g.translate(16, 16); g.rotate(k * Math.PI / 6); g.fillRect(-2.5, -15, 5, 6); g.restore(); } g.beginPath(); g.arc(16, 16, 11, 0, 7); g.fill(); g.fillStyle = "#6b5a1e"; g.beginPath(); g.arc(16, 16, 4, 0, 7); g.fill(); return iconCache[id] = c; }
+  if (id === 19) { g.strokeStyle = "#222428"; g.lineWidth = 4; g.beginPath(); g.arc(16, 14, 10, 0, 7); g.stroke(); g.fillStyle = "#55585f"; g.fillRect(6, 12, 20, 4); g.fillRect(14, 14, 4, 10); g.fillStyle = "#d8342c"; g.fillRect(13, 11, 6, 6); g.fillStyle = "#3a3f4a"; g.fillRect(14, 26, 4, 5); return iconCache[id] = c; }
   if (id === 17) { g.fillStyle = "#5d626b"; g.fillRect(12, 1, 8, 30); g.fillStyle = "#8d939e"; for (let k = 0; k < 4; k++) g.fillRect(4, 4 + k * 7, 24, 3); return iconCache[id] = c; }
   if (id === 18) { g.fillStyle = "#4aa3ff"; for (let k = 0; k < 3; k++) { g.save(); g.translate(16, 16); g.rotate(k * Math.PI * 2 / 3); g.beginPath(); g.ellipse(0, -8, 5, 8, 0, 0, 7); g.fill(); g.restore(); } g.fillStyle = "#e8e8e8"; g.beginPath(); g.arc(16, 16, 3.5, 0, 7); g.fill(); g.strokeStyle = "#bfc5cf"; g.lineWidth = 1.5; g.beginPath(); g.arc(16, 16, 15, 0, 7); g.stroke(); return iconCache[id] = c; }
   if (id === 15) { g.fillStyle = "#8d939e"; g.fillRect(2, 13, 28, 6); g.fillStyle = "#5d626b"; g.fillRect(12, 10, 8, 12); return iconCache[id] = c; }
@@ -1553,6 +1575,7 @@ addEventListener("keydown", (e) => {
   if (e.code === "KeyR") rotateIt();
   if (e.code === "KeyV") cycleView();
   if (e.code === "KeyF") toggleFly();
+  if (e.code === "KeyC") toggleProne();
   if (e.code === "KeyT" && mode === "sandbox") { setSky(!night); PROG.sbNight = night; saveProg(); }
   if (isTouch && SET.input === "auto" && /^Key[WASD]$/.test(e.code)) useTouch(false);
 });
@@ -1591,32 +1614,39 @@ const stickEnd = (e) => { if (e.pointerId !== stickId) return; stickId = null; s
 stick.addEventListener("pointerup", stickEnd); stick.addEventListener("pointercancel", stickEnd);
 const tb = (id, down, up) => { const b = $(id); b.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); ac(); if (!paused) down(); }); if (up) { b.addEventListener("pointerup", up); b.addEventListener("pointercancel", up); b.addEventListener("pointerleave", up); } };
 tb("tPlace", place); tb("tBreak", breakIt); tb("tJump", () => { tJump = true; }, () => { tJump = false; }); tb("tDown", () => { tDown = true; }, () => { tDown = false; });
-tb("tRot", rotateIt); tb("tView", cycleView); tb("tFly", toggleFly); tb("tInv", openInv); tb("tEsc", openMenu);
-function toggleFly() { player.fly = !player.fly; player.vy = 0; $("tDown").hidden = !player.fly; toast(player.fly ? "날기 켬 (Space 위로, Shift 아래로)" : "날기 끔", 1100); }
+tb("tRot", rotateIt); tb("tView", cycleView); tb("tFly", toggleFly); tb("tProne", toggleProne); tb("tInv", openInv); tb("tEsc", openMenu);
+// 엎드리기: 키가 0.8칸이 되어 한 칸 높이 틈으로 기어 들어가 밑면에 부품을 달 수 있어요
+function toggleProne() {
+  if (player.h > 1) { player.h = .8; player.fly = false; $("tDown").hidden = true; toast("엎드림: 한 칸 틈으로 기어 들어가 위쪽 밑면을 볼 수 있어요 (C로 일어나기)", 1800); }
+  else { player.h = 1.8; if (hits(player.x, player.y, player.z)) { player.h = .8; toast("위가 막혀서 일어설 수 없어요. 틈 밖으로 기어 나와요.", 1400, "bad"); return; } toast("일어섰어요", 800); }
+  const b = $("tProne"); if (b) b.textContent = player.h > 1 ? "엎드려" : "일어나";
+}
+function toggleFly() { if (player.h < 1) toggleProne(); if (player.h < 1) return; player.fly = !player.fly; player.vy = 0; $("tDown").hidden = !player.fly; toast(player.fly ? "날기 켬 (Space 위로, Shift 아래로)" : "날기 끔", 1100); }
 
 /* ═════════════ 물리 ═════════════ */
 function solidAt(x, y, z) { if (x < 0 || z < 0 || x >= SX || z >= SZ) return true; if (y < 0) return true; if (y >= SY) return false; return isSolid(W[ix(x, y, z)]); }
 function hits(px, py, pz) {
-  for (let x = Math.floor(px - .3); x <= Math.floor(px + .3); x++) for (let y = Math.floor(py); y <= Math.floor(py + 1.79); y++) for (let z = Math.floor(pz - .3); z <= Math.floor(pz + .3); z++) if (solidAt(x, y, z)) return true;
+  for (let x = Math.floor(px - .3); x <= Math.floor(px + .3); x++) for (let y = Math.floor(py); y <= Math.floor(py + player.h - .01); y++) for (let z = Math.floor(pz - .3); z <= Math.floor(pz + .3); z++) if (solidAt(x, y, z)) return true;
   return false;
 }
 function physics(dt) {
-  const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - stickV.y, s = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + stickV.x;
-  const sp = player.fly ? 7 : (keys.ShiftLeft ? 2.2 : 4.3);
+  const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - stickV.y, s = driving ? 0 : (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + stickV.x; // 운전 중엔 A/D가 핸들
+  const sp = player.fly ? 7 : player.h < 1 ? 1.6 : (keys.ShiftLeft ? 2.2 : 4.3);
   const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw), rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
   let mx = fx * f + rx * s, mz = fz * f + rz * s; const m = Math.hypot(mx, mz); if (m > 1) { mx /= m; mz /= m; }
   player.vx = mx * sp + windV.x; player.vz = mz * sp + windV.z;
   const up = keys.Space || tJump;
   if (player.fly) player.vy = (up ? 6 : 0) - ((keys.ShiftLeft || keys.ShiftRight || tDown) ? 6 : 0);
-  else { player.vy -= 24 * dt; if (up && player.ground) player.vy = 7.6; player.vy = Math.max(player.vy, -30); }
+  else { player.vy -= 24 * dt; if (up && player.ground && player.h > 1) player.vy = 7.6; player.vy = Math.max(player.vy, -30); }
   const steps = Math.ceil(dt / .02), h = dt / steps;
   for (let k = 0; k < steps; k++) {
     let nx = player.x + player.vx * h; if (hits(nx, player.y, player.z)) { nx = player.vx > 0 ? Math.floor(nx + .3) - .3 - 1e-3 : Math.floor(nx - .3) + 1.3 + 1e-3; if (hits(nx, player.y, player.z)) nx = player.x; player.vx = 0; } player.x = nx;
     let nz = player.z + player.vz * h; if (hits(player.x, player.y, nz)) { nz = player.vz > 0 ? Math.floor(nz + .3) - .3 - 1e-3 : Math.floor(nz - .3) + 1.3 + 1e-3; if (hits(player.x, player.y, nz)) nz = player.z; player.vz = 0; } player.z = nz;
     let ny = player.y + player.vy * h; player.ground = false;
-    if (hits(player.x, ny, player.z)) { if (player.vy < 0) { ny = Math.floor(ny) + 1; player.ground = true; } else ny = Math.floor(ny + 1.8) - 1.8 - 1e-3; if (hits(player.x, ny, player.z)) ny = player.y; player.vy = 0; }
+    if (hits(player.x, ny, player.z)) { if (player.vy < 0) { ny = Math.floor(ny) + 1; player.ground = true; } else ny = Math.floor(ny + player.h) - player.h - 1e-3; if (hits(player.x, ny, player.z)) ny = player.y; player.vy = 0; }
     player.y = Math.min(SY + 6, ny);
   }
+  if (!player.ground && !player.fly && player.vy <= 0 && hits(player.x, player.y - .02, player.z)) player.ground = true; // 느린 기기(한 프레임에 여러 번 계산)에서도 서 있는 걸 놓치지 않게
 }
 
 /* ═════════════ 루프 ═════════════ */
@@ -1628,7 +1658,7 @@ function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   if (!paused && mode !== "none") physics(dt);
   if (solveDirty && mode !== "none") recompute();
-  camera.position.set(player.x, player.y + 1.62, player.z); camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
+  player.eye += ((player.h > 1 ? 1.62 : .55) - player.eye) * Math.min(1, dt * 12); camera.position.set(player.x, player.y + player.eye, player.z); camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
   if (mode !== "none") { if (!paused) { machineTick(dt); windTick(dt); } else spinning.clear(); dotTick(dt); liveTick(dt, t); fxTick(dt); }
   if (hudOn && (probeT -= dt) < 0) { probeT = .12; probeTick(); }
   if (LV && (liveT -= dt) < 0) { liveT = .3; goalTick(false); }
@@ -1673,7 +1703,7 @@ renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
 // 새 버전 확인: 브라우저가 예전 페이지를 기억해도(최대 10분) 새 버전이 있으면 알려 줘요. 진행 기록은 그대로예요
-const VERSION = "2026-11-02-drone";
+const VERSION = "2026-11-03-taphotbar";
 function checkVersion() {
   try { fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.text() : "").then(h => { const m = h.match(/const VERSION = "([^"]+)"/); if (m && m[1] !== VERSION) { $("newVer").hidden = false; $("newVerGo").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); } }).catch(() => {}); } catch (e) {}
 }
