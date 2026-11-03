@@ -1796,9 +1796,10 @@ function relight(x0, x1, z0, z1) {
     break; } });
   return dirty;
 }
+// 여러 칸을 한꺼번에 바꿔요(운석·나무 자람). 상자가 부서지면 안의 물건을 돌려줘요
 function editMany(L) {
   const ch = new Set(), n = SX / CH;
-  L.forEach(([x, y, z, b]) => { if (wrapX) x = ((x % SX) + SX) % SX; set(x, y, z, b); flowWake(x, y, z); if (!b) setOwner(x, y, z, 0); (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b; net.send({ t: "edit", pk: S.planet, x, y, z, b }); ch.add(Math.floor(x / CH) + "," + Math.floor(z / CH)); });
+  L.forEach(([x, y, z, b]) => { if (wrapX) x = ((x % SX) + SX) % SX; if (b !== 94 && get(x, y, z) === 94) chestBreak(x, y, z); set(x, y, z, b); flowWake(x, y, z); if (!b) setOwner(x, y, z, 0); (S.edits[S.planet] = S.edits[S.planet] || {})[x + "," + y + "," + z] = b; net.send({ t: "edit", pk: S.planet, x, y, z, b }); ch.add(Math.floor(x / CH) + "," + Math.floor(z / CH)); });
   const xs = L.map(e => e[0]), zs = L.map(e => e[2]);
   const dirty = L.length ? relight(Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)) : new Set(); ch.forEach(k => dirty.add(k)); dirty.forEach(k => { const [a, c] = k.split(",").map(Number); if (a >= 0 && c >= 0 && a < n && c < n) buildChunk(a, c); }); updateWrapClones();
 }
@@ -2144,7 +2145,8 @@ function place() {
   // 카펫 윗면을 누르면 카펫 자리에 놓고 카펫은 가방에 돌려줘요(탁자·의자가 카펫 위에 둥둥 뜨지 않게)
   const onRug = !!(BLOCKS[h.b] && BLOCKS[h.b].rug && h.n[1] === 1 && !BLOCKS[id].rug && id !== 69);
   const x = onRug ? h.x : h.x + h.n[0], y = onRug ? h.y : h.y + h.n[1], z = onRug ? h.z : h.z + h.n[2];
-  if (y >= SY || SOLID(get(x, y, z))) return;
+  // 그 칸에 사다리·횃불·꽃 같은 얇은 블록이 있으면 덮어쓰지 않아요(겨눈 빛이 틈으로 지나가 뒤 벽을 맞혀도 사다리가 사라지지 않게)
+  const tb = y >= 0 && y < SY ? get(x, y, z) : 1; if (y < 0 || y >= SY || (tb && !LIQ(tb) && !onRug)) return;
   if (id === 69) { placeDoor(x, y, z); return; }
   if (id === 85 && (h.n[1] !== 1 || ![2, 3].includes(get(h.x, h.y, h.z)))) { toast("묘목은 풀이나 흙 위에 심어요", 2000); return; }
   if (BLOCKS[id].flower && (h.n[1] !== 1 || ![2, 3].includes(h.b))) { toast("꽃은 풀이나 흙 위에 심어요", 2000); return; }
@@ -2172,7 +2174,7 @@ function placeSlab(h, id, K) {
     if (y < 0 || y >= SY) return;
     const t = get(x, y, z);
     if (SLABK[t] === K) nb = K.full; // 그 칸에 같은 반 블록이 반쪽 있으면 채워요
-    else if (SOLID(t) && !rug) return;
+    else if (t && !LIQ(t) && !rug) return; // 얇은 블록(사다리·횃불 등)도 덮어쓰지 않아요
     else { nb = h.n[1] === -1 || (h.n[1] === 0 && h.py > .5) ? K.top : K.bot; if (rug) back = h.b; }
   }
   const old = get(x, y, z);
@@ -2659,7 +2661,7 @@ function openCraft() {
   const near = nearTable();
   const w = $("craftWhere"); w.className = near ? "ok" : "";
   const cq = (S.cook || []).filter(j => j.pk === S.planet);
-  w.textContent = (cq.length ? `화로에서 굽는 중: ${cq.map(j => `${itemName(j.out)} ${j.n}개 (${Math.ceil(j.left)}초)`).join(", ")} · ` : "") + (near ? `제작대 근처예요. 모든 것을 만들 수 있어요. 가장 좋은 도구: ${PICKS[bestTier()].n}` : `제작대가 근처에 없어요. 여기서는 제작대·횃불만 만들 수 있어요. 제작대 4칸 안이나 기지 코어 6칸 안으로 가세요. 가장 좋은 도구: ${PICKS[bestTier()].n}`);
+  w.textContent = (cq.length ? `화로에서 굽는 중: ${cq.map(j => `${itemName(j.out)} ${j.n}개 (${Math.ceil(j.left)}초)`).join(", ")} · ` : "") + (near ? `제작대 근처예요. 모든 것을 만들 수 있어요. 가장 좋은 도구: ${PICKS[bestTier()].n}` : `제작대가 근처에 없어요. 여기서는 손으로 만드는 것(제작대·횃불·판자·상자 등)만 만들 수 있어요. 제작대 4칸 안이나 기지 코어 6칸 안으로 가세요. 가장 좋은 도구: ${PICKS[bestTier()].n}`);
   const inv = $("invList"); inv.innerHTML = "";
   const ids = Object.keys(S.inv).filter(i => S.inv[i] > 0);
   if (!ids.length) inv.innerHTML = `<span>아직 가진 자원이 없어요</span>`;
@@ -3830,6 +3832,8 @@ addEventListener("keydown", (e) => {
   if (e.target && e.target.tagName === "INPUT") return;
   const k = (a) => e.code === KB(a);
   if (!$("chestOv").hidden) { if (k("craft") || e.code === "Escape" || k("inv")) closeChest(); return; }
+  // Esc로도 열린 창(제작·가방·도감·지도·설정·꾸미기·친구 목록)을 닫아요
+  if (e.code === "Escape") for (const [o, c] of [["craftOv", "craftClose"], ["invOv", "invClose"], ["dexOv", "dexClose"], ["mapOv", "mapClose"], ["setOv", "setClose"], ["lookOv", "lookClose"], ["rosterOv", "rosterClose"]]) if (!$(o).hidden && $(c)) { $(c).click(); return; }
   const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden || !$("setOv").hidden || !$("invOv").hidden;
   if (k("craft") && $("startOv").hidden && $("logOv").hidden) { if (!$("craftOv").hidden) $("craftClose").click(); else if (!anyOv) openCraft(); return; }
   if (k("inv") && $("startOv").hidden && $("logOv").hidden && $("teachOv").hidden) { if (!$("invOv").hidden) $("invClose").click(); else if (!anyOv) openInv(); return; }
@@ -5770,7 +5774,7 @@ const net = (() => {
     }
     if (d.t === "edit" && d.pk === S.planet && Number.isInteger(d.x) && Number.isInteger(d.y) && Number.isInteger(d.z) && (BLOCKS[d.b] || d.b === 0)) {
       edit(d.x, d.y, d.z, d.b, true, typeof d.o === "string" ? d.o.slice(0, 10) : "");
-    } else if (d.t === "edit" && PLANETS[d.pk] && Number.isInteger(d.x)) {
+    } else if (d.t === "edit" && PLANETS[d.pk] && d.pk !== S.planet && [d.x, d.y, d.z].every(Number.isInteger) && d.y >= 0 && d.y < SY && (BLOCKS[d.b] || d.b === 0)) { // 다른 천체에서 바뀐 것은 기록만(이상한 값은 버려요)
       (S.edits[d.pk] = S.edits[d.pk] || {})[d.x + "," + d.y + "," + d.z] = d.b;
       const O = (S.own = S.own || {})[d.pk] = (S.own || {})[d.pk] || {}, k = d.x + "," + d.y + "," + d.z;
       if (typeof d.o === "string" && d.o && isBuilt(d.b)) O[k] = d.o.slice(0, 10); else delete O[k];
@@ -5944,7 +5948,13 @@ function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.asp
 addEventListener("resize", resize); resize();
 let last = performance.now(), saveT = 0;
 const cA = new THREE.Color(), cB = new THREE.Color();
+// 한 곳에서 오류가 나도 게임이 멈추지 않게 다음 그림을 예약해 두고, 오류는 같은 내용이면 한 번만 알려요
+const frameErr = new Set();
 function frame(now, xf) {
+  try { frameBody(now, xf); }
+  catch (e) { if (!xrOn) requestAnimationFrame(frame); const k = String(e && e.message); if (!frameErr.has(k)) { frameErr.add(k); setTimeout(() => { throw e; }); } }
+}
+function frameBody(now, xf) {
   // VR 중에는 헤드셋 그림 고리(xf가 있는 호출)만 받아요. 화면 고리가 끼면 시간이 앞뒤로 튀어요
   if (xrOn && !xf) return;
   now = performance.now();
@@ -6187,7 +6197,7 @@ async function startXR() {
   try { document.exitPointerLock(); } catch (e) {}
   xrSes = ses; xrOn = true; xrYaw = P.yaw; xrPrev = {}; third = false;
   ses.addEventListener("end", endXR);
-  await renderer.xr.setSession(ses);
+  try { await renderer.xr.setSession(ses); } catch (e) { xrOn = false; xrSes = null; requestAnimationFrame(frame); toast("VR을 시작할 수 없어요", 3000); return; }
   xrRig.add(camera); camera.position.set(0, 0, 0); camera.quaternion.identity(); camera.matrixAutoUpdate = false; camera.add(xrHud); camera.add(xrDot); camera.add(xpMesh);
   xrMenu = null; xrXT = -1; xpMesh.visible = false; xrToolKey = -1; xrHasPrev = false; xrHit = 0;
   if (paused && $("startOv").hidden && [...document.querySelectorAll(".overlay")].every(o => o.hidden)) resume();
@@ -6324,7 +6334,8 @@ function start(fresh) {
   $("startOv").hidden = true; showHud(true); if (fresh) pause(false); else resume();
   if (fresh) showLog({ no: "탐사 대원 훈련", t: "지구 훈련 기지", ev: "왼쪽 아래 계기판: 체력 · 산소 · 전력 · 우주복 온도", x: "다른 천체에서는 숨 쉴 공기가 없거나, 너무 뜨겁거나 차가워요. 우주복은 전력으로 안쪽을 20 °C로 유지하고, 전력과 산소는 기지 코어 근처에서 채워져요. 먼저 지구에서 나무를 캐서 제작대와 곡괭이를 만들고, 밤이 오기 전에 횃불을 준비하세요. 굴 속은 어두우니 조심하세요." });
 }
-$("goBtn").onclick = () => { start(true); if (xrOK && xrWant) startXR(); };
+// 저장된 기록이 있으면 '새로 시작'은 기록을 지우니 한 번 더 물어봐요(이어서 하기를 누르려다 잘못 눌러도 기록이 남게)
+$("goBtn").onclick = () => { if (saved && !confirm("새로 시작하면 지금까지의 기록(가방·지은 것·임무)이 모두 지워져요.\n이어서 하려면 '취소'를 누르고 '이어서 하기'를 누르세요.\n정말 새로 시작할까요?")) return; start(true); if (xrOK && xrWant) startXR(); };
 $("contBtn").onclick = () => { start(false); if (xrOK && xrWant) startXR(); };
 loadPlanet("earth"); paused = true;
 requestAnimationFrame(frame);
