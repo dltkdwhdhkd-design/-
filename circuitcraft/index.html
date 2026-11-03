@@ -2,11 +2,15 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>서킷 크래프트</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
 <style>
+/* 태블릿·폰에서 화면이 확대되지 않게: 두 손가락 벌리기·두 번 톡 확대를 막고, 글 칸은 16px 이상(아이패드는 그보다 작으면 누를 때 확대해요) */
+* { touch-action: pan-x pan-y; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+input, textarea, select { font-size: max(16px, 1em) !important; }
 /* 화면 전체가 1인칭 블록 세계. 임무는 왼쪽 위, 측정기는 오른쪽 위, 부품 칸은 아래 */
 :root {
   --void: #070a14;
@@ -137,6 +141,21 @@ label.rng { display: grid; grid-template-columns: 7em 1fr 3em; gap: 8px; align-i
 }
 body.touch #keysHelp { display: none; }
 </style>
+<script>
+// 태블릿·폰에서 화면 확대 막기: 사파리의 두 손가락 확대(gesture)와 여러 손가락 끌기 확대
+(() => {
+  const stop = (e) => { if (e.cancelable) e.preventDefault(); };
+  for (const t of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(t, stop, { passive: false });
+  document.addEventListener("touchmove", (e) => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) stop(e); }, { passive: false });
+  // 이미 확대된 채로 남았으면(글 칸을 누른 뒤 등) 원래 크기로 되돌려요
+  const vp = document.querySelector('meta[name="viewport"]');
+  const typing = () => document.activeElement && document.activeElement.matches && document.activeElement.matches("input, textarea");
+  const reset = () => { if (!vp || !window.visualViewport || window.visualViewport.scale <= 1.01 || typing()) return; const c = vp.content; vp.content = c + ", minimum-scale=1"; setTimeout(() => { vp.content = c; }, 60); };
+  document.addEventListener("focusout", () => setTimeout(reset, 120));
+  window.addEventListener("orientationchange", () => setTimeout(reset, 300));
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", reset);
+})();
+</script>
 </head>
 <body>
 <canvas id="view"></canvas>
