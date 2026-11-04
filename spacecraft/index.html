@@ -76,6 +76,7 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 @keyframes blink { 50% { color: var(--bad); } }
 .suit { font-size: .8em; color: var(--ink-dim); }
 #warn { left: 50%; top: 18%; transform: translateX(-50%); background: rgba(80, 10, 20, .85); border: 1px solid var(--bad); border-radius: 10px; padding: .5em 1em; font-weight: 700; text-align: center; max-width: min(520px, 90vw); }
+#lockHint { left: 50%; top: calc(50% + 26px); transform: translateX(-50%); background: #0b0f1fcc; border: 1px solid #ffffff30; border-radius: 8px; padding: 4px 10px; font-size: .9em; pointer-events: none; white-space: nowrap; }
 #cross { left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; }
 #cross::before, #cross::after { content: ""; position: absolute; background: #fff; mix-blend-mode: difference; }
 #cross::before { left: 10px; top: 0; width: 2px; height: 22px; }
@@ -342,6 +343,7 @@ td.unk { color: #4e5786; }
 <div class="hud" id="notice" hidden></div>
 <div class="hud" id="fact" hidden></div>
 <div class="hud" id="cross" hidden></div>
+<div class="hud" id="lockHint" hidden>화면을 한 번 클릭하면 마우스로 둘러볼 수 있어요</div>
 <div class="hud" id="toast" hidden></div>
 <div class="hud" id="chatBox" hidden><div id="chatQuick"></div><div class="row"><input id="chatIn" maxlength="40" autocomplete="off" placeholder="친구에게 할 말 (Enter 보내기 · Esc 닫기)" aria-label="채팅"><button id="chatSend">보내기</button><button id="chatX">닫기</button></div><small id="chatNote"></small></div>
 <div class="hud" id="chat" hidden></div>
@@ -3953,17 +3955,24 @@ $("setClose").onclick = () => { $("setOv").hidden = true; if ($("startOv").hidde
 const drags = {};
 // 창을 닫으면(클릭이나 키 입력 직후라서 브라우저가 허락해 줘요) 바로 마우스 시점으로 돌아가요
 // 마우스 잠금이 세 번 연속 거절되면(잠금을 막아 둔 화면) 끌어서 둘러보기로 바꿈
+// 마우스 잠금은 브라우저가 거절할 때가 있어요(Esc로 막 풀었을 때, 클릭 없이 부를 때). 거절돼도 끄지 않고 다음 클릭에 다시 잠가요
 let noLock = !canvas.requestPointerLock, lockFails = 0;
-function lockFail() { if (++lockFails >= 3) noLock = true; }
+function lockFail() { lockFails++; }
 function lockMouse() { if (isTouch || noLock || locked) return; try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { lockFail(); } }
 document.addEventListener("pointerlockerror", lockFail);
+// 게임 중인데 마우스가 풀려 있으면 '클릭하면 둘러보기' 안내를 띄워요
+let lockHintOn = false;
+function lockHintTick() {
+  const on = !locked && !paused && !isTouch && !noLock && hudOn && !xrOn && !cine && !ride && $("chatBox").hidden;
+  if (on !== lockHintOn) { lockHintOn = on; $("lockHint").hidden = !on; }
+}
 function resume() { pause(false); for (const k in drags) delete drags[k]; wantMine = false; lockMouse(); }
 canvas.addEventListener("pointerdown", (e) => {
   if (paused) return;
   if (e.pointerType === "mouse" && SET.input !== "touch") {
     if (isTouch) useTouch(false);
     if (locked) { if (e.button === 2) place(); else wantMine = true; return; }
-    if (!noLock) { lockMouse(); return; }
+    if (!noLock) lockMouse(); // 잠기면 끌기는 지워지고, 안 잠기면 그동안 끌어서 둘러봐요
   } else if (SET.input !== "mouse") useTouch(true);
   drags[e.pointerId] = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0, btn: e.button, type: e.pointerType, hold: false };
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
@@ -6071,7 +6080,7 @@ function frameBody(now, xf) {
   if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); cropTick(dt); saplingTick(dt); flowTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
-  updateCamera(dt); chunkTick(); cineTick(dt); rideTick(dt); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
+  updateCamera(dt); chunkTick(); cineTick(dt); rideTick(dt); lockHintTick(); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
   skyDome.position.copy(camera.position); skyGroup.position.copy(camera.position);
   // 하늘·빛
   const e = env.e, day = smooth(-.12, .25, e), sk = PL.sky;
