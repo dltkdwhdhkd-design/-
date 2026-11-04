@@ -354,6 +354,7 @@ td.unk { color: #4e5786; }
   <button class="btn ghost click" id="bInv">가방·장비 <kbd data-k="inv">I</kbd></button>
   <button class="btn ghost click" id="bDex">도감·일지 <kbd data-k="dex">J</kbd></button>
   <button class="btn ghost click" id="bMap">우주 지도 <kbd data-k="map">M</kbd></button>
+  <button class="btn ghost click" id="bParty" hidden>친구·파티 <kbd data-k="party">P</kbd></button>
   <button class="btn ghost click" id="bDrop">든 것 버리기 <kbd data-k="drop">Q</kbd> · 전부 <kbd data-k="drop" data-pre="Shift+">Shift+Q</kbd></button>
   <button class="btn ghost click" id="bLook">꾸미기 <kbd data-k="look">C</kbd> · 시점 <kbd data-k="view">V</kbd></button>
   <button class="btn ghost click" id="bSet">설정·단축키 <kbd data-k="set">O</kbd></button>
@@ -5988,7 +5989,8 @@ const net = (() => {
   $("tSend").onclick = () => { const v = $("tMsg").value.trim(); if (!v) return; send({ t: "notice", text: v.slice(0, 60) }); $("tMsg").value = ""; $("tSend").textContent = "보냈어요"; setTimeout(() => { $("tSend").textContent = "학생 화면에 띄우기"; }, 1500); };
   $("tMsg").addEventListener("keydown", (e) => { if (e.key === "Enter") $("tSend").click(); });
   function renderRoom() {
-    const el = $("room"); if (!code || !$("startOv").hidden) { el.hidden = true; return; }
+    const el = $("room"); $("bParty").hidden = !code || teacher; // 방에 들어가 있으면 오른쪽 버튼으로도 친구 목록·파티를 열어요(패드·폰)
+    if (!code || !$("startOv").hidden) { el.hidden = true; return; }
     if (performance.now() - roomT < 500) return; roomT = performance.now();
     const n = Object.keys(others).length + 1, same = Object.values(others).filter(o => o.pk === S.planet).length;
     el.hidden = false; el.innerHTML = live ? `방 <b>${code}</b> · ${n}명 · 이 행성에 ${same}명 더${host ? ` · 방장 · 대결 ${pvp ? "켜짐" : "꺼짐"}` : pvp ? " · ⚔ 대결 켜짐" : ""} ▸` : `방 <b>${code}</b> · 연결 끊김`;
@@ -6023,7 +6025,7 @@ const net = (() => {
     $("tPvp").textContent = `플레이어 대결: ${pvp ? "켜짐" : "꺼짐"}`; $("tPvp").classList.toggle("on", pvp);
   }
   $("tPvp").onclick = () => setPvp(!pvp);
-  $("room").onclick = openRoster; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; resume(); };
+  $("room").onclick = openRoster; $("bParty").onclick = () => { if ($("rosterOv").hidden) openRoster(); }; $("rosterClose").onclick = () => { $("rosterOv").hidden = true; resume(); };
   $("hostBtn").onclick = () => makeRoom(false); $("joinBtn").onclick = joinRoom; $("teachBtn").onclick = () => makeRoom(true);
   addEventListener("beforeunload", (e) => {
     if (teacher && Object.keys(others).length) { e.preventDefault(); e.returnValue = ""; return; }
