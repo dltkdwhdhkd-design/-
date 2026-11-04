@@ -174,14 +174,6 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 .log.dead .no { color: var(--bad); }
 .log h2 { font-size: clamp(1.6rem, 3.6vw, 2.4rem); }
 .evidence { background: #ffffff0a; border-left: 4px solid var(--ore); border-radius: 0 10px 10px 0; padding: 10px 14px; font-weight: 700; color: var(--ink); line-height: 1.6; }
-.recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-.recipe { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; background: #ffffff08; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
-.recipe canvas { width: 40px; height: 40px; image-rendering: pixelated; border-radius: 6px; }
-.recipe b { display: block; }
-.recipe .need { color: var(--ink-dim); font-size: .85em; line-height: 1.5; }
-.recipe .need .ok { color: var(--good); font-weight: 700; }
-.recipe .need .no { color: #ff8a8a; font-weight: 700; }
-.recipe .use { font-size: .82em; color: var(--ink-dim); }
 .inv { display: flex; flex-wrap: wrap; gap: 6px; }
 .inv span { background: #ffffff0a; border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; font-size: .9em; }
 .tablewrap { overflow-x: auto; }
@@ -245,15 +237,51 @@ td.unk { color: #4e5786; }
 #notice { left: 50%; top: 32%; transform: translateX(-50%); background: rgba(40, 30, 6, .92); border: 2px solid var(--ore); border-radius: 12px; padding: .7em 1.2em; font-weight: 700; font-size: 1.15em; text-align: center; max-width: min(620px, 92vw); z-index: 9; }
 #fact { left: 50%; top: 14%; transform: translateX(-50%); background: rgba(10, 30, 40, .92); border: 2px solid #5fe0c8; border-radius: 12px; padding: .6em 1.1em; max-width: min(560px, 92vw); z-index: 11; font-size: .95em; line-height: 1.5; }
 #fact b { color: #5fe0c8; display: block; }
+/* 제작 창: 왼쪽 아이콘 칸에서 고르고, 오른쪽에서 재료를 보고 만들어요. 창 높이는 화면에 맞추고 목록만 스크롤해요 */
+.card.craft { width: min(1100px, 100%); height: min(92vh, 820px); grid-template-rows: auto auto auto auto minmax(0, 1fr); gap: 10px; padding: clamp(12px, 2vw, 22px); }
+.chead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chead h2 { margin: 0; margin-right: auto; }
+.chead input[type=search] { font: inherit; color: var(--ink); background: #0a0d1c; border: 1.5px solid var(--line); border-radius: 8px; padding: .4em .7em; width: min(260px, 40vw); }
+.chead .conly { display: flex; align-items: center; gap: 6px; font-size: .9em; color: var(--ink-dim); cursor: pointer; }
+.chead .conly input { width: 18px; height: 18px; accent-color: var(--ore); }
+.card.craft .inv { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+.card.craft .inv span { flex: none; }
+.ctabs .n { display: inline-block; min-width: 1.4em; margin-left: 5px; padding: 0 4px; border-radius: 999px; background: var(--good); color: #0b1a10; font-size: .78em; }
+.cbody { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 12px; min-height: 0; }
+.rgrid { overflow-y: auto; min-height: 0; padding-right: 4px; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); grid-auto-rows: max-content; gap: 8px; align-content: start; }
+.rgrid h3 { grid-column: 1 / -1; margin: 6px 0 0; font-size: .82em; color: var(--ink-dim); font-weight: 700; letter-spacing: .02em; }
+.rtile { position: relative; display: grid; justify-items: center; gap: 4px; padding: 8px 4px 6px; background: #ffffff08; border: 1.5px solid var(--line); border-radius: 10px; color: inherit; font: inherit; font-size: .78em; line-height: 1.25; cursor: pointer; text-align: center; min-height: 86px; }
+.rtile canvas { width: 40px; height: 40px; image-rendering: pixelated; }
+.rtile span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+.rtile.can { border-color: #6fe39a88; background: #6fe39a12; }
+.rtile.lack { opacity: .55; }
+.rtile.have { opacity: .45; }
+.rtile.sel { border-color: var(--ore); box-shadow: 0 0 0 2px var(--ore) inset; opacity: 1; }
+.rtile i { position: absolute; top: 4px; right: 6px; font-style: normal; font-size: .9em; font-weight: 700; color: var(--ink-dim); }
+.rtile.can i { color: var(--good); }
+.rdetail { overflow-y: auto; min-height: 0; background: #ffffff08; border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; align-content: start; }
+.rdetail .top { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; }
+.rdetail .top canvas { width: 64px; height: 64px; image-rendering: pixelated; background: #0a0d1c; border-radius: 10px; padding: 6px; box-sizing: border-box; }
+.rdetail h3 { margin: 0; font-size: 1.2em; }
+.rdetail .st { font-size: .88em; font-weight: 700; color: #ff8a8a; }
+.rdetail .st.ok { color: var(--good); }
+.rdetail .st.wait { color: var(--ore); }
+.rdetail .needs { display: grid; gap: 6px; }
+.rdetail .needs div { display: grid; grid-template-columns: 24px 1fr auto; gap: 8px; align-items: center; background: #0a0d1c; border-radius: 8px; padding: 6px 8px; font-size: .9em; }
+.rdetail .needs canvas { width: 24px; height: 24px; image-rendering: pixelated; }
+.rdetail .needs b { font-variant-numeric: tabular-nums; color: #ff8a8a; }
+.rdetail .needs b.ok { color: var(--good); }
+.rdetail .needs small { grid-column: 2 / -1; color: var(--ink-dim); font-size: .85em; }
+.rdetail p { margin: 0; font-size: .9em; line-height: 1.6; color: var(--ink-dim); }
+.rdetail .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.rdetail .btns .btn { flex: 1 1 auto; }
+@media (max-width: 700px) { .cbody { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); } .rdetail { order: -1; max-height: 42vh; } .chead input[type=search] { width: 100%; order: 3; } }
+@media (max-height: 520px) { .card.craft { height: calc(100vh - 32px); height: calc(100dvh - 32px); gap: 6px; } .chead h2 { font-size: 1.2em; } .card.craft .ctabs { margin: 0; flex-wrap: nowrap; overflow-x: auto; } .card.craft .ctabs button { flex: none; } #craftWhere { font-size: .8em; } .rtile { min-height: 72px; } .rtile canvas { width: 32px; height: 32px; } .rdetail .top { grid-template-columns: 44px 1fr; } .rdetail .top canvas { width: 44px; height: 44px; } .rdetail > * { order: 3; } .rdetail .top { order: 1; } .rdetail .btns { order: 2; } }
 .ctabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
 .ctabs button { background: #ffffff0a; border: 1px solid var(--line); color: inherit; border-radius: 999px; padding: 4px 12px; font: inherit; font-weight: 700; cursor: pointer; }
 .ctabs button.on { background: var(--ore); color: #1a1205; border-color: var(--ore); }
 #craftWhere { font-size: .88em; color: var(--ink-dim); }
 #craftWhere.ok { color: var(--good); }
-.recipe.cant { opacity: .62; }
-.recipe .need i { font-style: normal; color: var(--ink-dim); font-weight: 400; }
-.recipe .btns { display: flex; flex-direction: column; gap: 4px; }
-.recipe .btns .btn { padding: 6px 10px; }
 .inv span canvas { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; image-rendering: pixelated; }
 #notice small { display: block; color: var(--ore); font-size: .7em; letter-spacing: .08em; }
 #hurt { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255,0,0,0) 45%, rgba(220,20,30,.55)); opacity: 0; }
@@ -405,13 +433,12 @@ td.unk { color: #4e5786; }
 </div>
 
 <div class="overlay" id="craftOv" hidden>
-  <div class="card wide">
-    <h2>제작</h2>
+  <div class="card wide craft">
+    <div class="chead"><h2>제작</h2><input id="craftQ" type="search" placeholder="찾기 (예: 유리, 칼, 철)" aria-label="만들 것 찾기" autocomplete="off"><label class="conly"><input type="checkbox" id="craftOnly"> 지금 만들 수 있는 것만</label><button class="btn ghost" id="craftClose">닫기 <kbd data-k="craft">E</kbd></button></div>
     <div id="craftWhere"></div>
-    <div class="inv" id="invList"></div>
+    <div class="inv" id="invList" title="내 가방"></div>
     <div class="ctabs" id="ctabs"></div>
-    <div class="recipes" id="recipes"></div>
-    <div class="row"><button class="btn ghost" id="craftClose">닫기 <kbd data-k="craft">E</kbd></button></div>
+    <div class="cbody"><div class="rgrid" id="recipes"></div><div class="rdetail" id="rdetail"></div></div>
   </div>
 </div>
 
@@ -2647,7 +2674,29 @@ function makeIt(r, k) {
   }
   sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save();
 }
-let craftTab = "all";
+let craftTab = "all", craftSel = null, craftQ = "", craftOnly = false, craftScroll = null;
+// 고른 것의 재료(가진 수/필요한 수)·만드는 곳·설명·만들기 버튼
+function craftDetail(near) {
+  const el = $("rdetail"), r = craftSel; el.innerHTML = "";
+  if (!r) { el.innerHTML = "<p>왼쪽에서 만들 것을 고르세요.</p>"; return; }
+  const have = owned(r), ok = canMake(r), all = hasAll(r);
+  const top = document.createElement("div"); top.className = "top"; top.appendChild(recipeIcon(r));
+  const st = have ? ["가지고 있어요", "ok"] : ok ? [r.fire ? "화로에 넣어 구울 수 있어요" : "지금 만들 수 있어요", "ok"] : all && r.fire ? ["화로 4칸 안에서 구울 수 있어요", "wait"] : all ? ["제작대 근처에서 만들 수 있어요", "wait"] : ["재료가 모자라요", ""];
+  top.insertAdjacentHTML("beforeend", `<div><h3>${esc(r.n)}${r.gear === "batt" ? ` (${S.gear.batt}/3)` : ""}</h3><div class="st ${st[1]}">${st[0]}</div></div>`); el.appendChild(top);
+  if (!have) {
+    const nd = document.createElement("div"); nd.className = "needs";
+    Object.entries(r.need).forEach(([id, n]) => { const h = S.inv[id] || 0, row = document.createElement("div"); row.appendChild(iconCanvas(+id));
+      row.insertAdjacentHTML("beforeend", `<span>${esc(itemName(+id))}</span><b class="${h >= n ? "ok" : ""}">${n}개 필요 · ${h}개 있음</b>${h < n && WHERE[id] ? `<small>구하는 곳: ${esc(WHERE[id])}</small>` : ""}`); nd.appendChild(row); });
+    el.appendChild(nd);
+  }
+  el.insertAdjacentHTML("beforeend", `<p>${r.use}</p>${r.fire ? `<p>굽는 시간 약 ${r.cook}초 · 화로를 눌러도 이 창이 열려요</p>` : r.hand ? "<p>손으로 만들어요(제작대 없어도 돼요)</p>" : "<p>제작대 4칸 안이나 기지 코어 6칸 안에서 만들어요</p>"}`);
+  if (!have) {
+    const bs = document.createElement("div"); bs.className = "btns";
+    const b = document.createElement("button"); b.className = "btn"; b.textContent = r.fire ? "굽기" : "만들기"; b.disabled = !ok; b.onclick = () => makeIt(r, 1); bs.appendChild(b);
+    const mx = maxMake(r); if (r.out && mx > 1) { const b2 = document.createElement("button"); b2.className = "btn ghost"; b2.textContent = `최대 ×${mx}`; b2.onclick = () => makeIt(r, mx); bs.appendChild(b2); }
+    el.appendChild(bs);
+  }
+}
 const CTABS = [["all", "전체"], ["block", "블록"], ["build", "건축"], ["deco", "꾸미기"], ["rock", "암석 가공"], ["food", "음식"], ["tool", "도구"], ["gear", "장비"]];
 function drillIcon() { const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d");
   g.fillStyle = "#3a3c44"; g.fillRect(1, 9, 5, 6); g.fillStyle = "#ffb347"; g.fillRect(2, 5, 8, 6); g.fillStyle = "#d8862a"; g.fillRect(2, 9, 8, 2);
@@ -2691,26 +2740,34 @@ function openCraft() {
   if (!ids.length) inv.innerHTML = `<span>아직 가진 자원이 없어요</span>`;
   ids.forEach(i => { const sp = document.createElement("span"); sp.appendChild(iconCanvas(+i)); sp.appendChild(document.createTextNode(`${itemName(+i)} ${S.inv[i]}`)); inv.appendChild(sp); });
   const tabs = $("ctabs"); tabs.innerHTML = "";
-  CTABS.forEach(([k, n]) => { const b = document.createElement("button"); b.textContent = n; b.className = craftTab === k ? "on" : ""; b.onclick = () => { craftTab = k; openCraft(); }; tabs.appendChild(b); });
-  const box = $("recipes"); box.innerHTML = "";
-  // 지금 만들 수 있는 것 → 재료만 모자란 것 → 이미 가진 것 순서
+  const q = craftQ.trim(), match = (r) => !q || r.n.includes(q) || Object.keys(r.need).some(id => itemName(+id).includes(q)) || (r.use || "").includes(q);
+  CTABS.forEach(([k, n]) => { const b = document.createElement("button"); const c = RECIPES.filter(r => (k === "all" || r.cat === k) && canMake(r)).length;
+    b.innerHTML = esc(n) + (c ? `<span class="n" title="지금 만들 수 있는 것">${c}</span>` : ""); b.className = craftTab === k ? "on" : ""; b.onclick = () => { craftTab = k; craftScroll = 0; openCraft(); }; tabs.appendChild(b); });
+  // 지금 만들 수 있는 것 → 재료만 모자란 것 → 이미 가진 것 순서로, 무리마다 제목을 달아요
   const rank = (r) => owned(r) ? 3 : canMake(r) ? 0 : hasAll(r) ? 1 : 2;
-  RECIPES.filter(r => craftTab === "all" || r.cat === craftTab).map((r, i) => [r, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).forEach(([r]) => {
-    const have = owned(r);
-    const need = Object.entries(r.need).map(([id, n]) => { const ok = (S.inv[id] || 0) >= n; return `<span class="${ok ? "ok" : "no"}">${itemName(+id)} ${S.inv[id] || 0}/${n}</span>${ok || !WHERE[id] ? "" : ` <i>(${WHERE[id]})</i>`}`; }).join(" · ");
-    const d = document.createElement("div"); d.className = "recipe" + (canMake(r) ? "" : " cant");
-    d.appendChild(recipeIcon(r));
-    const why = have ? "" : r.fire && !nearFire() ? `<div class="use" style="color:var(--ore)">화로 4칸 안에서 만들 수 있어요</div>` : !r.fire && !r.hand && !near && hasAll(r) ? `<div class="use" style="color:var(--ore)">제작대 근처에서 만들 수 있어요</div>` : "";
-    d.insertAdjacentHTML("beforeend", `<div><b>${r.n}${r.gear === "batt" ? ` (${S.gear.batt}/3)` : ""}</b><div class="need">${have ? "<span class=ok>가지고 있어요</span>" : need}</div>${why}<div class="use">${r.use}</div></div>`);
-    const bs = document.createElement("div"); bs.className = "btns";
-    const b = document.createElement("button"); b.className = "btn"; b.textContent = "만들기"; b.disabled = !canMake(r); b.onclick = () => makeIt(r, 1); bs.appendChild(b);
-    const mx = maxMake(r);
-    if (r.out && mx > 1) { const b2 = document.createElement("button"); b2.className = "btn ghost"; b2.textContent = `최대 ×${mx}`; b2.onclick = () => makeIt(r, mx); bs.appendChild(b2); }
-    d.appendChild(bs); box.appendChild(d);
+  const list = RECIPES.map((r, i) => [r, i]).filter(([r]) => (craftTab === "all" || r.cat === craftTab) && match(r) && (!craftOnly || canMake(r))).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([r]) => r);
+  if (!list.includes(craftSel)) craftSel = list[0] || null;
+  const box = $("recipes"), keep = box.scrollTop; box.innerHTML = "";
+  const HEAD = ["지금 만들 수 있어요", "재료는 있어요 · 제작대나 화로 근처로 가세요", "재료가 모자라요", "이미 가지고 있어요"];
+  let last = -1;
+  if (!list.length) box.insertAdjacentHTML("beforeend", `<h3>${q ? `'${esc(q)}'에 맞는 것이 없어요` : craftOnly ? "지금 만들 수 있는 것이 없어요. 자원을 더 모으거나 '지금 만들 수 있는 것만'을 끄세요" : "없어요"}</h3>`);
+  list.forEach(r => {
+    const k = rank(r); if (k !== last) { last = k; box.insertAdjacentHTML("beforeend", `<h3>${HEAD[k]}</h3>`); }
+    const t = document.createElement("button"); t.className = "rtile " + ["can", "lack", "lack", "have"][k] + (r === craftSel ? " sel" : "");
+    t.appendChild(recipeIcon(r)); const nm = document.createElement("span"); nm.textContent = r.n.replace(/ ×\d+$/, ""); t.appendChild(nm);
+    if ((r.count || 1) > 1) t.insertAdjacentHTML("beforeend", `<i>×${r.count}</i>`); else if (k === 3) t.insertAdjacentHTML("beforeend", "<i>✓</i>");
+    t.onclick = () => { craftSel = r; box.querySelectorAll(".rtile.sel").forEach(e => e.classList.remove("sel")); t.classList.add("sel"); craftDetail(near); };
+    t.ondblclick = () => { if (canMake(r)) makeIt(r, 1); }; // 두 번 누르면 바로 하나 만들어요
+    box.appendChild(t);
   });
+  box.scrollTop = craftScroll != null ? craftScroll : keep; craftScroll = null;
+  craftDetail(near);
   $("craftOv").hidden = false;
 }
-$("bCraft").onclick = openCraft; $("craftClose").onclick = () => { $("craftOv").hidden = true; resume(); };
+$("bCraft").onclick = openCraft; $("craftClose").onclick = () => { $("craftQ").blur(); $("craftOv").hidden = true; resume(); };
+$("craftQ").addEventListener("input", (e) => { craftQ = e.target.value; craftScroll = 0; openCraft(); $("craftQ").focus(); });
+$("craftQ").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); if (craftQ) { craftQ = ""; e.target.value = ""; openCraft(); } else $("craftClose").click(); } else if (e.key === "Enter" && craftSel && canMake(craftSel)) makeIt(craftSel, 1); });
+$("craftOnly").addEventListener("change", (e) => { craftOnly = e.target.checked; craftScroll = 0; openCraft(); });
 
 /* ═════════════ 우주 지도·비행 ═════════════ */
 const ORBC = { mercury: ["#d9d4cc", "#6f6a63"], venus: ["#fff0c2", "#c89a50"], earth: ["#9fd8ff", "#2f7fe0"], moon: ["#f2f2f2", "#8d8d92"], mars: ["#ffb08a", "#b4552f"], jupiter: ["#fbe3c0", "#b07a4f"], europa: ["#f4ead8", "#b08a6a"], saturn: ["#fff2c8", "#c8a860"], titan: ["#f0b060", "#a8601e"], uranus: ["#d8fbfb", "#5fc4cc"], neptune: ["#a8c8ff", "#2850c8"] };
@@ -3860,7 +3917,7 @@ let locked = false, isTouch = false;
 function pause(p) { paused = p; wantMine = false; atkHeld = false; tapHit = 0; $("tAtk").classList.remove("on"); if (p) { try { document.exitPointerLock(); } catch (e) {} for (const k in keys) keys[k] = false; stickV = { x: 0, y: 0 }; touchJump = false; recall = 0; } }
 addEventListener("keydown", (e) => {
   if (keyWait) { keyGrab(e); return; }
-  if (e.target && e.target.tagName === "INPUT") return;
+  if (e.target && e.target.tagName === "INPUT" && !/^(checkbox|range|radio|button)$/.test(e.target.type)) return; // 글 칸에 쓰는 중에만 단축키를 막아요
   const k = (a) => e.code === KB(a);
   if (!$("chestOv").hidden) { if (k("craft") || e.code === "Escape" || k("inv")) closeChest(); return; }
   // Esc로도 열린 창(제작·가방·도감·지도·설정·꾸미기·친구 목록)을 닫아요
