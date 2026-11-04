@@ -1796,8 +1796,8 @@ function load() { try { const s = JSON.parse(localStorage.getItem("spacecraft2")
 /* ═════════════ 행성 불러오기 ═════════════ */
 let placedTimes = {};
 // 밤은 낮보다 NIGHT_K배 빨리 지나가요(낮 길이는 그대로). 시각 0~0.5가 낮, 0.5~1이 밤
-const NIGHT_K = 2, DAY_FR = NIGHT_K / (NIGHT_K + 1);
-// 하루 길이 배율: 지구 낮 8분·밤 4분. 천체끼리의 하루 길이 비율(달·금성은 아주 길고 목성형 행성은 짧아요)은 그대로예요
+const NIGHT_K = 4, DAY_FR = NIGHT_K / (NIGHT_K + 1);
+// 하루 길이 배율: 지구 낮 8분·밤 2분. 천체끼리의 하루 길이 비율(달·금성은 아주 길고 목성형 행성은 짧아요)은 그대로예요
 const DAY_X = 8 / 3, daySec = (PL) => PL.dayMin * 60 * DAY_X;
 const cycleSec = (PL) => daySec(PL) * (.5 + .5 / NIGHT_K);
 const warpT = (pk, q) => PLANETS[pk].wrap ? q : q < DAY_FR ? q / DAY_FR * .5 : .5 + (q - DAY_FR) / (1 - DAY_FR) * .5;
