@@ -283,6 +283,7 @@ td.unk { color: #4e5786; }
 .setIn small, #pvpBox small { color: var(--ink-dim); }
 #pvpBox { margin-top: 10px; }
 .ctabs button:disabled { opacity: .5; }
+#rideBox { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 6%); transform: translateX(-50%); z-index: 11; }
 #cine { position: fixed; inset: auto 0 18% 0; z-index: 11; display: grid; gap: 6px; justify-items: center; pointer-events: none; text-align: center; text-shadow: 0 2px 12px #000; }
 #cineBig { font-family: "Black Han Sans", sans-serif; font-size: clamp(2.6rem, 9vw, 5.5rem); color: #fff; }
 #cineSub { font-weight: 700; color: #ffe2b0; max-width: 34em; padding: 0 16px; }
@@ -521,6 +522,7 @@ td.unk { color: #4e5786; }
 </div>
 
 <div id="cine" hidden><b id="cineBig"></b><span id="cineSub"></span></div>
+<div id="rideBox" hidden><button class="btn ghost" id="rideOff">로켓에서 내리기</button></div>
 <div id="flight" hidden><canvas id="flightCv"></canvas><div class="txt"><h2 id="flightTo"></h2><p id="flightSub"></p></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -2717,7 +2719,9 @@ function fuelHave() { return FUELS.reduce((a, id) => a + (S.inv[id] || 0), 0); }
 function openMap() {
   pause(true);
   const pad = nearPad();
-  $("mapNote").innerHTML = !S.gear.rocket && !S.inv[126] ? "<b>로켓이 없어요.</b> 제작대에서 로켓(철 6, 규소 4)을 먼저 만드세요." : S.rocketPk !== S.planet ? "<b>로켓을 발사대에 세우세요.</b> 로켓을 손에 들고 착륙선 옆 주황 줄무늬 발사대를 바라보며 놓기(오른쪽 클릭, 터치는 놓기 모드)를 하세요." : !pad ? "<b>내 로켓 근처에서만 출발할 수 있어요.</b> 로켓을 세워 둔 발사대로 가세요." : `연료(물·얼음·수소·메테인) ${fuelHave()}개 보유. 태양에서 가까운 순서로 나열했어요.`;
+  const pr = nearPartyRocket(), prN = pr ? net.others[pr].name : "", riders = net.riders();
+  $("mapNote").innerHTML = (pr && !(S.rocketPk === S.planet && pad) ? `<b>파티 친구 ${esc(prN)}의 로켓이 옆에 있어요.</b> 아래 '함께 타기'를 누르면, ${esc(prN)}${josa(prN, "이", "가")} 출발할 때 같이 날아가요(연료는 조종하는 친구가 내요). ` : "") +
+    (!S.gear.rocket && !S.inv[126] ? "<b>로켓이 없어요.</b> 제작대에서 로켓(철 6, 규소 4)을 먼저 만들거나, 파티 친구 로켓에 함께 타세요." : S.rocketPk && S.rocketPk !== S.planet && !(S.inv[126] > 0) ? `<b>내 로켓은 ${PLANETS[S.rocketPk].name} 발사대에 있어요.</b> 파티 친구 로켓에 함께 타고 가거나, 로켓을 새로 만드세요.` : S.rocketPk !== S.planet ? "<b>로켓을 발사대에 세우세요.</b> 로켓을 손에 들고 착륙선 옆 주황 줄무늬 발사대를 바라보며 놓기(오른쪽 클릭, 터치는 놓기 모드)를 하세요." : !pad ? "<b>내 로켓 근처에서만 출발할 수 있어요.</b> 로켓을 세워 둔 발사대로 가세요." : `연료(물·얼음·수소·메테인) ${fuelHave()}개 보유. 태양에서 가까운 순서로 나열했어요.`);
   const L = $("destList"); L.innerHTML = "";
   ORDER.forEach(pk => {
     const b = document.createElement("button");
@@ -2728,6 +2732,8 @@ function openMap() {
     b.onclick = () => landPick(pk);
     L.appendChild(b);
   });
+  if (riders.length && S.rocketPk === S.planet) $("mapNote").innerHTML += ` <b>함께 탄 친구: ${riders.map(esc).join(", ")}</b> (출발하면 같이 가요)`;
+  if (pr) { const b = document.createElement("button"); b.innerHTML = `<span class="orb" style="background:#e9edf3"></span><span class="info"><b>🚀 ${esc(prN)}의 로켓에 함께 타기</b><small>${esc(prN)}${josa(prN, "이", "가")} 목적지를 골라 출발하면 같이 가요 · 연료 필요 없음</small></span><span></span>`; b.onclick = () => boardRide(pr); L.prepend(b); }
   $("mapOv").hidden = false;
 }
 $("bMap").onclick = openMap; $("mapClose").onclick = () => { $("mapOv").hidden = true; resume(); };
@@ -2753,9 +2759,10 @@ function fly(pk, m) {
   let f = FUEL[pk] + LANDM[m].extra;
   for (const id of FUELS) { const u = Math.min(f, S.inv[id] || 0); if (u) { S.inv[id] -= u; f -= u; } }
   $("mapOv").hidden = true;
+  net.send({ t: "launch", pk, m }); // 내 로켓에 함께 탄 파티 친구도 같이 출발해요
   if (!launchCine(pk)) { sfx.launch(); flyAnim(pk); }
 }
-function flyAnim(pk) {
+function flyAnim(pk, rd) {
   const box = $("flight"), cv = $("flightCv"), g = cv.getContext("2d"); box.hidden = false;
   $("flightTo").textContent = `${PLANETS[pk].name}(으)로 비행 중`;
   $("flightSub").textContent = `${PLANETS[pk].type} · 태양에서 ${PLANETS[pk].au} AU`;
@@ -2767,7 +2774,8 @@ function flyAnim(pk) {
     st.forEach(s => { s.z -= .02; if (s.z <= .02) s.z = 1; const k = .5 / s.z; g.fillStyle = "#fff"; g.fillRect(cv.width / 2 + s.x * k * cv.width / 2, cv.height / 2 + s.y * k * cv.height / 2, 2 / s.z, 2 / s.z); });
     if (t > 1.6) { const r = (t - 1.6) * 200; g.fillStyle = ORB[pk] ? "#888" : "#888"; const gr = g.createRadialGradient(cv.width / 2 - r * .3, cv.height / 2 - r * .3, 0, cv.width / 2, cv.height / 2, r); const cc = ORBC[pk]; gr.addColorStop(0, cc[0]); gr.addColorStop(1, cc[1]); g.fillStyle = gr; g.beginPath(); g.arc(cv.width / 2, cv.height / 2, r, 0, 7); g.fill(); }
     if (t < 3.2) requestAnimationFrame(anim);
-    else { box.hidden = true; S.rocketPk = pk; S.rocketAt = null; loadPlanet(pk); S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; if (!landCine()) { pause(false); showHud(true); arriveLog(pk); } }
+    else { box.hidden = true; if (!rd || rd.mine) { S.rocketPk = pk; S.rocketAt = null; } loadPlanet(pk); S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20;
+      if (rd) rideArrive(pk, rd); else if (!landCine()) { pause(false); showHud(true); arriveLog(pk); } }
   })();
 }
 const ARRIVE = {
@@ -3344,6 +3352,7 @@ function bountyTick() {
 }
 
 /* ═════════════ 화면 정보 ═════════════ */
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const josa = (w, a, b) => ((w.charCodeAt(w.length - 1) - 0xAC00) % 28 ? a : b);
 const fmtSun = (v) => v === 0 ? "0" : v < .01 ? v.toFixed(4) : v < .1 ? v.toFixed(3) : v.toFixed(2);
 const fmtP = (p) => p === 0 ? "0 (대기 없음)" : p < .1 ? p.toFixed(3) + "기압" : p < 2 ? p.toFixed(1) + "기압" : Math.round(p) + "기압";
@@ -3852,6 +3861,7 @@ addEventListener("keydown", (e) => {
   const k = (a) => e.code === KB(a);
   if (!$("chestOv").hidden) { if (k("craft") || e.code === "Escape" || k("inv")) closeChest(); return; }
   // Esc로도 열린 창(제작·가방·도감·지도·설정·꾸미기·친구 목록)을 닫아요
+  if (e.code === "Escape" && ride && ride.ph === "wait") { rideOff("로켓에서 내렸어요"); return; }
   if (e.code === "Escape") for (const [o, c] of [["craftOv", "craftClose"], ["invOv", "invClose"], ["dexOv", "dexClose"], ["mapOv", "mapClose"], ["setOv", "setClose"], ["lookOv", "lookClose"], ["rosterOv", "rosterClose"]]) if (!$(o).hidden && $(c)) { $(c).click(); return; }
   const anyOv = !$("craftOv").hidden || !$("dexOv").hidden || !$("mapOv").hidden || !$("rosterOv").hidden || !$("lookOv").hidden || !$("setOv").hidden || !$("invOv").hidden;
   if (k("craft") && $("startOv").hidden && $("logOv").hidden) { if (!$("craftOv").hidden) $("craftClose").click(); else if (!anyOv) openCraft(); return; }
@@ -4226,9 +4236,10 @@ function rocketSpot() {
 // 다른 친구 로켓이 이미 서 있는 자리인지
 const rocketTaken = (x, z) => Object.values(net.others).some(o => o.pk === S.planet && o.rk && Math.hypot(o.rk[0] - x, o.rk[2] - z) < .9);
 // 도착하면 비어 있는 발사대 칸에 내려요
-function landSpot() {
+function landSpot(last) {
   const c = findPad(); if (!c) return null; const L = [];
   for (let dx = -9; dx <= 9; dx++) for (let dz = -9; dz <= 9; dz++) for (let dy = -3; dy <= 1; dy++) { const x = base.x + dx, y = base.y + dy, z = base.z + dz; if (get(x, y, z) === 34 && !SOLID(get(x, y + 1, z))) L.push({ x: x + .5, y: y + 1, z: z + .5 }); }
+  if (last) L.reverse(); // 함께 타고 온 사람의 로켓은 반대쪽 끝 칸부터 써요(조종한 친구와 겹치지 않게)
   return L.find(p => !rocketTaken(p.x, p.z)) || L[0] || c;
 }
 function syncRocket() {
@@ -4249,15 +4260,72 @@ function setRocket(h) {
   syncRocket(); renderHotbar(); save();
   toast("로켓을 세웠어요! 로켓을 누르거나 M을 눌러 올라타세요", 3000);
 }
-// 서 있는 로켓을 누르면(캐기 버튼) 탑승해요
+// 서 있는 로켓을 누르면(캐기 버튼) 탑승해요. 파티 친구 로켓이면 함께 타요
 function rocketAim() {
-  if (!rocketG || cine || !wantMine) return false;
+  if (cine || ride || !wantMine) return false;
+  const L = []; if (rocketG) L.push([rocketG.position, null]);
+  for (const id in net.others) { const q = net.others[id]; if (q.rkG && q.rkG.visible && q.pk === S.planet) L.push([q.rkG.position, id]); }
+  if (!L.length) return false;
   const o = camera.position, d = new THREE.Vector3(); camera.getWorldDirection(d);
   for (let t = 0; t < 5; t += .2) { const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
-    if (Math.hypot(x - rocketG.position.x, z - rocketG.position.z) < .75 && y > rocketG.position.y && y < rocketG.position.y + 5.4) { wantMine = false; openMap(); return true; }
+    for (const [p, id] of L) if (Math.hypot(x - p.x, z - p.z) < .75 && y > p.y && y < p.y + 5.4) {
+      wantMine = false; const n = id ? net.others[id].name : "";
+      if (!id) openMap(); else if (net.sameParty(id)) boardRide(id); else toast(`${n}의 로켓이에요. 같은 파티가 되면 함께 탈 수 있어요(P 친구 목록에서 파티 초대)`, 3000);
+      return true; }
     if (SOLID(get(Math.floor(x), Math.floor(y), Math.floor(z)))) break; }
   return false;
 }
+/* ═════════════ 파티 로켓 함께 타기 ═════════════ */
+// 파티 친구가 세운 로켓에 올라타면, 그 친구가 목적지를 골라 출발할 때 같이 날아가요. 연료는 조종하는 친구가 내고, 착륙 방법(낙하산·역추진)도 함께 겪어요
+let ride = null;
+function nearPartyRocket(r = 5) {
+  if (!net.live) return null; let best = null, bd = r;
+  for (const id in net.others) { const q = net.others[id]; if (q.pk !== S.planet || !q.rk || !net.sameParty(id) || q.rd) continue;
+    const dd = Math.hypot(P.pos.x - q.rk[0], P.pos.z - q.rk[2]); if (dd < bd && Math.abs(P.pos.y - q.rk[1]) < 5) { bd = dd; best = id; } }
+  return best;
+}
+function boardRide(id) {
+  const q = net.others[id]; if (!q || !q.rk || cine || ride || q.pk !== S.planet) return;
+  ride = { id, name: q.name, ph: "wait", t: 0, pad: { x: q.rk[0], y: q.rk[1], z: q.rk[2] } };
+  ["mapOv", "craftOv", "invOv"].forEach(k => { $(k).hidden = true; }); pause(true); showHud(false); $("rideBox").hidden = false; sfx.place(23);
+  toast(`${q.name}의 로켓에 탔어요. ${q.name}${josa(q.name, "이", "가")} 출발하면 함께 가요`, 3200);
+}
+function rideOff(msg) {
+  if (!ride) return; const p = ride.pad; ride = null; $("rideBox").hidden = true; cineTxt();
+  P.pos.set(p.x + 2.2, p.y + .01, p.z + .5); P.vel.set(0, 0, 0); showHud(true); resume(); if (msg) toast(msg, 2800);
+}
+function rideLaunch(id, pk, m) {
+  if (!ride || ride.id !== id || ride.ph !== "wait" || pk === S.planet) return;
+  Object.assign(ride, { ph: "go", t: 0, t0: performance.now(), pk, m }); $("rideBox").hidden = true;
+}
+function rideTick(dt) {
+  if (!ride) return;
+  const q = net.others[ride.id], g = q && q.rkG && q.rkG.visible ? q.rkG : null; ride.t += dt;
+  if (ride.ph === "wait") {
+    if (!net.live || !q || !q.rk || q.pk !== S.planet || !net.sameParty(ride.id)) { rideOff(`${ride.name}의 로켓이 떠나서 내렸어요`); return; }
+    ride.pad = { x: q.rk[0], y: q.rk[1], z: q.rk[2] };
+    if (!paused) pause(true);
+    cineTxt("", `${ride.name}의 로켓에 탔어요 · ${ride.name}${josa(ride.name, "이", "가")} 목적지를 골라 출발하면 함께 날아가요`);
+  } else {
+    const n = 3 - Math.floor(ride.t), to = PLANETS[ride.pk].name;
+    cineTxt(ride.t < 3 ? String(n) : ride.t < 4 ? "발사!" : "", ride.t < 3 ? `${ride.name}${josa(ride.name, "이", "가")} 조종하는 로켓으로 ${to}에 함께 가요` : `연료를 태운 기체를 아래로 뿜는 반작용으로 로켓이 올라가요 · ${to}(으)로 출발`);
+    // 친구 로켓이 높이 올라가거나 친구가 이 천체를 떠나면 같이 날아가요(혹시 소식이 끊겨도 20초 뒤엔 출발)
+    if ((!q || q.pk !== S.planet || (g && g.position.y > ride.pad.y + 55)) || performance.now() - ride.t0 > 20000) { const r = ride; ride = null; cineTxt(); S.landM = { pk: r.pk, m: r.m }; sfx.launch(); flyAnim(r.pk, { name: r.name, mine: S.rocketPk === S.planet && !(S.inv[126] > 0) }); return; }
+  }
+  P.pos.set(ride.pad.x, ride.pad.y + .6, ride.pad.z); P.vel.set(0, 0, 0);
+  if (xrOn) return;
+  // 카메라: 발사대 옆에서 친구 로켓을 올려다봐요
+  const pc = ride.pad, gy = g ? g.position.y : pc.y, ty = gy + 2.5, cy = pc.y + 2.5, sh = ride.ph === "go" && ride.t > 1.8 && ride.t < 5 ? .04 : 0;
+  camera.position.set(pc.x + 7 + (Math.random() - .5) * sh, cy + Math.max(0, (ty - cy) * .25), pc.z + 6); camera.lookAt(pc.x, ty, pc.z);
+  handRig.visible = false; if (selfAv.g) selfAv.g.visible = false;
+}
+// 함께 타고 도착: 조종한 친구와 같은 착륙 결과를 겪고, 기지 옆에 내려요. 내 로켓이 떠난 곳에 서 있었으면 같이 실어 와 빈 발사대에 세워요
+function rideArrive(pk, rd) {
+  if (rd.mine) { const sp = landSpot(true); if (sp) S.rocketAt = [sp.x, sp.y, sp.z]; syncRocket(); }
+  P.vel.set(0, 0, 0); pause(false); showHud(true); arriveLog(pk);
+  toast(`${rd.name}의 로켓을 타고 ${PLANETS[pk].name}에 함께 왔어요${rd.mine ? " · 내 로켓도 실어 와서 발사대에 세웠어요" : ""}`, 4200);
+}
+$("rideOff").onclick = () => rideOff("로켓에서 내렸어요");
 function puff(x, y, z, k = 1) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(.5, .5, .5), new THREE.MeshBasicMaterial({ color: 0xd8d8d8, transparent: true, opacity: .8, depthWrite: false }));
   m.position.set(x + (Math.random() - .5) * .8, y, z + (Math.random() - .5) * .8); scene.add(m);
@@ -5789,6 +5857,10 @@ const net = (() => {
       Object.assign(o, { name: String(d.name || "?").slice(0, 10), color: /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "#ffffff", pk: String(d.pk), x: +d.x || 0, y: +d.y || 0, z: +d.z || 0, yaw: +d.yaw || 0, pitch: +d.pitch || 0, done: +d.done || 0, dex: +d.dex || 0, hp: +d.hp || 0, look: cleanLook(d.look), sw: +d.sw || 0, seen: performance.now(),
         mission: String(d.mission || "").slice(0, 40), o2: +d.o2 || 0, pw: +d.pw || 0, T: +d.T || 0, party: typeof d.party === "string" ? d.party.slice(0, 16) : "", plead: typeof d.plead === "string" ? d.plead.slice(0, 10) : "", pln: String(d.pln || "").slice(0, 10),
         rk: Array.isArray(d.rk) && d.rk.length === 3 && d.rk.every(Number.isFinite) ? d.rk.map(Number) : null, rf: !!d.rf });
+      const rd = typeof d.rd === "string" ? d.rd.slice(0, 10) : ""; // 누구 로켓에 타 있는지
+      if (rd === me.id && o.rd !== me.id && !teacher) toast(`${o.name}${josa(o.name, "이", "가")} 내 로켓에 탔어요. 출발하면 함께 가요`, 3200);
+      if (o.rd === me.id && rd !== me.id && !teacher && o.pk === S.planet && !cine) toast(`${o.name}${josa(o.name, "이", "가")} 내 로켓에서 내렸어요`, 2400);
+      o.rd = rd;
       if (teacher) { const k = o.name + o.color; const b = book[k] = book[k] || { first: Date.now() }; Object.assign(b, { id: d.from, name: o.name, color: o.color, pk: o.pk, done: o.done, dex: o.dex, hp: o.hp, party: o.party, pln: o.pln, seen: Date.now() }); }
     }
     if (d.t === "edit" && d.pk === S.planet && Number.isInteger(d.x) && Number.isInteger(d.y) && Number.isInteger(d.z) && (BLOCKS[d.b] || d.b === 0)) {
@@ -5799,6 +5871,7 @@ const net = (() => {
       if (typeof d.o === "string" && d.o && isBuilt(d.b)) O[k] = d.o.slice(0, 10); else delete O[k];
     }
     if (d.t === "bye" && d.from) removeOther(d.from);
+    if (d.t === "launch" && d.from && sameParty(d.from) && PLANETS[d.pk] && LANDM[d.m]) rideLaunch(d.from, d.pk, d.m);
     if (d.t === "herd" && d.from && others[d.from] && Array.isArray(d.a))
       others[d.from].herd = { pk: String(d.pk), seen: performance.now(), a: d.a.slice(0, 40).filter(e => Array.isArray(e) && e.length === 8 && e.every(Number.isFinite) && ANIMK[e[1]] && e[6] >= 30 && e[6] <= 100) };
     if ((d.t === "pdone" || d.t === "psync") && typeof d.party === "string") takeParty(d);
@@ -5834,7 +5907,7 @@ const net = (() => {
     for (const id in pendingInv) if (performance.now() - pendingInv[id].t > 25000) { delete pendingInv[id]; if (isLeader() && me.members.length <= 1 && !Object.keys(pendingInv).length) leftParty(); }
     if ((herdT += dt) > 1) { herdT = 0; const a = herdPack(); if (a.length || herdN) send({ t: "herd", pk: S.planet, a }); herdN = a.length; }
     if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", party: me.pid, plead: me.plead, pln: me.pid ? nameOf(me.plead) : "", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length,
-      rk: rocketG && S.rocketPk === S.planet ? [+rocketG.position.x.toFixed(2), +rocketG.position.y.toFixed(2), +rocketG.position.z.toFixed(2)] : null, rf: rocketG && rocketG.userData.flame.visible ? 1 : 0 }); }
+      rk: rocketG && S.rocketPk === S.planet ? [+rocketG.position.x.toFixed(2), +rocketG.position.y.toFixed(2), +rocketG.position.z.toFixed(2)] : null, rf: rocketG && rocketG.userData.flame.visible ? 1 : 0, rd: ride ? ride.id : "" }); }
     tickOthers(dt);
     renderRoom();
   }
@@ -5856,7 +5929,7 @@ const net = (() => {
       herdView(o, dt, here);
       if (o.bub && now > o.bubT) { if (o.bub.parent) o.bub.parent.remove(o.bub); o.bub.material.map.dispose(); o.bub.material.dispose(); o.bub = null; }
       if (o.mesh) {
-        o.mesh.visible = here && !(spec.id === id && spec.view === 0);
+        o.mesh.visible = here && !o.rd && !(o.rf && o.rk && Math.hypot(o.x - o.rk[0], o.z - o.rk[2]) < 4) && !(spec.id === id && spec.view === 0); // 로켓에 탄 친구(타고 출발하는 친구)는 안 보여요
         const px = o.mesh.position.x, pz = o.mesh.position.z;
         let tx = o.x; if (wrapX && Math.abs(tx - o.mesh.position.x) > SX / 2) o.mesh.position.x = tx;
         o.mesh.position.x += (tx - o.mesh.position.x) * Math.min(1, dt * 10); o.mesh.position.y += (o.y - o.mesh.position.y) * Math.min(1, dt * 10); o.mesh.position.z += (o.z - o.mesh.position.z) * Math.min(1, dt * 10);
@@ -5959,7 +6032,7 @@ const net = (() => {
   });
   try { const n = localStorage.getItem("spacecraft2-name"); if (n) $("nick").value = n; } catch (e) {}
   $("nick").addEventListener("change", () => { try { localStorage.setItem("spacecraft2-name", $("nick").value.trim()); } catch (e) {} });
-  return { say, openChat, closeChat, setChat, QUICK, CHATM, get chatMode() { return chatMode; }, get chatLog() { return chatLog; }, herdList, send, tick, partyDone, setPvp, sameParty, invitePl, kickPl, leaveParty, get party() { return { pid: me.pid, lead: me.plead, members: me.members.slice() }; }, get invite() { return invite; }, answerInvite, get host() { return live && host; }, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get myName() { return me.name || ($("nick").value || "").trim().slice(0, 10); }, get partyNames() { return me.pid ? me.members.filter(id => id !== me.id).map(nameOf) : []; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
+  return { say, openChat, closeChat, setChat, QUICK, CHATM, get chatMode() { return chatMode; }, get chatLog() { return chatLog; }, herdList, send, tick, partyDone, setPvp, sameParty, invitePl, kickPl, leaveParty, get party() { return { pid: me.pid, lead: me.plead, members: me.members.slice() }; }, get invite() { return invite; }, answerInvite, get host() { return live && host; }, get pvp() { return live && pvp; }, get myColor() { return me.color; }, get myName() { return me.name || ($("nick").value || "").trim().slice(0, 10); }, riders: () => Object.values(others).filter(o => o.rd === me.id && o.pk === S.planet).map(o => o.name), get partyNames() { return me.pid ? me.members.filter(id => id !== me.id).map(nameOf) : []; }, get teacher() { return teacher; }, get others() { return others; }, get live() { return live; }, clock() { return !live ? null : host ? (performance.now() - roomT0) / 1000 : clockOff == null ? null : performance.now() / 1000 + clockOff; }, get via() { return mqJoin ? "mq" : hostConn ? "p2p" : host ? "host:" + mqs.length + (peer && peer.open ? "+p2p" : "") : ""; }, me };
 })();
 
 /* ═════════════ 루프 ═════════════ */
@@ -5996,7 +6069,7 @@ function frameBody(now, xf) {
   if (!paused) { survival(dt); missionTick(dt); hazards(dt); hazards2(dt); deviceTick(dt); recallTick(dt); cropTick(dt); saplingTick(dt); flowTick(dt); holdCheck(); saveT += dt; if (saveT > 5) { saveT = 0; save(); } }
   // 카메라
   if (spec.id && window.specTick) window.specTick(dt);
-  updateCamera(dt); chunkTick(); cineTick(dt); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
+  updateCamera(dt); chunkTick(); cineTick(dt); rideTick(dt); smokeTick(dt); if (!paused) dropTick(dt); pileTick(dt);
   skyDome.position.copy(camera.position); skyGroup.position.copy(camera.position);
   // 하늘·빛
   const e = env.e, day = smooth(-.12, .25, e), sk = PL.sky;
@@ -6166,12 +6239,13 @@ function xrItems() {
       const j = S.hot.indexOf(id); if (j >= 0 && j !== sel) S.hot[j] = S.hot[sel]; S.hot[sel] = id; renderHotbar(); toast(`${itemName(id)}${josa(itemName(id), "을", "를")} 손에 들었어요`); xrMenu = null; } }));
   }
   if (m.pg === "map") {
-    const pad = nearPad();
-    if (!S.gear.rocket && !S.inv[126]) return [{ t: "로켓이 없어요", sub: "제작대에서 로켓(철 6, 규소 4)을 먼저 만드세요", ok: false }];
-    if (S.rocketPk !== S.planet) return [{ t: "로켓을 발사대에 세우세요", sub: "로켓을 손에 들고 발사대를 바라보며 그립", ok: false }];
-    if (!pad) return [{ t: "로켓 가까이 가세요", sub: `연료(물·얼음·수소·메테인) ${fuelHave()}개`, ok: false }];
-    return ORDER.map(pk => { const PL = PLANETS[pk], here = pk === S.planet, f = FUEL[pk];
-      return { t: `${PL.name}${here ? " (지금 여기)" : ""}`, sub: `${PL.type} · 태양에서 ${PL.au} AU · 연료 ${f}개 (가진 연료 ${fuelHave()})`, ok: !here && fuelHave() >= f, go: () => { if (!here && fuelHave() >= f) xrMenu = { pg: "land", pk, i: 0 }; else toast(here ? "지금 여기 있어요" : "연료가 모자라요", 2000); } }; });
+    const pad = nearPad(), pr = nearPartyRocket();
+    const rideIt = pr ? [{ t: `${net.others[pr].name}의 로켓에 함께 타기`, sub: "친구가 출발하면 같이 가요 · 연료 필요 없음", ok: true, go: () => { xrMenu = null; boardRide(pr); } }] : [];
+    if (!S.gear.rocket && !S.inv[126]) return [...rideIt, { t: "로켓이 없어요", sub: "제작대에서 로켓(철 6, 규소 4)을 먼저 만드세요", ok: false }];
+    if (S.rocketPk !== S.planet) return [...rideIt, { t: "로켓을 발사대에 세우세요", sub: "로켓을 손에 들고 발사대를 바라보며 그립", ok: false }];
+    if (!pad) return [...rideIt, { t: "로켓 가까이 가세요", sub: `연료(물·얼음·수소·메테인) ${fuelHave()}개`, ok: false }];
+    return [...rideIt, ...ORDER.map(pk => { const PL = PLANETS[pk], here = pk === S.planet, f = FUEL[pk];
+      return { t: `${PL.name}${here ? " (지금 여기)" : ""}`, sub: `${PL.type} · 태양에서 ${PL.au} AU · 연료 ${f}개 (가진 연료 ${fuelHave()})`, ok: !here && fuelHave() >= f, go: () => { if (!here && fuelHave() >= f) xrMenu = { pg: "land", pk, i: 0 }; else toast(here ? "지금 여기 있어요" : "연료가 모자라요", 2000); } }; })];
   }
   if (m.pg === "land") {
     const pk = m.pk, dx = S.dex[pk];
