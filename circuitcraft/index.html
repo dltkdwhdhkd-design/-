@@ -284,18 +284,19 @@ const BL = {
   9: { n: "지붕", t: [10, 10, 10] }, 10: { n: "나뭇잎", t: [11, 11, 11], see: true }, 11: { n: "바닥돌", t: [12, 12, 12], hard: true }, 12: { n: "고무 매트", t: [13, 13, 13] }, 13: { n: "철 블록", t: [14, 14, 14], iron: true }, 14: { n: "바퀴", t: [15, 15, 15], see: true, shaped: true }, 15: { n: "바퀴축", t: [14, 14, 14], see: true, shaped: true },
   16: { n: "톱니바퀴", t: [14, 14, 14], see: true, shaped: true }, 17: { n: "톱니 기둥", t: [14, 14, 14], see: true, shaped: true }, 18: { n: "선풍기 날개", t: [14, 14, 14], see: true, shaped: true }, 19: { n: "핸들", t: [14, 14, 14], see: true, shaped: true },
 };
-// R: 저항(Ω). 전지는 전압 V와 내부 저항 r. 전선은 거의 0Ω(0.01Ω)
+// R: 저항(Ω). 교과서 계산과 맞도록 전선·스위치·전류계·퓨즈는 0Ω, 전지는 이상적인 전지(속 저항 0)로 봐요.
+// (계산이 무너지지 않게 속으로는 0.000001Ω처럼 아주 작은 값을 써서, 화면 값에는 드러나지 않아요)
 const PT = {
-  20: { n: "구리 전선", k: "wire", sym: "wire", d: "전기가 아주 잘 통해요(저항 거의 0). 붙어 있는 전선끼리는 모두 이어져요." },
-  21: { n: "전지 1.5V", k: "bat", V: 1.5, r: 0.1, max: 3, d: "빨간 쪽이 (+)극. 여러 개를 +와 −끼리 한 줄로 이으면 전압이 더해져요." },
+  20: { n: "구리 전선", k: "wire", sym: "wire", d: "저항 0Ω. 전선 위 어디서나 전압이 같아요. 붙어 있는 전선끼리는 모두 이어져요." },
+  21: { n: "전지 1.5V", k: "bat", V: 1.5, r: 1e-6, max: 3, d: "빨간 쪽이 (+)극. 여러 개를 +와 −끼리 한 줄로 이으면 전압이 더해져요." },
   22: { n: "꼬마전구", k: "bulb", R: 5, d: "저항 5Ω. 전기 에너지를 빛으로 바꿔요. 전압이 4.8V를 넘으면 필라멘트가 끊어져요." },
   23: { n: "저항 10Ω", k: "res", R: 10, d: "전류의 흐름을 방해하는 정도가 10Ω인 부품이에요." },
   24: { n: "니크롬선 2Ω", k: "nic", R: 2, d: "한 칸에 2Ω. 길게 이을수록(직렬) 저항이 커지고, 나란히 여러 줄로 이으면(굵게) 작아져요." },
   25: { n: "스위치", k: "sw", d: "오른쪽 클릭으로 열고 닫아요. 열리면 회로가 끊겨요." },
-  26: { n: "전류계", k: "amm", R: 0.01, max: 3, d: "회로에 직렬로 끼워 전류(A)를 재요. 빨간 단자가 (+)." },
+  26: { n: "전류계", k: "amm", R: 1e-6, max: 3, d: "회로에 직렬로 끼워 전류(A)를 재요. 빨간 단자가 (+)." },
   27: { n: "전압계", k: "vm", R: 1e6, d: "재고 싶은 부품의 양 끝에 병렬로 대어 전압(V)을 재요. 빨간 단자가 (+)." },
   28: { n: "전동기(기어 모터)", k: "mot", R: 4, d: "저항 4Ω. 양 끝 구리 단자로 전류가 흐르면 옆 두 면으로 나온 회전축이 돌아요(장난감 자동차의 노란 기어 모터처럼). 전류가 셀수록 빨리, 전류 방향을 바꾸면 반대로 돌아요. 회전축에 바퀴축·바퀴·톱니바퀴·선풍기 날개를 한 줄로 끼우면 그것들이 함께 돌아요." },
-  29: { n: "퓨즈 2A", k: "fuse", R: 0.01, max: 2, d: "전류가 2A를 넘으면 끊어져 회로를 지켜요. 오른쪽 클릭으로 새 퓨즈로 갈아요." },
+  29: { n: "퓨즈 2A", k: "fuse", R: 1e-6, max: 2, d: "전류가 2A를 넘으면 끊어져 회로를 지켜요. 오른쪽 클릭으로 새 퓨즈로 갈아요." },
   30: { n: "버저", k: "buz", R: 10, d: "저항 10Ω. 전류가 흐르면 삐 소리가 나요. 전류가 셀수록 크고 높아요." },
   31: { n: "가변 저항", k: "var", R: 10, d: "오른쪽 클릭으로 저항을 2→5→10→20Ω으로 바꿔요. 밝기·속도 조절기의 원리예요." },
   32: { n: "빨간 전구", k: "bulb", R: 5, col: 0xff5040, d: "저항 5Ω. 빨간빛을 내요." },
@@ -311,7 +312,7 @@ const isSolid = (id) => id > 0 && id < 20;
 const itemName = (id) => (PT[id] || BL[id] || { n: "?" }).n;
 const BULB_REF = 1.5 * 1.5 / 5; // 전지 1개에 전구 1개일 때 전력(밝기 1)
 const BULB_MAX_V = 4.8;
-const G_WIRE = 1000; // 전선 이음 0.001Ω
+const G_WIRE = 1e6; // 전선 이음·닫힌 스위치: 사실상 0Ω(0.000001Ω)
 
 /* ═════════════ 세계 ═════════════ */
 const SX = 48, SY = 24, SZ = 48, NN = SX * SY * SZ;
@@ -1386,12 +1387,12 @@ function probeTick() {
   let html = `<div class="n">${P.n}${LOCK[i] && mode === "level" ? " 🔒" : ""}</div>`;
   if (id === 20) { const I = RES.wireI.get(i) || 0; html += `<div class="vals"><span>전류</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">전선은 저항이 거의 0이라 전압을 거의 쓰지 않아요.</div>`; el.innerHTML = html; el.hidden = false; return; }
   const p = pv(i), v = p.v, I = p.i;
-  if (P.k === "bat") html += `<div class="vals"><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span><span>속 저항</span><span class="O">${P.r} Ω</span></div><div class="f">아무것도 안 이었을 때 1.5V. 전류가 많이 흐를수록 전지 속 저항 때문에 조금 줄어요.</div>`;
+  if (P.k === "bat") html += `<div class="vals"><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">늘 1.5V를 걸어 줘요(이상적인 전지). 전지 두 개를 직렬로 이으면 3V. 3A가 넘게 흐르면(합선) 뜨거워져요.</div>`;
   else if (P.k === "sw") html += `<div class="vals"><span>상태</span><span>${FL[i] & 1 ? "닫힘 (전류 흐름)" : "열림 (끊김)"}</span><span>전류</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">오른쪽 클릭(폰: 켜기)으로 바꿔요.</div>`;
   else if (P.k === "amm") html += `<div class="vals"><span>읽은 값</span><span class="A">${fmt(I, 3)} A</span></div><div class="f">전류계는 저항이 거의 0이라서 반드시 <b>직렬</b>로 끼워요.</div>`;
   else if (P.k === "vm") html += `<div class="vals"><span>읽은 값</span><span class="V">${fmt(v, 2)} V</span></div><div class="f">전압계는 저항이 아주 커서(1,000,000Ω) 전류를 거의 안 받아요. <b>병렬</b>로 대요.</div>`;
   else {
-    const R = rOf(i); html += `<div class="vals"><span>저항</span><span class="O">${R} Ω</span><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span>` + (P.k === "bulb" ? `<span>밝기</span><span>${fmt(bright(i), 2)}배</span>` : "") + `</div>`;
+    const R = rOf(i) < 1e-3 ? 0 : rOf(i); html += `<div class="vals"><span>저항</span><span class="O">${R} Ω</span><span>전압</span><span class="V">${fmt(v, 2)} V</span><span>전류</span><span class="A">${fmt(I, 3)} A</span>` + (P.k === "bulb" ? `<span>밝기</span><span>${fmt(bright(i), 2)}배</span>` : "") + `</div>`;
     if (P.k === "heat") html += `<div class="vals"><span>전력</span><span>${fmt(Math.abs(v * I), 2)} W</span><span>온도</span><span>약 ${Math.round(20 + 60 * Math.abs(v * I))} ℃</span></div>`;
     if (P.k === "mag") html += `<div class="vals"><span>자석 힘</span><span>${magReach(I) ? `아래 ${magReach(I)}칸 거리까지 끌어당김` : "약함 (0.25A 넘어야)"}</span></div>`;
     if (P.k === "var") html += `<div class="f">오른쪽 클릭: 2 → 5 → 10 → 20 Ω</div>`;
@@ -1513,7 +1514,7 @@ function renderHot() {
     el.appendChild(s);
   });
   if (mode === "sandbox") { const b = document.createElement("div"); b.className = "s box"; b.innerHTML = "<span>📦</span><i>부품</i>"; b.title = "부품 상자 (E)"; b.onpointerdown = (e) => { e.stopPropagation(); openInv(); }; el.appendChild(b); }
-  const id = hot[sel]; $("hotName").textContent = id ? itemName(id) + (PT[id] && PT[id].R ? ` · ${PT[id].R >= 1e5 ? "아주 큰" : PT[id].R} Ω` : "") : "";
+  const id = hot[sel]; $("hotName").textContent = id ? itemName(id) + (PT[id] && PT[id].R ? ` · ${PT[id].R >= 1e5 ? "아주 큰" : PT[id].R < 1e-3 ? 0 : PT[id].R} Ω` : "") : "";
 }
 let toastT = 0;
 function toast(t, ms = 1300, cls = "") { const el = $("toast"); el.textContent = t; el.style.whiteSpace = "pre-line"; el.className = "hud " + cls; el.hidden = false; toastT = performance.now() + ms; }
@@ -1722,7 +1723,7 @@ renderLevels();
 requestAnimationFrame(frame);
 // 점검용(테스트 스크립트에서 씀)
 // 새 버전 확인: 브라우저가 예전 페이지를 기억해도(최대 10분) 새 버전이 있으면 알려 줘요. 진행 기록은 그대로예요
-const VERSION = "2026-11-03-taphotbar";
+const VERSION = "2026-11-04-ideal";
 function checkVersion() {
   try { fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.text() : "").then(h => { const m = h.match(/const VERSION = "([^"]+)"/); if (m && m[1] !== VERSION) { $("newVer").hidden = false; $("newVerGo").onclick = () => location.replace(location.pathname + "?v=" + encodeURIComponent(m[1])); } }).catch(() => {}); } catch (e) {}
 }
