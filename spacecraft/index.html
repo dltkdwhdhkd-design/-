@@ -1058,38 +1058,40 @@ function iconCanvas(id) {
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerp = (a, b, t) => a + (b - a) * t;
 const PLANETS = {
-  earth: { size: 608, name: "지구", type: "지구형 행성", g: 1, P: 1, solar: 1, au: 1, dayReal: "24시간", dayMin: 6, dir: 1, breath: true, airless: false, wrap: false,
+  earth: { size: 608, name: "지구", type: "지구형 행성", g: 1, P: 1, solar: 1, au: 1, dayReal: "24시간", dayH: 24, dir: 1, breath: true, airless: false, wrap: false,
     sky: { dt: "#3b7fd8", dh: "#a8d0f2", nt: "#03050e", nh: "#0d1733", sun: "#ff9a4a" }, sunCol: 0xfff3dd, sunSize: 60, fog: [45, 95], amb: [.18, .62],
     T: (e) => lerp(9, 27, smooth(-.2, .6, e)), skyText: "파란 하늘", ground: "흙·암석, 액체 물, 생명", order: 3 },
-  moon: { name: "달", type: "지구의 위성", g: .166, P: 0, solar: 1, au: 1, dayReal: "약 29.5일", dayMin: 20, dir: 1, breath: false, airless: true, wrap: false,
+  moon: { name: "달", type: "지구의 위성", g: .166, P: 0, solar: 1, au: 1, dayReal: "약 29.5일", dayH: 708.7, dir: 1, breath: false, airless: true, wrap: false,
     sky: { dt: "#000000", dh: "#05060a", nt: "#000000", nh: "#020306", sun: "#000000" }, sunCol: 0xffffff, sunSize: 60, fog: [55, 110], amb: [.16, .3],
     T: (e, sh) => sh ? -230 : lerp(-170, 120, smooth(-.05, .35, e)), skyText: "낮에도 검은 하늘", ground: "레골리스, 운석 구덩이, 현무암 바다", order: 3.5 },
-  mars: { name: "화성", type: "지구형 행성", g: .38, P: .006, solar: .43, au: 1.52, dayReal: "약 24시간 40분", dayMin: 6, dir: 1, breath: false, airless: false, wrap: false,
-    sky: { dt: "#c8956a", dh: "#e3c39a", nt: "#05040a", nh: "#1c1416", sun: "#6f9fd8" }, sunCol: 0xfff0e0, sunSize: 40, fog: [28, 80], amb: [.12, .5],
+  mars: { name: "화성", type: "지구형 행성", g: .38, P: .006, solar: .43, au: 1.52, dayReal: "약 24시간 40분", dayH: 24.66, dir: 1, breath: false, airless: false, wrap: false,
+    sky: { dt: "#c8956a", dh: "#e3c39a", nt: "#05040a", nh: "#1c1416", sun: "#6f9fd8" }, sunCol: 0xfff0e0, sunSize: 39.5, fog: [28, 80], amb: [.12, .5],
     T: (e) => lerp(-90, 20, smooth(-.1, .5, e)), skyText: "먼지로 누런 하늘, 노을은 푸른색", ground: "산화 철 붉은 흙, 극관, 물이 흐른 흔적", order: 4 },
-  mercury: { name: "수성", type: "지구형 행성", g: .38, P: 0, solar: 6.7, au: .39, dayReal: "약 176일", dayMin: 14, dir: 1, breath: false, airless: true, wrap: true,
-    sky: { dt: "#000000", dh: "#07060a", nt: "#000000", nh: "#020306", sun: "#000000" }, sunCol: 0xffffff, sunSize: 150, fog: [55, 110], amb: [.16, .3],
+  mercury: { name: "수성", type: "지구형 행성", g: .38, P: 0, solar: 6.7, au: .39, dayReal: "약 176일", dayH: 4222.6, dir: 1, breath: false, airless: true, wrap: true,
+    sky: { dt: "#000000", dh: "#07060a", nt: "#000000", nh: "#020306", sun: "#000000" }, sunCol: 0xffffff, sunSize: 153.8, fog: [55, 110], amb: [.16, .3],
     T: (e, sh) => sh ? -170 : e > .35 ? lerp(50, 430, smooth(.35, .85, e)) : e < -.35 ? lerp(-25, -180, smooth(-.35, -.75, e)) : lerp(-25, 50, (e + .35) / .7), skyText: "검은 하늘, 해가 2.5배 크게 보임", ground: "구덩이 많은 암석, 철·황", order: 1 },
-  venus: { name: "금성", type: "지구형 행성", g: .9, P: 92, solar: 1.9, au: .72, dayReal: "약 117일 (해가 서쪽에서 뜸)", dayMin: 24, dir: -1, breath: false, airless: false, wrap: false,
-    sky: { dt: "#d9b56a", dh: "#efd9a0", nt: "#2a1d10", nh: "#4a3418", sun: "#ffcf80" }, sunCol: 0xfff0c8, sunSize: 70, fog: [6, 46], amb: [.3, .55],
+  venus: { name: "금성", type: "지구형 행성", g: .9, P: 92, solar: 1.9, au: .72, dayReal: "약 117일 (해가 서쪽에서 뜸)", dayH: 2802, dir: -1, breath: false, airless: false, wrap: false,
+    sky: { dt: "#d9b56a", dh: "#efd9a0", nt: "#2a1d10", nh: "#4a3418", sun: "#ffcf80" }, sunCol: 0xfff0c8, sunSize: 83.3, fog: [6, 46], amb: [.3, .55],
     T: null, skyText: "두꺼운 노란 구름", ground: "현무암 용암 평원, 화산", order: 2 },
 };
 const GASP = (sky, top) => ({ g: 1, P: 1, breath: false, airless: false, wrap: false, gas: true, sky, sunCol: 0xffffff, fog: [24, 80], amb: [.22, .5], T: () => top, Ttop: top, ground: "단단한 표면 없음 (수소·헬륨 기체)" });
 Object.assign(PLANETS, {
-  jupiter: Object.assign(GASP({ dt: "#c9a77c", dh: "#e8d2b0", nt: "#140e08", nh: "#2a1d12", sun: "#ffe0b0" }, -110), { name: "목성", type: "목성형 행성", g: 2.53, solar: .037, au: 5.2, dayReal: "약 10시간", dayMin: 2.5, dir: 1, sunSize: 14, skyText: "갈색·흰색 줄무늬 구름, 대적점" }),
-  europa: { name: "유로파", type: "목성의 위성", g: .13, P: 0, solar: .037, au: 5.2, dayReal: "약 3.5일", dayMin: 8, dir: 1, breath: false, airless: true, wrap: false,
-    sky: { dt: "#000000", dh: "#05060a", nt: "#000000", nh: "#020306", sun: "#000000" }, sunCol: 0xffffff, sunSize: 14, fog: [55, 110], amb: [.2, .32],
+  jupiter: Object.assign(GASP({ dt: "#c9a77c", dh: "#e8d2b0", nt: "#140e08", nh: "#2a1d12", sun: "#ffe0b0" }, -110), { name: "목성", type: "목성형 행성", g: 2.53, solar: .037, au: 5.2, dayReal: "약 10시간", dayH: 9.93, dir: 1, sunSize: 11.5, skyText: "갈색·흰색 줄무늬 구름, 대적점" }),
+  europa: { name: "유로파", type: "목성의 위성", g: .13, P: 0, solar: .037, au: 5.2, dayReal: "약 3.5일", dayH: 85.2, dir: 1, breath: false, airless: true, wrap: false,
+    sky: { dt: "#000000", dh: "#05060a", nt: "#000000", nh: "#020306", sun: "#000000" }, sunCol: 0xffffff, sunSize: 11.5, fog: [55, 110], amb: [.2, .32],
     T: (e) => lerp(-190, -150, smooth(-.2, .6, e)), skyText: "검은 하늘에 거대한 목성", ground: "얼음 껍질, 그 아래 바다", order: 5.5 },
-  saturn: Object.assign(GASP({ dt: "#7f9cc4", dh: "#dccfa8", nt: "#0a0c14", nh: "#262012", sun: "#fff0c8" }, -140), { name: "토성", type: "목성형 행성", g: 1.07, solar: .011, au: 9.5, dayReal: "약 10시간 40분", dayMin: 2.7, dir: 1, sunSize: 8, skyText: "옅은 노란 구름, 하늘을 가로지르는 고리" }),
-  titan: { name: "타이탄", type: "토성의 위성", g: .14, P: 1.5, solar: .011, au: 9.5, dayReal: "약 16일", dayMin: 12, dir: 1, breath: false, airless: false, wrap: false, thick: true,
-    sky: { dt: "#b8732a", dh: "#d89a4a", nt: "#2a1806", nh: "#4a2a0e", sun: "#ffb060" }, sunCol: 0xffd8a0, sunSize: 10, fog: [4, 34], amb: [.3, .5],
+  saturn: Object.assign(GASP({ dt: "#7f9cc4", dh: "#dccfa8", nt: "#0a0c14", nh: "#262012", sun: "#fff0c8" }, -140), { name: "토성", type: "목성형 행성", g: 1.07, solar: .011, au: 9.5, dayReal: "약 10시간 33분", dayH: 10.55, dir: 1, sunSize: 6.3, skyText: "옅은 노란 구름, 하늘을 가로지르는 고리" }),
+  titan: { name: "타이탄", type: "토성의 위성", g: .14, P: 1.5, solar: .011, au: 9.5, dayReal: "약 16일", dayH: 382.7, dir: 1, breath: false, airless: false, wrap: false, thick: true,
+    sky: { dt: "#b8732a", dh: "#d89a4a", nt: "#2a1806", nh: "#4a2a0e", sun: "#ffb060" }, sunCol: 0xffd8a0, sunSize: 6.3, fog: [4, 34], amb: [.3, .5],
     T: () => -180, skyText: "짙은 주황색 안개", ground: "얼음 바위, 메테인 호수와 강", order: 6.5 },
-  uranus: Object.assign(GASP({ dt: "#6fcfd4", dh: "#bff0ee", nt: "#06181c", nh: "#0e2a30", sun: "#ffffff" }, -195), { name: "천왕성", type: "목성형 행성", g: .9, solar: .0027, au: 19.2, dayReal: "약 17시간 (자전축이 98° 누움)", dayMin: 2, dir: 1, sunSize: 5, skyText: "청록색, 해가 지지 않는 여름" }),
-  neptune: Object.assign(GASP({ dt: "#2f5fd8", dh: "#6f9cf0", nt: "#050a20", nh: "#0d1a40", sun: "#ffffff" }, -200), { name: "해왕성", type: "목성형 행성", g: 1.14, solar: .0011, au: 30.1, dayReal: "약 16시간", dayMin: 2, dir: 1, sunSize: 4, skyText: "짙은 파란색, 아주 센 바람" }),
+  uranus: Object.assign(GASP({ dt: "#6fcfd4", dh: "#bff0ee", nt: "#06181c", nh: "#0e2a30", sun: "#ffffff" }, -195), { name: "천왕성", type: "목성형 행성", g: .9, solar: .0027, au: 19.2, dayReal: "약 17시간 (자전축이 98° 누움, 거꾸로 돎)", dayH: 17.24, dir: -1, sunSize: 3.1, skyText: "청록색, 해가 지지 않는 여름" }),
+  neptune: Object.assign(GASP({ dt: "#2f5fd8", dh: "#6f9cf0", nt: "#050a20", nh: "#0d1a40", sun: "#ffffff" }, -200), { name: "해왕성", type: "목성형 행성", g: 1.14, solar: .0011, au: 30.1, dayReal: "약 16시간", dayH: 16.11, dir: 1, sunSize: 2, skyText: "짙은 파란색, 아주 센 바람" }),
 });
 const XTRA = { mercury: [.38, 5.4, 0, "없음"], venus: [.95, 5.2, 0, "없음"], earth: [1, 5.5, 1, "없음"], moon: [.27, 3.3, "—", "—"], mars: [.53, 3.9, 2, "없음"],
-  jupiter: [11.2, 1.3, 95, "있음 (희미함)"], europa: [.25, 3.0, "—", "—"], saturn: [9.4, .7, 146, "있음 (뚜렷함)"], titan: [.4, 1.9, "—", "—"], uranus: [4, 1.3, 28, "있음 (희미함)"], neptune: [3.9, 1.6, 16, "있음 (희미함)"] };
+  jupiter: [11.2, 1.3, 101, "있음 (희미함)"], europa: [.25, 3.0, "—", "—"], saturn: [9.4, .7, 285, "있음 (뚜렷함)"], titan: [.4, 1.9, "—", "—"], uranus: [4, 1.3, 29, "있음 (희미함)"], neptune: [3.9, 1.6, 16, "있음 (희미함)"] };
 for (const k in XTRA) Object.assign(PLANETS[k], { r: XTRA[k][0], rho: XTRA[k][1], moons: XTRA[k][2], ring: XTRA[k][3] });
+// 하루 길이는 실제 태양일(해가 떴다가 다시 뜰 때까지, 시간) 비율 그대로예요. 지구 24시간 = 게임 하루 배율 6
+for (const k in PLANETS) PLANETS[k].dayMin = PLANETS[k].dayH / 4;
 const ORDER = ["mercury", "venus", "earth", "moon", "mars", "jupiter", "europa", "saturn", "titan", "uranus", "neptune"];
 const TOUR = ["earth", "moon", "mars", "mercury", "venus", "jupiter", "europa", "saturn", "titan", "uranus", "neptune"];
 const FUEL = { earth: 3, moon: 3, mars: 6, mercury: 8, venus: 6, jupiter: 6, europa: 3, saturn: 8, titan: 3, uranus: 6, neptune: 6 };
@@ -1797,7 +1799,7 @@ function load() { try { const s = JSON.parse(localStorage.getItem("spacecraft2")
 let placedTimes = {};
 // 밤은 낮보다 NIGHT_K배 빨리 지나가요(낮 길이는 그대로). 시각 0~0.5가 낮, 0.5~1이 밤
 const NIGHT_K = 4, DAY_FR = NIGHT_K / (NIGHT_K + 1);
-// 하루 길이 배율: 지구 낮 8분·밤 2분. 천체끼리의 하루 길이 비율(달·금성은 아주 길고 목성형 행성은 짧아요)은 그대로예요
+// 하루 길이 배율: 지구 낮 8분·밤 2분. 천체끼리의 하루 길이 비율은 실제와 같아요(달 낮 약 3.9시간, 수성 낮 약 23시간, 목성 낮 약 3.3분)
 const DAY_X = 8 / 3, daySec = (PL) => PL.dayMin * 60 * DAY_X;
 const cycleSec = (PL) => daySec(PL) * (.5 + .5 / NIGHT_K);
 const warpT = (pk, q) => PLANETS[pk].wrap ? q : q < DAY_FR ? q / DAY_FR * .5 : .5 + (q - DAY_FR) / (1 - DAY_FR) * .5;
@@ -1889,7 +1891,7 @@ function computeEnv() {
   const shaded = SH[(((x % SX) + SX) % SX) + SX * Math.max(0, Math.min(SZ - 1, z))] === 1;
   let sunAmt = Math.max(0, e) > 0 ? Math.min(1, e * 3) : 0;
   if (shaded) sunAmt = 0;
-  if (pk === "uranus") { env.sunDir.set(Math.cos(a) * .35, .92, Math.sin(a) * .35).normalize(); env.e = env.sunDir.y; sunAmt = 1; }
+  if (pk === "uranus") { env.sunDir.set(Math.cos(a) * .35, .92, Math.sin(a) * .35 * dir).normalize(); env.e = env.sunDir.y; sunAmt = 1; }
   if (PL.gas) {
     const d = Math.max(0, Math.min(1, (GAS_TOP - P.pos.y) / GAS_TOP));
     env.T = PL.Ttop + 620 * d; env.Pa = Math.pow(1000, d);
