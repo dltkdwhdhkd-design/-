@@ -123,6 +123,13 @@ kbd { font-family: inherit; font-weight: 700; border: 1px solid var(--line); bor
 .equip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
 .equip div { background: #ffffff08; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; display: grid; }
 .equip small { color: var(--ink-dim); font-size: .8em; }
+.eqslots { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; margin: 6px 0 8px; }
+.eqs { display: flex; gap: 8px; align-items: center; text-align: left; background: #ffffff08; border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; color: inherit; font: inherit; cursor: pointer; min-width: 0; }
+.eqs.on { border-color: #ffd65a99; background: #ffd65a14; }
+.eqs.on:hover { background: #ffd65a26; }
+.eqs canvas { width: 32px; height: 32px; image-rendering: pixelated; flex: none; }
+.eqs.empty { cursor: default; } .eqs.empty canvas { opacity: .22; filter: grayscale(1); }
+.eqs span { min-width: 0; } .eqs b { display: block; font-size: .9em; } .eqs small { display: block; color: var(--ink-dim); font-size: .76em; line-height: 1.25; }
 .slot span { position: absolute; right: 3px; bottom: 1px; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px #000; }
 #tools { right: max(10px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 10px); display: grid; gap: 6px; }
 #tools .btn { padding: .5em .9em; font-size: .9em; text-align: left; }
@@ -456,6 +463,7 @@ td.unk { color: #4e5786; }
 <div class="overlay" id="chestOv" hidden>
   <div class="card wide">
     <h2>상자 <small id="chestCnt"></small></h2>
+    <p class="hint" id="chestParty" hidden>파티 상자: 같은 파티 친구와 안의 물건을 함께 써요. 누가 넣어도 모두 보이고 꺼낼 수 있어요.</p>
     <div class="ctabs" id="chestMode"></div>
     <h3>상자 안 <small>(누르면 가방으로)</small></h3><div class="bag" id="chestIn"></div>
     <h3>내 가방 <small>(누르면 상자로)</small></h3><div class="bag" id="chestBag"></div>
@@ -466,11 +474,14 @@ td.unk { color: #4e5786; }
 <div class="overlay" id="invOv" hidden>
   <div class="card wide">
     <h2>가방과 장비</h2>
+    <h3>입은 장비 <small>(누르면 벗어서 가방에 넣어요. 가방의 장비를 누르면 입어요)</small></h3>
+    <div class="eqslots" id="eqSlots"></div>
     <div class="equip" id="equipList"></div>
     <p class="hint">아래 단축 칸(1~9)을 하나 고른 뒤, 그 칸에 넣을 물건을 누르세요. 게임 중에는 숫자 키나 마우스 휠로 바꿔 들어요. 버린 물건은 땅에 떨어져서 누구나 주울 수 있어요.</p>
     <div class="bag hot" id="hotEdit"></div>
     <div class="ctabs" id="bagMode"></div>
     <h3>도구</h3><div class="bag" id="bagTools"></div>
+    <h3>장비 <small>(누르면 입어요. 버리면 친구가 주워서 입을 수 있어요)</small></h3><div class="bag" id="bagEquip"></div>
     <h3>블록</h3><div class="bag" id="bagBlocks"></div>
     <h3>재료 <small>(손에 들 수는 있지만 놓을 수는 없어요)</small></h3><div class="bag" id="bagMats"></div>
     <div class="row"><button class="btn ghost" id="hotClear">고른 칸 비우기</button><button class="btn ghost" id="dropOne">1개 버리기 <kbd data-k="drop">Q</kbd></button><button class="btn ghost" id="dropAll">모두 버리기 <kbd data-k="drop" data-pre="Shift+">Shift+Q</kbd></button><button class="btn" id="invClose">닫기 <kbd>I</kbd></button></div>
@@ -765,7 +776,9 @@ const TOOLS = { 120: { n: "돌 곡괭이", tier: 1 }, 121: { n: "철 곡괭이",
 const bestTier = () => Math.max(0, ...Object.keys(TOOLS).filter(t => S.inv[t] > 0 && TOOLS[t].tier).map(t => TOOLS[t].tier));
 const SAFE_R = 6; // 기지 코어 근처 안전 구역(대결 피해 없음)
 const TOOL_OF = { 1: 120, 2: 121, 3: 122 };
-const itemName = (id) => (BLOCKS[id] || MATS[id] || TOOLS[id] || {}).n || "?";
+// 벗은 장비(갑옷·우주복 등)는 가방 물건이 돼요(1000번부터). 내용은 갑옷 표 아래에서 채워요
+const EQ = {};
+const itemName = (id) => (BLOCKS[id] || MATS[id] || TOOLS[id] || EQ[id] || {}).n || "?";
 const SOLID = (b) => b !== 0 && !(BLOCKS[b] && (BLOCKS[b].liquid || BLOCKS[b].thin || BLOCKS[b].soft));
 const LIQ = (b) => !!(BLOCKS[b] && BLOCKS[b].liquid);
 const FLOW0 = 85, FALLW = 93, isFlowW = (b) => b > FLOW0 && b <= FALLW, isWat = (b) => b === 6 || isFlowW(b);
@@ -1043,6 +1056,7 @@ const crackCv = document.createElement("canvas"); crackCv.width = crackCv.height
   [[16, 16, 2, 4], [16, 16, 30, 10], [16, 16, 8, 30], [16, 16, 28, 28], [16, 16, 20, 1]].forEach(([a, b, c, d]) => { k.beginPath(); k.moveTo(a, b); k.lineTo((a + c) / 2 + 3, (b + d) / 2 - 2); k.lineTo(c, d); k.stroke(); });
 })();
 function iconCanvas(id) {
+  if (EQ[id]) return EQ[id].armor ? armorIcon(...EQ[id].armor) : gearIcon(EQ[id].gear);
   if (TOOLS[id]) return TOOLS[id].drill ? drillIcon() : TOOLS[id].rocket ? rocketIcon() : TOOLS[id].hoe ? hoeIcon() : TOOLS[id].tier ? pickIcon(TOOLS[id].tier) : swordIcon(TOOLS[id].col);
   const c = document.createElement("canvas"); c.width = c.height = 16;
   const B = BLOCKS[id], ox = !B ? (id - 100 + MT) * 16 : AX(id), oy = !B ? 0 : AY(id, B.top ? 1 : 0);
@@ -2130,6 +2144,8 @@ function mineTick(dt, h) {
   if (!wantMine || !h) { mining = null; crack.material.opacity = 0; return; }
   const b = h.b, B = BLOCKS[b];
   if (!B || B.h > 1e6) { if (!mining || mining.key !== "x") toast(`${itemName(b)}${josa(itemName(b), "은", "는")} 캘 수 없어요`); mining = { key: "x" }; return; }
+  if (isPad(b)) { const rid = Object.keys(net.others).find(id => { const o = net.others[id]; return o.pk === S.planet && o.rk && Math.hypot(o.rk[0] - h.x - .5, o.rk[2] - h.z - .5) < .7 && Math.abs(o.rk[1] - h.y - 1) < .6; });
+    if (rid && !net.sameParty(rid)) { if (!mining || mining.key !== "x") { const o = net.others[rid].name; toast(`${o}의 로켓이 서 있는 발사대예요. ${o}${josa(o, "과", "와")} 같은 파티일 때만 부술 수 있어요`, 2600); } mining = { key: "x" }; return; } }
   if (!canBreak(h.x, h.y, h.z)) { if (!mining || mining.key !== "x") { const o = ownerAt(h.x, h.y, h.z); toast(`${o}${josa(o, "이", "가")} 놓은 ${B.n}${josa(B.n, "이에요", "예요")}. ${o}${josa(o, "과", "와")} 같은 파티일 때만 부술 수 있어요`, 2600); } mining = { key: "x" }; return; }
   const tier = B.tier || 0, tool = heldTier();
   if (tier > tool) { if (!mining || mining.key !== "x") toast(bestTier() >= tier ? `곡괭이를 손에 드세요(1~9 칸). ${B.n}${josa(B.n, "은", "는")} ${PICKS[tier].n} 이상이 필요해요` : `${B.n}${josa(B.n, "은", "는")} ${PICKS[tier].n} 이상으로 캘 수 있어요`, 2400); mining = { key: "x" }; return; }
@@ -2563,6 +2579,47 @@ const ARMOR_T = [null, { n: "철", m: 100, k: 1, col: "#d0d3da", where: "지구"
   { n: "화성 합금", m: 112, x: 135, k: 2, col: "#ff7a50", where: "화성 보스" }, { n: "별빛", m: 139, k: 2.6, col: "#fff2a8", where: "수성·유로파·타이탄 보스" }];
 const armorPart = (slot, t) => ARMOR_P.find(p => p[0] === slot)[3] * ARMOR_T[t].k * .025;
 const armorK = () => Math.min(.65, ARMOR_P.reduce((a, [slot]) => a + (S.armor && S.armor[slot] ? armorPart(slot, S.armor[slot]) : 0), 0));
+// 장비 물건 번호: 갑옷 1000 + 단계×10 + 부위, 나머지 장비 1100~
+const aid = (slot, t) => 1000 + t * 10 + ARMOR_P.findIndex(p => p[0] === slot);
+const GEAR_ID = { insul: 1100, pressure: 1101, batt: 1102, rtg: 1103, boots: 1104, radar: 1105 };
+const GEAR_N = { insul: "단열 우주복", pressure: "내압 냉각복", batt: "배터리 팩", rtg: "원자력 전지 (RTG)", boots: "점프 부츠", radar: "탐사 레이더" };
+ARMOR_T.forEach((T, t) => { if (T) ARMOR_P.forEach(([slot, pn]) => { EQ[aid(slot, t)] = { n: `${T.n} ${pn}`, armor: [slot, t] }; }); });
+for (const k in GEAR_ID) EQ[GEAR_ID[k]] = { n: GEAR_N[k], gear: k };
+const hasInsul = () => S.gear.insul || S.gear.pressure;
+const addInv = (id, n = 1) => { S.inv[id] = (S.inv[id] || 0) + n; };
+// 장비 칸: 입은 것을 누르면 벗어서 가방에 넣어요
+const EQ_SLOTS = [["head", "투구"], ["body", "갑옷"], ["legs", "바지"], ["feet", "장화"], ["suit", "우주복"], ["batt", "배터리 팩"], ["rtg", "원자력 전지"], ["boots", "점프 부츠"], ["radar", "탐사 레이더"]];
+function wornId(k) {
+  if (ARMOR_P.some(p => p[0] === k)) return S.armor[k] ? aid(k, S.armor[k]) : 0;
+  if (k === "suit") return S.gear.pressure ? GEAR_ID.pressure : S.gear.insul ? GEAR_ID.insul : 0;
+  if (k === "batt") return S.gear.batt > 0 ? GEAR_ID.batt : 0;
+  return S.gear[k] ? GEAR_ID[k] : 0;
+}
+function eqDone(msg) { sfx.pop(); if (msg) toast(msg, 2200); syncHot(); renderHotbar(); renderGauges(); save(); }
+function unequip(k) {
+  const id = wornId(k); if (!id) return;
+  const E = EQ[id];
+  if (E.armor) S.armor[k] = 0; else if (k === "batt") { S.gear.batt--; S.pw = Math.min(S.pw, maxPw()); } else S.gear[E.gear] = false;
+  addInv(id);
+  const warn = E.gear === "pressure" && S.planet === "venus" ? " 금성 표면의 압력에 조심하세요!" : E.gear === "rtg" && PLANETS[S.planet].solar < .1 ? " 햇빛이 약해서 전력이 금방 떨어져요!" : "";
+  eqDone(`${E.n}${josa(E.n, "을", "를")} 벗어서 가방에 넣었어요.${warn}`);
+}
+function equip(id) {
+  const E = EQ[id]; if (!E || !(S.inv[id] > 0)) return;
+  if (E.armor) { const [slot, t] = E.armor, old = S.armor[slot]; if (old) addInv(aid(slot, old)); S.armor[slot] = t; }
+  else if (E.gear === "batt") { if (S.gear.batt >= 3) { toast("배터리 팩은 3개까지만 달 수 있어요", 1800); return; } S.gear.batt++; }
+  else if (E.gear === "insul" || E.gear === "pressure") { const o = wornId("suit"); if (o) { S.gear[EQ[o].gear] = false; addInv(o); } S.gear[E.gear] = true; }
+  else { if (S.gear[E.gear]) { toast(`${E.n}${josa(E.n, "은", "는")} 이미 입고 있어요`, 1800); return; } S.gear[E.gear] = true; }
+  S.inv[id]--;
+  eqDone(`${E.n}${josa(E.n, "을", "를")} 입었어요${E.armor ? ` · 받는 피해 −${Math.round(armorK() * 100)}%` : ""}`);
+}
+// 새로 만든 장비: 우주복은 하나만 입어요(더 좋은 것을 입고, 남은 것은 가방에)
+function gainGear(k) {
+  if (k === "insul" && S.gear.pressure) { addInv(GEAR_ID.insul); return "가방에 넣었어요(지금은 내압 냉각복을 입고 있어요)"; }
+  if (k === "pressure" && S.gear.insul) { S.gear.insul = false; addInv(GEAR_ID.insul); S.gear.pressure = true; return "입었어요. 단열 우주복은 벗어서 가방에 넣었어요"; }
+  if (S.gear[k] === true) { addInv(GEAR_ID[k]); return "가방에 넣었어요"; }
+  S.gear[k] = true; return "입었어요";
+}
 ARMOR_T.forEach((T, t) => { if (!T) return; ARMOR_P.forEach(([slot, pn, cost]) => {
   const need = { [T.m]: t === 4 ? Math.ceil(cost / 2) : cost }; if (T.x) need[T.x] = 1; if (t === 1) need[100] = cost; if (t === 3) need[100] = 2;
   RECIPES.push({ id: `ar${t}${slot}`, n: `${T.n} ${pn}`, need, armor: [slot, t], cat: "gear",
@@ -2643,7 +2700,7 @@ function nearTable() {
   for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) for (let dy = -3; dy <= 3; dy++) { const b = get(px + dx, py + dy, pz + dz); if (b === 33 || (b === 35 && Math.abs(dx) <= 4 && Math.abs(dz) <= 4)) return true; }
   return false;
 }
-const owned = (r) => (r.armor && (S.armor || {})[r.armor[0]] >= r.armor[1]) || (r.gear && r.gear !== "batt" && S.gear[r.gear]) || (r.gear === "batt" && S.gear.batt >= 3) || (r.pick && S.inv[TOOL_OF[r.pick]] > 0) || (r.tool && (S.inv[r.tool] > 0 || (r.tool === 126 && S.rocketPk)));
+const owned = (r) => (r.armor && ((S.armor || {})[r.armor[0]] >= r.armor[1] || S.inv[aid(...r.armor)] > 0)) || (r.gear && r.gear !== "batt" && (S.gear[r.gear] || S.inv[GEAR_ID[r.gear]] > 0)) || (r.gear === "batt" && S.gear.batt >= 3) || (r.pick && S.inv[TOOL_OF[r.pick]] > 0) || (r.tool && (S.inv[r.tool] > 0 || (r.tool === 126 && S.rocketPk)));
 const hasAll = (r, k = 1) => Object.entries(r.need).every(([id, n]) => (S.inv[id] || 0) >= n * k);
 // 화로가 필요한 것(굽기)은 화로 4칸 안에서만 만들어요
 const isFurnace = (b) => b === 44 || b === 79;
@@ -2665,14 +2722,17 @@ function makeIt(r, k) {
     tone(220, .3, "sawtooth", .03, 0, 120); renderHotbar(); openCraft(); save(); return;
   }
   if (r.armor) {
-    Object.entries(r.need).forEach(([id, n]) => S.inv[id] -= n); S.armor[r.armor[0]] = r.armor[1];
-    toast(`${r.n}${josa(r.n, "을", "를")} 입었어요! 받는 피해 −${Math.round(armorK() * 100)}%`, 2600); sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save(); return;
+    Object.entries(r.need).forEach(([id, n]) => S.inv[id] -= n);
+    const [slot, t] = r.armor, old = S.armor[slot];
+    if (old >= t) { addInv(aid(slot, t)); toast(`${r.n}${josa(r.n, "을", "를")} 가방에 넣었어요`, 2600); }
+    else { if (old) addInv(aid(slot, old)); S.armor[slot] = t;
+      toast(`${r.n}${josa(r.n, "을", "를")} 입었어요! 받는 피해 −${Math.round(armorK() * 100)}%${old ? ` · 벗은 ${EQ[aid(slot, old)].n}${josa(EQ[aid(slot, old)].n, "은", "는")} 가방에 있어요` : ""}`, 3000); } sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save(); return;
   }
   for (let i = 0; i < k; i++) {
     Object.entries(r.need).forEach(([id, n]) => S.inv[id] -= n);
     if (r.pick) { const tid = TOOL_OF[r.pick]; S.inv[tid] = 1; S.tool = Math.max(S.tool || 0, r.pick); syncHot(); if (S.hot.includes(tid)) sel = S.hot.indexOf(tid); toast(`${r.n} 완성! 손에 들고 캐면 더 빨리, 더 단단한 광석까지 캘 수 있어요`, 2500); }
     else if (r.tool) { S.inv[r.tool] = 1; syncHot(); if (S.hot.includes(r.tool)) sel = S.hot.indexOf(r.tool); if (r.tool === 126) S.gear.rocket = true; toast(r.tool === 126 ? "로켓 완성! 손에 들고 발사대(주황 줄무늬)를 바라보며 놓기(오른쪽 클릭)하면 세워져요" : `${r.n} 완성! 손에 들고 로봇을 때리세요`, 3600); }
-    else if (r.gear === "batt") { S.gear.batt++; S.pw += 50; } else if (r.gear) S.gear[r.gear] = true; else S.inv[r.out] = (S.inv[r.out] || 0) + (r.count || 1);
+    else if (r.gear === "batt") { S.gear.batt++; S.pw += 50; } else if (r.gear) toast(`${r.n}${josa(r.n, "을", "를")} ${gainGear(r.gear)}`, 2600); else S.inv[r.out] = (S.inv[r.out] || 0) + (r.count || 1);
   }
   sfx.quest(); renderHotbar(); renderGauges(); openCraft(); save();
 }
@@ -2723,11 +2783,25 @@ function armorIcon(slot, t) {
   if (slot === "head") { R(3, 3, 10, 3); R(2, 5, 3, 7); R(11, 5, 3, 7); } else if (slot === "body") { R(2, 2, 4, 4); R(10, 2, 4, 4); R(4, 3, 8, 11); } else if (slot === "legs") { R(3, 2, 10, 3); R(3, 4, 4, 10); R(9, 4, 4, 10); } else { R(2, 7, 4, 6); R(10, 7, 4, 6); R(1, 11, 6, 2); R(9, 11, 6, 2); }
   g.fillStyle = "#00000044"; g.fillRect(8, 2, 1, 12); g.fillStyle = "#ffffff99"; g.fillRect(4, 3, 2, 1); return c;
 }
+// 장비 그림(16×16): 우주복·배터리·원자력 전지·점프 부츠·레이더
+function gearIcon(k) {
+  const c = document.createElement("canvas"); c.width = c.height = 16; const g = c.getContext("2d");
+  const R = (col, x, y, w, h) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  if (k === "insul" || k === "pressure") { const b = k === "insul" ? "#eef0f4" : "#6b7280", d = k === "insul" ? "#b8bcc6" : "#454b56";
+    R(b, 5, 1, 6, 5); R(k === "insul" ? "#f0a040" : "#5ab0ff", 6, 2, 4, 3); R(b, 3, 6, 10, 6); R(d, 3, 6, 2, 6); R(d, 11, 6, 2, 6); R(b, 4, 12, 3, 3); R(b, 9, 12, 3, 3);
+    if (k === "insul") R("#f0a040", 5, 9, 6, 1); else { R("#2f343c", 6, 8, 4, 2); R("#8a909a", 2, 7, 1, 4); R("#8a909a", 13, 7, 1, 4); } }
+  else if (k === "batt") { R("#2a2e36", 3, 3, 10, 12); R("#8a909a", 6, 1, 4, 2); R("#f2d23a", 4, 9, 8, 5); R("#7ad04a", 4, 5, 8, 4); R("#ffffff66", 5, 6, 1, 7); }
+  else if (k === "rtg") { R("#5a606a", 5, 2, 6, 12); R("#8a909a", 2, 4, 3, 1); R("#8a909a", 11, 4, 3, 1); R("#8a909a", 2, 8, 3, 1); R("#8a909a", 11, 8, 3, 1); R("#8a909a", 2, 12, 3, 1); R("#8a909a", 11, 12, 3, 1); R("#7fe0a0", 7, 3, 2, 10); R("#d8ffe6", 7, 6, 1, 3); }
+  else if (k === "boots") { R("#c9b8ff", 2, 2, 4, 7); R("#c9b8ff", 10, 2, 4, 7); R("#c9b8ff", 1, 7, 6, 2); R("#c9b8ff", 9, 7, 6, 2); R("#d0d3da", 2, 10, 4, 1); R("#d0d3da", 10, 10, 4, 1); R("#d0d3da", 2, 12, 4, 1); R("#d0d3da", 10, 12, 4, 1); R("#8a909a", 1, 14, 6, 1); R("#8a909a", 9, 14, 6, 1); }
+  else { R("#d0d3da", 2, 3, 9, 2); R("#d0d3da", 1, 5, 2, 4); R("#d0d3da", 3, 5, 9, 5); R("#9aa0aa", 4, 6, 6, 3); R("#e0905a", 7, 5, 1, 1); R("#ffd23f", 11, 2, 2, 2); R("#8a909a", 7, 10, 2, 3); R("#5a606a", 4, 13, 8, 2); }
+  return c;
+}
 function recipeIcon(r) {
   if (r.armor) return armorIcon(r.armor[0], r.armor[1]);
   if (r.out) return iconCanvas(r.out);
   if (r.pick) return pickIcon(r.pick);
   if (r.tool) return iconCanvas(r.tool);
+  if (GEAR_ID[r.gear]) return gearIcon(r.gear);
   return iconCanvas(r.id === "batt" ? 100 : r.id === "pressure" ? 102 : r.id === "insul" ? 11 : r.id === "rtg" ? 104 : 34);
 }
 function openCraft() {
@@ -2788,7 +2862,7 @@ function openMap() {
   ORDER.forEach(pk => {
     const b = document.createElement("button");
     const PL = PLANETS[pk], here = pk === S.planet, f = FUEL[pk];
-    const risk = pk === "mercury" && !S.gear.insul ? "단열 우주복 없이는 낮·밤 어느 쪽도 오래 못 버텨요" : pk === "venus" && !S.gear.pressure ? "구름 위 기지는 괜찮지만, 표면은 내압 냉각복 없이 갈 수 없어요" : pk === "moon" && !S.gear.batt ? "밤이 오면 전력이 빨리 닳아요" : PLANETS[pk].au > 5 && !S.gear.rtg ? `햇빛이 지구의 ${fmtSun(PLANETS[pk].solar)}배뿐이라 원자력 전지(RTG) 없이는 전력이 바닥나요` : PLANETS[pk].gas ? "착륙할 땅이 없어서 구름 위 떠 있는 기지에 내려요" : "";
+    const risk = pk === "mercury" && !hasInsul() ? "단열 우주복 없이는 낮·밤 어느 쪽도 오래 못 버텨요" : pk === "venus" && !S.gear.pressure ? "구름 위 기지는 괜찮지만, 표면은 내압 냉각복 없이 갈 수 없어요" : pk === "moon" && !S.gear.batt ? "밤이 오면 전력이 빨리 닳아요" : PLANETS[pk].au > 5 && !S.gear.rtg ? `햇빛이 지구의 ${fmtSun(PLANETS[pk].solar)}배뿐이라 원자력 전지(RTG) 없이는 전력이 바닥나요` : PLANETS[pk].gas ? "착륙할 땅이 없어서 구름 위 떠 있는 기지에 내려요" : "";
     b.disabled = here || S.rocketPk !== S.planet || !pad || fuelHave() < f;
     b.innerHTML = `<span class="orb" style="background:${ORB[pk]}"></span><span class="info"><b>${PL.name}${here ? " (지금 여기)" : ""}</b><small>${PL.type} · 태양에서 ${PL.au} AU · 연료 ${f}개${S.dex[pk] ? " · 도감 기록됨" : ""}</small>${risk ? `<small class="warn">주의: ${risk}</small>` : ""}</span><span>${S.visited[pk] ? "방문함" : ""}</span>`;
     b.onclick = () => landPick(pk);
@@ -2908,7 +2982,7 @@ const MISSIONS = {
       log: () => ({ t: "옛날에는 물이 흘렀다", ev: `골짜기 바닥에서 둥글게 닳은 자갈 ${minedOn("mars", 18)}개를 찾았어요.`, x: "자갈이 둥글어지려면 물에 오래 굴러야 해요. 지금 화성 표면에는 액체 물이 없지만, 과거에 물이 흐른 흔적이 남아 있어요." }) },
     { id: "r5", t: "극관 얼음", d: "북쪽 끝 하얀 극관에서 극관 얼음 8개를 캐세요. 수성까지 갈 연료예요.", p: () => minedOn("mars", 17) / 8,
       log: () => ({ t: "화성의 하얀 극관", ev: `극관에서 얼음 ${minedOn("mars", 17)}개를 모았어요. 붉은 흙도 캐 보면 산화 철(녹)이 많아요.`, x: "화성의 양 극에는 얼음과 드라이아이스로 된 극관이 있고, 계절에 따라 커졌다 작아져요. 표면이 붉은 이유는 흙 속 산화 철 때문이에요." }) },
-    { id: "r6", t: "수성으로", d: "단열 우주복을 갖추고, 얼음 8개를 연료로 수성에 가세요.", p: () => S.visited.mercury ? 1 : (S.gear.insul ? .4 : 0) + Math.min(.5, fuelHave() / 8 * .5), log: null },
+    { id: "r6", t: "수성으로", d: "단열 우주복을 갖추고, 얼음 8개를 연료로 수성에 가세요.", p: () => S.visited.mercury ? 1 : (hasInsul() ? .4 : 0) + Math.min(.5, fuelHave() / 8 * .5), log: null },
   ],
   mercury: [
     { id: "q1", t: "수성 관측", d: "관측 장치를 놓아 수성의 값을 재세요.", p: () => S.dex.mercury ? 1 : 0,
@@ -3480,18 +3554,26 @@ function renderInv() {
   const fill = (el, list, empty) => { el.innerHTML = ""; if (!list.length) el.innerHTML = `<small>${empty}</small>`;
     list.forEach(id => { const b = document.createElement("button"); b.className = "slot" + (S.hot.includes(id) ? " inhot" : ""); b.title = itemName(id); b.appendChild(iconCanvas(id)); if (!TOOLS[id]) b.insertAdjacentHTML("beforeend", `<span>${S.inv[id]}</span>`);
       b.insertAdjacentHTML("beforeend", `<label>${itemName(id)}</label>`);
-      b.onclick = () => { if (bagMode !== "put") { dropItem(id, bagMode === "all"); return; } const was = S.hot.indexOf(id); if (was >= 0) S.hot[was] = S.hot[sel]; S.hot[sel] = id; sfx.pop(); renderHotbar(); }; el.appendChild(b); }); };
+      b.onclick = () => { if (bagMode !== "put") { dropItem(id, bagMode === "all"); return; } if (EQ[id]) { equip(id); return; } const was = S.hot.indexOf(id); if (was >= 0) S.hot[was] = S.hot[sel]; S.hot[sel] = id; sfx.pop(); renderHotbar(); }; el.appendChild(b); }); };
   const bm = $("bagMode"); bm.innerHTML = "";
   [["put", "누르면 단축 칸에 넣기"], ["one", "누르면 1개 버리기"], ["all", "누르면 전부 버리기"]].forEach(([k, t]) => { const b = document.createElement("button"); b.textContent = t; b.className = bagMode === k ? "on" : ""; b.onclick = () => { bagMode = k; renderInv(); }; bm.appendChild(b); });
   fill($("bagTools"), ids.filter(i => TOOLS[i]), "제작대에서 곡괭이와 칼을 만들어 보세요");
+  fill($("bagEquip"), ids.filter(i => EQ[i]), "벗은 장비나 친구가 버린 장비가 여기 모여요");
+  const es = $("eqSlots"); es.innerHTML = "";
+  EQ_SLOTS.forEach(([k, kn]) => {
+    const id = wornId(k), b = document.createElement("button"), arm = ARMOR_P.find(p => p[0] === k);
+    b.className = "eqs" + (id ? " on" : " empty"); b.disabled = !id;
+    b.appendChild(id ? iconCanvas(id) : arm ? armorIcon(k, 1) : gearIcon(k === "suit" ? "insul" : k));
+    const eff = !id ? (k === "suit" ? "기본 우주복 · 2기압까지" : "비어 있음") : arm ? `받는 피해 −${Math.round(armorPart(k, S.armor[k]) * 100)}%` : k === "suit" ? `${suit().pr}기압까지 · 단열 ${Math.round(suit().ins * 100)}%` : k === "batt" ? `${S.gear.batt} / 3개 · 전력 한도 ${maxPw()}` : k === "rtg" ? "햇빛 없이도 전기를 만들어요" : k === "boots" ? "점프 1.35배" : "나침반에 보스 둥지";
+    b.insertAdjacentHTML("beforeend", `<span><small>${kn}</small><b>${id ? EQ[id].n : k === "suit" ? "기본 우주복" : "—"}</b><small>${eff}${id ? (k === "batt" ? " · 누르면 1개 벗기" : " · 누르면 벗기") : ""}</small></span>`);
+    if (id) b.onclick = () => unequip(k);
+    es.appendChild(b);
+  });
   fill($("bagBlocks"), ids.filter(i => BLOCKS[i]), "캐거나 만든 블록이 여기 모여요");
   fill($("bagMats"), ids.filter(i => MATS[i]), "광석을 캐면 재료가 모여요");
   const eq = [
     ["손에 든 것", heldId() ? itemName(heldId()) : "맨손", (TOOLS[heldId()] || {}).dmg ? `공격 피해 ${atkDmg()} (맨손 2) · 캐는 속도는 맨손과 같아요` : heldTier() ? `캐는 속도 ${PICKS[heldTier()].sp}배 · 로봇 피해 ${PICKS[heldTier()].dmg}` : "곡괭이를 들면 더 빨리 캐요"],
-    ["우주복", suit().n, `${suit().pr}기압까지 · 단열 ${Math.round(suit().ins * 100)}%`],
-    ["갑옷", ARMOR_P.map(([slot, pn]) => S.armor[slot] ? `${ARMOR_T[S.armor[slot]].n} ${pn}` : "").filter(Boolean).join(", ") || "없음", `받는 피해 −${Math.round(armorK() * 100)}% · 제작(E) 장비 탭에서 만들어요`],
-    ["배터리 팩", `${S.gear.batt} / 3`, `전력 한도 ${maxPw()}`],
-    ["원자력 전지", S.gear.rtg ? "있음" : "없음", S.gear.rtg ? "햇빛 없이도 전기를 만들어요" : "토륨 3, 철 4로 만들어요"],
+    ["방어 합계", `받는 피해 −${Math.round(armorK() * 100)}%`, "갑옷 네 부위를 다 입으면 가장 많이 줄어요 · 제작(E) 장비 탭에서 만들어요"],
     ["로켓", S.rocketPk ? `${PLANETS[S.rocketPk].name} 발사대에 서 있어요` : S.inv[126] ? "가방에 있어요" : "없음", S.rocketPk ? "로켓을 누르거나 M으로 탑승" : S.inv[126] ? "들고 발사대에 놓아 세우세요" : "철 6, 규소 4로 만들어요"],
   ];
   $("equipList").innerHTML = eq.map(([a, b, c]) => `<div><small>${a}</small><b>${b}</b><small>${c}</small></div>`).join("");
@@ -3504,6 +3586,32 @@ let chestAt = null, chestMode = "one";
 function openChest(x, y, z) {
   if (xrOn) { toast("상자는 VR을 끄고 열어요 (X 3초)", 2200); return; }
   chestAt = [x, y, z]; chestMode = "one"; pause(true); renderChest(); $("chestOv").hidden = false; sfx.chest(true);
+  if (net.live && net.party.pid) net.send({ t: "chestQ", k: chestKey(x, y, z) }); // 파티 친구가 가진 최신 내용을 받아 와요
+}
+// 파티 상자: 같은 파티끼리는 상자 안이 똑같아요. 바뀔 때마다 상자 전체를 시각(ts)과 함께 보내고, 더 새것으로 맞춰요
+let chestOut = {};
+function chestStamp(k) { S.chestT = S.chestT || {}; if (!S.chestT[k]) S.chestT[k] = Date.now(); return S.chestT[k]; }
+function chestShare(k, now) {
+  if (!net.live || !net.party.pid) return;
+  S.chestT = S.chestT || {}; if (now) S.chestT[k] = Date.now(); else chestStamp(k);
+  chestOut[k] = 1; clearTimeout(chestShare.t);
+  chestShare.t = setTimeout(() => { for (const q in chestOut) net.send({ t: "chest", k: q, items: (S.chest || {})[q] || {}, ts: S.chestT[q] }); chestOut = {}; }, 120);
+}
+function chestGot(k, items, ts, add) {
+  S.chest = S.chest || {}; S.chestT = S.chestT || {};
+  const mine = S.chest[k], myT = S.chestT[k] || 0;
+  if (add) { // 파티가 되기 전에 친구가 혼자 넣어 둔 물건: 내 상자에 더해요
+    const m = Object.assign({}, mine || {}); for (const id in items) m[id] = (m[id] || 0) + items[id];
+    if (Object.keys(m).length) S.chest[k] = m; chestShare(k, true);
+    if (chestAt && chestKey(...chestAt) === k) renderChest(); save(); return;
+  }
+  if (!(ts > myT)) return;
+  if (!myT && mine && Object.values(mine).some(n => n > 0)) { // 아직 나누지 않은 내 물건은 합쳐서 다시 알려요
+    const m = Object.assign({}, items); for (const id in mine) if (mine[id] > 0) m[id] = (m[id] || 0) + mine[id];
+    S.chest[k] = m; chestShare(k, true);
+  } else { if (Object.keys(items).length) S.chest[k] = items; else delete S.chest[k]; S.chestT[k] = ts; }
+  if (chestAt && chestKey(...chestAt) === k) renderChest();
+  save();
 }
 function chestMove(id, toChest) {
   const C = (S.chest = S.chest || {})[chestKey(...chestAt)] = (S.chest || {})[chestKey(...chestAt)] || {}, src = toChest ? S.inv : C, dst = toChest ? C : S.inv;
@@ -3511,11 +3619,12 @@ function chestMove(id, toChest) {
   if (toChest && !(C[id] > 0) && Object.values(C).filter(n => n > 0).length >= CHEST_KINDS) { toast(`상자에는 물건을 ${CHEST_KINDS}가지까지 넣을 수 있어요`, 1800); return; }
   const n = chestMode === "all" ? src[id] : 1; src[id] -= n; dst[id] = (dst[id] || 0) + n;
   if (!(C[id] > 0)) delete C[id]; if (!Object.keys(C).length) delete S.chest[chestKey(...chestAt)];
+  chestShare(chestKey(...chestAt), true);
   tone(toChest ? 520 : 700, .05, "sine", .04); renderHotbar(); renderChest(); save();
 }
 function renderChest() {
   const C = (S.chest || {})[chestKey(...chestAt)] || {}, inC = Object.keys(C).map(Number).filter(i => C[i] > 0), bag = Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0);
-  $("chestCnt").textContent = `${inC.length} / ${CHEST_KINDS}가지`;
+  $("chestCnt").textContent = `${inC.length} / ${CHEST_KINDS}가지`; $("chestParty").hidden = !(net.live && net.party.pid);
   const fill = (el, list, cnt, toChest, empty) => { el.innerHTML = ""; if (!list.length) el.innerHTML = `<small>${empty}</small>`;
     list.forEach(id => { const b = document.createElement("button"); b.className = "slot"; b.title = itemName(id); b.appendChild(iconCanvas(id)); b.insertAdjacentHTML("beforeend", `<span>${cnt[id]}</span><label>${itemName(id)}</label>`); b.onclick = () => chestMove(id, toChest); el.appendChild(b); }); };
   fill($("chestIn"), inC, C, false, "비어 있어요. 아래 가방에서 물건을 눌러 넣으세요");
@@ -4192,7 +4301,7 @@ function dropTick(dt) {
 }
 /* ═════════════ 떨어진 물건 더미(버린 것·쓰러진 자리) ═════════════ */
 const PILE_LIFE = 30 * 60 * 1000, pileMesh = {};
-const okItem = (id) => !!(BLOCKS[id] || MATS[id] || TOOLS[id]);
+const okItem = (id) => !!(BLOCKS[id] || MATS[id] || TOOLS[id] || EQ[id]);
 function cleanItems(it) {
   const o = {}; let n = 0;
   if (it && typeof it === "object") for (const k in it) { const id = +k, c = Math.floor(+it[k]); if (okItem(id) && c > 0 && n < 80) { o[id] = Math.min(c, 9999); n++; } }
@@ -4221,6 +4330,11 @@ function makePile(items, x, y, z, kind) {
   addPile(Object.assign({ own: true }, p)); net.send({ t: "pile", p });
   return p;
 }
+const eqMats = {};
+function eqMesh(id) {
+  if (!eqMats[id]) { const t = new THREE.CanvasTexture(iconCanvas(id)); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; eqMats[id] = new THREE.MeshLambertMaterial({ map: t, alphaTest: .5, side: THREE.DoubleSide }); }
+  return new THREE.Mesh(new THREE.PlaneGeometry(1, 1), eqMats[id]);
+}
 function buildPile(p) {
   const g = new THREE.Group();
   if (p.kind === "death") {
@@ -4230,7 +4344,7 @@ function buildPile(p) {
   } else {
     Object.keys(p.items).map(Number).slice(0, 3).forEach((id, i) => {
       let m;
-      if (TOOLS[id]) { m = toolMesh(id); m.rotation.set(0, 0, .8); m.scale.setScalar(.9); } else { m = new THREE.Mesh(itemGeo(id), itemMat); m.scale.setScalar(.28); }
+      if (TOOLS[id]) { m = toolMesh(id); m.rotation.set(0, 0, .8); m.scale.setScalar(.9); } else if (EQ[id]) { m = eqMesh(id); m.scale.setScalar(.34); } else { m = new THREE.Mesh(itemGeo(id), itemMat); m.scale.setScalar(.28); }
       m.position.set(i * .14, .22 + i * .08, 0); g.add(m);
     });
   }
@@ -5932,7 +6046,13 @@ const net = (() => {
       o.rd = rd;
       if (teacher) { const k = o.name + o.color; const b = book[k] = book[k] || { first: Date.now() }; Object.assign(b, { id: d.from, name: o.name, color: o.color, pk: o.pk, done: o.done, dex: o.dex, hp: o.hp, party: o.party, pln: o.pln, seen: Date.now() }); }
     }
+    if (d.t === "chest" && d.from && sameParty(d.from) && typeof d.k === "string" && d.k.length < 40 && Number.isFinite(+d.ts) && (!d.add || d.to === me.id)) chestGot(d.k, cleanItems(d.items) || {}, +d.ts, !!d.add);
+    if (d.t === "chestQ" && d.from && sameParty(d.from) && typeof d.k === "string" && d.k.length < 40) { const C = (S.chest || {})[d.k], T = (S.chestT = S.chestT || {})[d.k];
+      if (T) send({ t: "chest", k: d.k, items: C || {}, ts: T });
+      else if (C && Object.values(C).some(n => n > 0)) { S.chestT[d.k] = 1; send({ t: "chest", k: d.k, items: C, ts: 1, add: 1, to: d.from }); } } // 아직 안 나눈 내 물건은 연 친구에게 더해 달라고 보내요
     if (d.t === "edit" && d.pk === S.planet && Number.isInteger(d.x) && Number.isInteger(d.y) && Number.isInteger(d.z) && (BLOCKS[d.b] || d.b === 0)) {
+      // 파티 친구가 파티 상자를 부수면 안의 물건은 그 친구 가방으로 가요(내 쪽에서 또 생기지 않게)
+      if (d.b !== 94 && get(d.x, d.y, d.z) === 94 && d.from && sameParty(d.from)) { const k = chestKey(d.x, d.y, d.z); if (S.chest) delete S.chest[k]; if (S.chestT) delete S.chestT[k]; if (chestAt && chestKey(...chestAt) === k) closeChest(); }
       edit(d.x, d.y, d.z, d.b, true, typeof d.o === "string" ? d.o.slice(0, 10) : "");
     } else if (d.t === "edit" && PLANETS[d.pk] && d.pk !== S.planet && [d.x, d.y, d.z].every(Number.isInteger) && d.y >= 0 && d.y < SY && (BLOCKS[d.b] || d.b === 0)) { // 다른 천체에서 바뀐 것은 기록만(이상한 값은 버려요)
       (S.edits[d.pk] = S.edits[d.pk] || {})[d.x + "," + d.y + "," + d.z] = d.b;
@@ -6305,7 +6425,7 @@ function xrItems() {
   if (m.pg === "bag") {
     const ids = Object.keys(S.inv).map(Number).filter(i => S.inv[i] > 0);
     if (!ids.length) return [{ t: "가방이 비었어요", sub: "", ok: false }];
-    return ids.map(id => ({ t: `${itemName(id)}${TOOLS[id] ? "" : ` ×${S.inv[id]}`}`, sub: S.hot[sel] === id ? "지금 손에 들고 있어요" : `${sel + 1}번 칸에 넣기`, ok: true, go: () => {
+    return ids.map(id => EQ[id] ? { t: `${itemName(id)} ×${S.inv[id]}`, sub: "장비 · 누르면 입어요", ok: true, go: () => { equip(id); xrMenu = null; } } : ({ t: `${itemName(id)}${TOOLS[id] ? "" : ` ×${S.inv[id]}`}`, sub: S.hot[sel] === id ? "지금 손에 들고 있어요" : `${sel + 1}번 칸에 넣기`, ok: true, go: () => {
       const j = S.hot.indexOf(id); if (j >= 0 && j !== sel) S.hot[j] = S.hot[sel]; S.hot[sel] = id; renderHotbar(); toast(`${itemName(id)}${josa(itemName(id), "을", "를")} 손에 들었어요`); xrMenu = null; } }));
   }
   if (m.pg === "map") {
@@ -6473,6 +6593,7 @@ function start(fresh) {
   if (fresh) { S = DEF(); S.inv = {}; try { localStorage.removeItem("spacecraft2"); } catch (e) {} }
   else { S = Object.assign(DEF(), saved); if (saved.tool == null) { S.tool = S.visited.moon ? 2 : 0; if (S.visited.moon) S.done.e1b = S.done.e1c = true; }
     if (S.gear.rocket && !S.rocketPk && !(S.inv[126] > 0)) S.rocketPk = S.planet;
+    if (S.gear.insul && S.gear.pressure) { S.gear.insul = false; S.inv[GEAR_ID.insul] = (S.inv[GEAR_ID.insul] || 0) + 1; } // 우주복은 이제 하나만 입어요
     if (!saved.worldV) { // 지구가 넓어지면서 기지가 (46,50) → (150,154)로 옮겨졌어요. 지은 것도 같이 옮겨요
       const dx = 104, dz = 104, mv = (o) => { const n = {}; for (const k in o) { const [x, y, z] = k.split(",").map(Number); n[(x + dx) + "," + y + "," + (z + dz)] = o[k]; } return n; };
       if (S.edits.earth) S.edits.earth = mv(S.edits.earth); if (S.crops && S.crops.earth) S.crops.earth = mv(S.crops.earth);
