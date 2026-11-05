@@ -4439,6 +4439,8 @@ function setRocket(h) {
   if (SOLID(get(h.x, h.y + 1, h.z))) { toast("발사대 위가 막혀 있어요"); return; }
   if (S.rocketPk === S.planet) { toast("이미 로켓이 서 있어요"); return; }
   if (rocketTaken(h.x + .5, h.z + .5)) { toast("친구 로켓이 서 있는 칸이에요. 옆 발사대 칸에 세우세요", 2400); return; }
+  // 직접 만든 발사대는 만든 사람과 그 파티만 써요(기지의 공용 발사대는 누구나)
+  if (!canBreak(h.x, h.y, h.z)) { const o = ownerAt(h.x, h.y, h.z); toast(`${o}${josa(o, "이", "가")} 만든 발사대예요. ${o}${josa(o, "과", "와")} 같은 파티일 때만 로켓을 세울 수 있어요. 기지의 공용 발사대를 쓰세요`, 3000); return; }
   S.inv[126]--; S.rocketPk = S.planet; S.rocketAt = [h.x + .5, h.y + 1, h.z + .5]; S.gear.rocket = true; sfx.place(23); swing = .001;
   syncRocket(); renderHotbar(); save();
   toast("로켓을 세웠어요! 로켓을 누르거나 M을 눌러 올라타세요", 3000);
@@ -5789,7 +5791,7 @@ const net = (() => {
   const COLORS = ["#ff6b6b", "#ffb347", "#ffd65a", "#6fe39a", "#5fe0c8", "#7fd3ff", "#8f9bff", "#d68fff", "#ff8fc8", "#c7c9d1"];
   // 파티: 초대받아 수락해야 들어가요. 처음 초대한 사람이 파티장이 되어 내보내기·해산을 관리해요.
   const me = { id: Math.random().toString(36).slice(2, 10), name: "", color: LOOK_OPT.pack[LOOK.pack], pid: "", plead: "", members: [], names: {} };
-  let psyncT = 0, invite = null, joining = null, herdT = 0, herdN = 0; const pendingInv = {};
+  let psyncT = 0, invite = null, joining = null, herdT = 0, herdN = 0, herdLast = "", herdK5 = 0; const pendingInv = {};
   const isLeader = () => !!me.pid && me.plead === me.id;
   const pcol = (pid) => pid ? COLORS[[...pid].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length] : "";
   const nameOf = (id) => id === me.id ? me.name : (others[id] || {}).name || me.names[id] || "?";
@@ -5985,7 +5987,7 @@ const net = (() => {
       BROKERS.forEach(u => mqOpen(u, will).then(m => {
         if (won !== null) { m.cl.end(true); return; } all.push(m);
         m.cl.on("message", (tp, buf) => {
-          if (tp.endsWith("/room")) { if (String(buf) === "1") finish(m); else if (won === m) closed(); return; }
+          if (tp.endsWith("/room")) { if (String(buf) === "1") { finish(m); if (won === m) keepRoom(); } else if (won === m) maybeClosed(); return; }
           if (won !== m) return; const d = parse(buf); if (d && d.from !== me.id) onData(d, m);
         });
         m.cl.subscribe([TOP + code + "/room", TOP + code + "/d"]);
@@ -5993,7 +5995,25 @@ const net = (() => {
       }, () => { if (won === null && --left === 0) finish(false); }));
     });
   }
-  function closed() { if (!live) return; live = false; toast("방이 닫혔어요. 혼자 계속 탐사해요"); for (const id in others) removeOther(id); renderRoom(); }
+  // 선생님 기기가 중계 서버와 잠깐 끊기면 서버가 '방 닫힘'을 알려요. 바로 내보내지 않고, 20초 동안 선생님 시계가 안 오면 그때 닫아요
+  let closeT = null, lastClock = 0;
+  function maybeClosed() { if (closeT || !live) return; toast("선생님 연결이 잠깐 끊겼어요. 다시 이어지기를 기다려요…", 3000);
+    closeT = setTimeout(() => { closeT = null; if (performance.now() - lastClock > 12000) closed(); }, 20000); }
+  function keepRoom() { if (closeT) { clearTimeout(closeT); closeT = null; } }
+  // 직접 연결(WebRTC)로 들어온 학생: 끊기면 몇 번 다시 붙어 봐요
+  function hostLost() {
+    if (!live) return; let n = 0; toast("방 연결이 끊겨서 다시 붙는 중이에요…", 2500);
+    const again = () => {
+      if (!live) return; if (++n > 5) { closed(); return; }
+      try { if (peer.disconnected) peer.reconnect(); } catch (e) {}
+      let c; try { c = peer.connect(PREFIX + code, { reliable: true }); } catch (e) { setTimeout(again, 3000); return; }
+      const to = setTimeout(() => { try { c.close(); } catch (e) {} again(); }, 6000);
+      c.on("open", () => { clearTimeout(to); hostConn = c; toast("방에 다시 연결됐어요", 1800); });
+      c.on("data", (d) => onData(d, c)); c.on("close", () => { if (hostConn === c) hostLost(); });
+    };
+    setTimeout(again, 800);
+  }
+  function closed() { keepRoom(); if (!live) return; live = false; toast("방이 닫혔어요. 혼자 계속 탐사해요"); for (const id in others) removeOther(id); renderRoom(); }
   async function joinRoom() {
     if (!nameOk()) return; const c = ($("code").value || "").replace(/\D/g, "");
     if (c.length !== 4) { msg("방 코드 4자리 숫자를 적어 주세요.", true); return; }
@@ -6015,7 +6035,7 @@ const net = (() => {
       hostConn = peer.connect(PREFIX + code, { reliable: true });
       hostConn.on("open", () => { clearTimeout(wait); live = true; msg(`방 ${code}에 들어왔어요! 시작 버튼을 누르세요.`); });
       hostConn.on("data", (d) => onData(d, hostConn));
-      hostConn.on("close", closed);
+      const hc = hostConn; hostConn.on("close", () => { if (hostConn === hc) hostLost(); });
     });
     peer.on("error", (e) => { clearTimeout(wait); fail(e); });
   }
@@ -6040,6 +6060,7 @@ const net = (() => {
       Object.assign(o, { name: String(d.name || "?").slice(0, 10), color: /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : "#ffffff", pk: String(d.pk), x: +d.x || 0, y: +d.y || 0, z: +d.z || 0, yaw: +d.yaw || 0, pitch: +d.pitch || 0, done: +d.done || 0, dex: +d.dex || 0, hp: +d.hp || 0, look: cleanLook(d.look), sw: +d.sw || 0, seen: performance.now(),
         mission: String(d.mission || "").slice(0, 40), o2: +d.o2 || 0, pw: +d.pw || 0, T: +d.T || 0, party: typeof d.party === "string" ? d.party.slice(0, 16) : "", plead: typeof d.plead === "string" ? d.plead.slice(0, 10) : "", pln: String(d.pln || "").slice(0, 10),
         rk: Array.isArray(d.rk) && d.rk.length === 3 && d.rk.every(Number.isFinite) ? d.rk.map(Number) : null, rf: !!d.rf });
+      o.lookK = JSON.stringify(o.look);
       const rd = typeof d.rd === "string" ? d.rd.slice(0, 10) : ""; // 누구 로켓에 타 있는지
       if (rd === me.id && o.rd !== me.id && !teacher) toast(`${o.name}${josa(o.name, "이", "가")} 내 로켓에 탔어요. 출발하면 함께 가요`, 3200);
       if (o.rd === me.id && rd !== me.id && !teacher && o.pk === S.planet && !cine) toast(`${o.name}${josa(o.name, "이", "가")} 내 로켓에서 내렸어요`, 2400);
@@ -6050,6 +6071,14 @@ const net = (() => {
     if (d.t === "chestQ" && d.from && sameParty(d.from) && typeof d.k === "string" && d.k.length < 40) { const C = (S.chest || {})[d.k], T = (S.chestT = S.chestT || {})[d.k];
       if (T) send({ t: "chest", k: d.k, items: C || {}, ts: T });
       else if (C && Object.values(C).some(n => n > 0)) { S.chestT[d.k] = 1; send({ t: "chest", k: d.k, items: C, ts: 1, add: 1, to: d.from }); } } // 아직 안 나눈 내 물건은 연 친구에게 더해 달라고 보내요
+    if (d.t === "p" && d.from && others[d.from] && Array.isArray(d.a) && d.a.length >= 8 && PLANETS[d.a[0]] && d.a.slice(1, 8).every(Number.isFinite)) {
+      const o = others[d.from], a = d.a; Object.assign(o, { pk: a[0], x: +a[1], y: +a[2], z: +a[3], yaw: +a[4], pitch: +a[5], sw: +a[6], hp: +a[7], seen: performance.now() });
+      o.rk = Array.isArray(a[8]) && a[8].length === 3 && a[8].every(Number.isFinite) ? a[8].map(Number) : null; o.rf = !!a[9];
+      const rd = typeof a[10] === "string" ? a[10].slice(0, 10) : "";
+      if (rd === me.id && o.rd !== me.id && !teacher) toast(`${o.name}${josa(o.name, "이", "가")} 내 로켓에 탔어요. 출발하면 함께 가요`, 3200);
+      if (o.rd === me.id && rd !== me.id && !teacher && o.pk === S.planet && !cine) toast(`${o.name}${josa(o.name, "이", "가")} 내 로켓에서 내렸어요`, 2400);
+      o.rd = rd;
+    }
     if (d.t === "edit" && d.pk === S.planet && Number.isInteger(d.x) && Number.isInteger(d.y) && Number.isInteger(d.z) && (BLOCKS[d.b] || d.b === 0)) {
       // 파티 친구가 파티 상자를 부수면 안의 물건은 그 친구 가방으로 가요(내 쪽에서 또 생기지 않게)
       if (d.b !== 94 && get(d.x, d.y, d.z) === 94 && d.from && sameParty(d.from)) { const k = chestKey(d.x, d.y, d.z); if (S.chest) delete S.chest[k]; if (S.chestT) delete S.chestT[k]; if (chestAt && chestKey(...chestAt) === k) closeChest(); }
@@ -6065,7 +6094,7 @@ const net = (() => {
       others[d.from].herd = { pk: String(d.pk), seen: performance.now(), a: d.a.slice(0, 40).filter(e => Array.isArray(e) && e.length === 8 && e.every(Number.isFinite) && ANIMK[e[1]] && e[6] >= 30 && e[6] <= 100) };
     if ((d.t === "pdone" || d.t === "psync") && typeof d.party === "string") takeParty(d);
     if (/^p(inv|no|join|leave|roster)$/.test(d.t)) partyMsg(d);
-    if (d.t === "clock" && !host && Number.isFinite(d.c)) {
+    if (d.t === "clock" && !host && Number.isFinite(d.c)) { lastClock = performance.now(); keepRoom();
       clockOff = d.c - performance.now() / 1000;
       if (typeof d.chat === "string" && CHATM[d.chat] && d.chat !== chatMode) { chatMode = d.chat; chatLine(null, `방장이 채팅을 '${CHATM[chatMode]}'(으)로 바꿨어요`, true); if (!$("chatBox").hidden) renderChatBox(); }
       if (typeof d.pvp === "boolean" && d.pvp !== pvp) { pvp = d.pvp; toast(pvp ? "방장이 플레이어끼리 대결을 켰어요! 기지 코어 6칸 안은 안전 구역이에요" : "방장이 대결을 껐어요", 3200); }
@@ -6081,12 +6110,14 @@ const net = (() => {
   function removeOther(id) { const o = others[id]; if (o && o.mesh) scene.remove(o.mesh); if (o && o.rkG) scene.remove(o.rkG); if (o && o.hm) for (const k in o.hm) scene.remove(o.hm[k].g); delete others[id]; }
   // 친구 가축의 위치(조준용)
   function herdList() { const L = []; for (const id in others) { const o = others[id]; if (o.hm) for (const k in o.hm) { const r = o.hm[k], T = ANIMT[r.type], sc = r.g.scale.x; if (!r.g.visible) continue; L.push({ c: new THREE.Vector3(r.g.position.x, r.g.position.y + T.h * .55 * sc, r.g.position.z), r: (.35 + T.w) * sc, owner: o.name }); } } return L; }
-  function tick(dt) {
+  function tick(dt0) {
     if (!live) return;
+    // 보내는 간격은 실제 시간으로 재요(느린 기기에서 프레임이 적어도 0.2초마다 보내서 다른 화면에서 끊겨 보이지 않게)
+    const now = performance.now(), dt = Math.min(1, (now - (tickAt || now)) / 1000); tickAt = now;
     sendT += dt;
     if (host && (clockT += dt) > 2) sendClock();
     if (teacher) { if (!spec.id && performance.now() - teachT > 1000) { teachT = performance.now(); renderTeacher(); } }
-    if (teacher) { tickOthers(dt); return; }
+    if (teacher) { tickOthers(dt0); return; }
     $("chat").hidden = !hudOn; $("tChat").hidden = false;
     if (me.pid && (psyncT += dt) > 3) { psyncT = 0; send({ t: "psync", party: me.pid, name: me.name, done: Object.keys(S.done) }); rosterMsg();
       // 파티장이 방을 떠났으면 파티가 풀려요. 파티장은 떠난 파티원을 지워요
@@ -6094,19 +6125,27 @@ const net = (() => {
       else if (isLeader()) { const keep = me.members.filter(id => id === me.id || others[id]); if (keep.length !== me.members.length) { me.members = keep; rosterMsg(); if (keep.length <= 1 && !Object.keys(pendingInv).length) leftParty("파티원이 모두 나가서 파티가 풀렸어요"); } } }
     if (invite && performance.now() > invite.until) { send({ t: "pno", to: invite.from }); invite = null; showInvite(); }
     for (const id in pendingInv) if (performance.now() - pendingInv[id].t > 25000) { delete pendingInv[id]; if (isLeader() && me.members.length <= 1 && !Object.keys(pendingInv).length) leftParty(); }
-    if ((herdT += dt) > 1) { herdT = 0; const a = herdPack(); if (a.length || herdN) send({ t: "herd", pk: S.planet, a }); herdN = a.length; }
-    if (sendT > .2) { sendT = 0; const cm = curMission(); send({ t: "state", party: me.pid, plead: me.plead, pln: me.pid ? nameOf(me.plead) : "", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length,
-      rk: rocketG && S.rocketPk === S.planet ? [+rocketG.position.x.toFixed(2), +rocketG.position.y.toFixed(2), +rocketG.position.z.toFixed(2)] : null, rf: rocketG && rocketG.userData.flame.visible ? 1 : 0, rd: ride ? ride.id : "" }); }
-    tickOthers(dt);
+    if ((herdT += dt) > 1) { herdT = 0; const a = herdPack(), k = S.planet + JSON.stringify(a); herdK5 += 1; // 가축이 그대로면 5초에 한 번만
+      if ((a.length || herdN) && (k !== herdLast || herdK5 >= 5)) { send({ t: "herd", pk: S.planet, a }); herdLast = k; herdK5 = 0; } herdN = a.length; }
+    // 움직임(p)은 0.2초마다 바뀐 것만, 이름·꾸미기·임무 같은 나머지(state)는 1.5초마다 보내요(통신량을 줄여 끊김을 막아요)
+    if (sendT > .2) { fullT += sendT; sendT = 0; const a = poseArr(), k = a.join(",");
+      if (fullT >= 1.5) { fullT = 0; lastPose = k; sendState(); } else if (k !== lastPose) { lastPose = k; send({ t: "p", a }); } }
+    tickOthers(dt0);
     renderRoom();
   }
+  let fullT = 99, lastPose = "", tickAt = 0;
+  function poseArr() { const a = [S.planet, +P.pos.x.toFixed(2), +P.pos.y.toFixed(2), +P.pos.z.toFixed(2), +P.yaw.toFixed(2), +P.pitch.toFixed(2), +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), Math.round(S.hp)];
+    const rk = rocketG && S.rocketPk === S.planet ? [+rocketG.position.x.toFixed(2), +rocketG.position.y.toFixed(2), +rocketG.position.z.toFixed(2)] : null, rf = rocketG && rocketG.userData.flame.visible ? 1 : 0, rd = ride ? ride.id : "";
+    if (rk || rd) a.push(rk, rf, rd); return a; }
+  function sendState() { const cm = curMission(); send({ t: "state", party: me.pid, plead: me.plead, pln: me.pid ? nameOf(me.plead) : "", look: LOOK, pitch: +P.pitch.toFixed(2), sw: +Math.sin(Math.min(1, swing) * Math.PI).toFixed(2), mission: cm ? cm.t : "임무 완료", o2: Math.round(S.o2), pw: Math.round(S.pw), T: Math.round(env.T), dex: Object.keys(S.dex).length, hp: Math.round(S.hp), name: me.name, color: me.color, pk: S.planet, x: +P.pos.x.toFixed(2), y: +P.pos.y.toFixed(2), z: +P.pos.z.toFixed(2), yaw: +P.yaw.toFixed(2), done: Object.keys(S.done).length,
+      rk: rocketG && S.rocketPk === S.planet ? [+rocketG.position.x.toFixed(2), +rocketG.position.y.toFixed(2), +rocketG.position.z.toFixed(2)] : null, rf: rocketG && rocketG.userData.flame.visible ? 1 : 0, rd: ride ? ride.id : "" }); }
   function tickOthers(dt) {
     const now = performance.now();
     for (const id in others) {
       const o = others[id];
       if (now - o.seen > 8000) { removeOther(id); continue; }
       const here = o.pk === S.planet;
-      if (o.mesh && o.mesh.userData.look !== JSON.stringify(o.look)) { scene.remove(o.mesh); o.mesh = null; }
+      if (o.mesh && o.mesh.userData.look !== o.lookK) { scene.remove(o.mesh); o.mesh = null; }
       if (here && !o.mesh) { o.mesh = avatar(o); o.mesh.position.set(o.x, o.y, o.z); }
       // 친구 로켓: 서 있는 자리와 발사·착륙하는 모습이 보여요
       if (here && o.rk) {
