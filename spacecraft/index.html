@@ -2055,6 +2055,7 @@ function physics(dt) {
   let wx = (fx * c + fz * s) * sp, wz = (-fx * s + fz * c) * sp;
   const cur = flowPush(P.pos.x, P.pos.y + .2, P.pos.z); if (cur) { wx += cur[0]; wz += cur[1]; }
   if (S.planet === "neptune") { wind = 4 * Math.pow(Math.max(0, Math.sin(gameT * .55)), 2); wz += wind; }
+  if (bossPull) { wx += bossPull[0]; wz += bossPull[1]; } // 보스 돌풍이 끌어당겨요
   const k = P.ground || inWater || PL.thick ? 1 : .35;
   P.vel.x += (wx - P.vel.x) * Math.min(1, dt * 12 * k); P.vel.z += (wz - P.vel.z) * Math.min(1, dt * 12 * k);
   if (swim) {
@@ -4603,7 +4604,7 @@ const MPOOL = {
   titan: { drone: 22, shield: 20, splitter: 18, charger: 15, bomber: 10, heavy: 12 },
 };
 const MELEE = { scout: 12, charger: 12, shield: 14, splitter: 10, mini: 6 };
-let mobs = [], mobSpawnT = 0, atkCD = 0, slowT = 0, bossFog = 0;
+let mobs = [], mobSpawnT = 0, atkCD = 0, slowT = 0, bossFog = 0, bossPull = null;
 const laserGeo = new THREE.BoxGeometry(.035, .035, 1);
 function buildRobot(type = "scout") {
   const T = MOBT[type], g = new THREE.Group(), body = lam(T.col[0]), dark = lam(T.col[1]), eye = new THREE.MeshBasicMaterial({ color: T.eye });
@@ -4819,28 +4820,48 @@ function mobTick(dt) {
 let zones = [], fxs = [];
 const ringGeo = new THREE.RingGeometry(.84, 1, 40); ringGeo.rotateX(-Math.PI / 2);
 const discGeo = new THREE.CircleGeometry(1, 32); discGeo.rotateX(-Math.PI / 2);
+// 그 밖의 경고: 움직이는 회오리(move), 공중 폭발 구(sky)
+const zSphGeo = new THREE.SphereGeometry(1, 18, 12);
 function addZone(z) {
-  const m = new THREE.Mesh(z.pool ? discGeo : ringGeo, new THREE.MeshBasicMaterial({ color: z.col || 0xff3030, transparent: true, opacity: .4, depthWrite: false, side: THREE.DoubleSide }));
-  m.scale.setScalar(z.wave ? .5 : z.r); m.position.set(z.x, z.y + .06, z.z); m.renderOrder = 3; scene.add(m); z.m = m; z.t = 0; z.life = z.life || (z.wave ? z.max / z.sp : z.delay + .3); zones.push(z); return z;
+  const mat = new THREE.MeshBasicMaterial({ color: z.col || 0xff3030, transparent: true, opacity: .4, depthWrite: false, side: THREE.DoubleSide });
+  const m = z.mesh || new THREE.Mesh(z.sky ? zSphGeo : z.pool || z.move ? discGeo : ringGeo, mat);
+  if (z.mesh) mat.dispose();
+  if (!z.mesh) m.scale.setScalar(z.wave || z.sky ? .5 : z.r); m.position.set(z.x, z.sky ? z.y : z.y + .06, z.z);
+  m.renderOrder = 3; scene.add(m); z.m = m; z.t = 0; z.life = z.life || (z.wave ? z.max / z.sp : z.delay + .3); zones.push(z); return z;
 }
-function addFx(m, life, up = 0) { scene.add(m); fxs.push({ m, t: 0, life, up }); }
+function addFx(m, life, up = 0, v = null, op = 1) { scene.add(m); fxs.push({ m, t: 0, life, up, v, op }); }
+const mDisp = (m) => m.traverse(o => { if (o.material) o.material.dispose(); });
 function zoneTick(dt) {
   slowT = Math.max(0, slowT - dt);
-  fxs = fxs.filter(f => { f.t += dt; f.m.position.y += f.up * dt; if (f.m.material) f.m.material.opacity = Math.max(0, 1 - f.t / f.life); if (f.t > f.life) { scene.remove(f.m); return false; } return true; });
+  fxs = fxs.filter(f => { f.t += dt; f.m.position.y += f.up * dt; if (f.gy) f.m.scale.y = Math.min(f.gy, f.m.scale.y + f.gy * dt * 5); if (f.v) { f.m.position.x += f.v[0] * dt; f.m.position.z += f.v[1] * dt; } if (f.m.material) f.m.material.opacity = Math.max(0, 1 - f.t / f.life) * (f.op || 1); if (f.t > f.life) { scene.remove(f.m); if (f.m.material) f.m.material.dispose(); return false; } return true; });
   zones = zones.filter(z => {
     z.t += dt; const d = Math.hypot(P.pos.x - z.x, P.pos.z - z.z), dy = P.pos.y - z.y;
-    if (z.wave) { const r = Math.min(z.max, .5 + z.t * z.sp); z.m.scale.setScalar(r); z.m.material.opacity = .85 * (1 - r / z.max) + .1;
+    if (z.move) {
+      // 회오리: 천천히 나를 쫓아오며 닿으면 들어 올려 밀쳐 내요
+      if (z.home && z.t > .4) { const hx = P.pos.x - z.x, hz = P.pos.z - z.z, hl = Math.hypot(hx, hz) || 1, wob = Math.sin(z.t * 2 + z.seed) * .8;
+        z.vx += ((hx / hl + -hz / hl * wob) * z.sp - z.vx) * Math.min(1, dt * 1.5); z.vz += ((hz / hl + hx / hl * wob) * z.sp - z.vz) * Math.min(1, dt * 1.5); }
+      z.x += z.vx * dt; z.z += z.vz * dt; const ty = topY(Math.floor(z.x), Math.floor(z.z)); if (ty > 0 && Math.abs(ty + 1 - z.y) < 3) z.y += (ty + 1 - z.y) * Math.min(1, dt * 4);
+      z.m.position.set(z.x, z.y + .06, z.z); z.m.rotation.y += dt * 7; const fade = Math.min(1, z.t * 2, (z.life - z.t) * 1.5);
+      z.m.scale.setScalar(Math.max(.01, fade)); if (z.tickFx) z.tickFx(z, dt);
+      const d2 = Math.hypot(P.pos.x - z.x, P.pos.z - z.z);
+      if (z.dmg && (z.cd = (z.cd || 0) - dt) <= 0 && fade > .6 && d2 < z.r && dy > -1 && dy < 3.2 && !paused) { z.cd = .7; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 8, z.boss); P.vel.y = Math.max(P.vel.y, 6); }
+    } else if (z.sky) {
+      // 공중 폭발: 내가 떨어질 자리를 계산해서 터져요
+      const k = Math.min(1, z.t / z.delay); z.m.scale.setScalar(z.r * (.3 + .7 * k)); z.m.material.opacity = .15 + .35 * k + (k > .8 ? .2 * Math.sin(z.t * 40) : 0);
+      if (!z.done && z.t >= z.delay) { z.done = true; burst(Math.floor(z.x), Math.floor(z.y), Math.floor(z.z), z.blk || 23); tone(300, .25, "square", .04, 0, 80);
+        if (Math.hypot(P.pos.x - z.x, P.pos.y + .9 - z.y, P.pos.z - z.z) < z.r + .4 && !paused) hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 6, z.boss); }
+    } else if (z.wave) { const r = Math.min(z.max, .5 + z.t * z.sp); z.m.scale.setScalar(r); z.m.material.opacity = .85 * (1 - r / z.max) + .1;
       if (!z.hit && z.dmg && Math.abs(d - r) < .9 && dy > -1 && dy < 1.1 && P.ground && !paused) { z.hit = true; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 7, z.boss); P.vel.y = Math.max(P.vel.y, 5); } }
     else if (z.pool) { z.m.material.opacity = z.t < z.delay ? .2 + .3 * z.t / z.delay : .45 + .1 * Math.sin(z.t * 6);
       if (z.t > z.delay && d < z.r && dy > -1 && dy < 2 && !paused) { slowT = Math.max(slowT, .4); if ((z.tick = (z.tick || 0) - dt) <= 0) { z.tick = .5; hurtBy(z.dmg / 2, 0, 0, 0, z.boss); } }
       if (z.t > z.life - 1) z.m.material.opacity *= Math.max(0, z.life - z.t); }
     else if (!z.done) { const k = Math.min(1, z.t / z.delay); z.m.material.opacity = .2 + .7 * k; z.m.scale.setScalar(z.r * (.5 + .5 * k));
-      if (z.t >= z.delay) { z.done = true; if (z.fx) z.fx(z); if (d < z.r && dy > -1 && dy < 2.2 && !paused) hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 6, z.boss); } }
-    if (z.t > z.life) { scene.remove(z.m); z.m.material.dispose(); return false; }
+      if (z.t >= z.delay) { z.done = true; if (z.fx) z.fx(z); if (d < z.r && dy > -1 && dy < (z.hh || 2.2) && !paused && !(z.grp && z.grp.hit)) { if (z.grp) z.grp.hit = true; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 6, z.boss); } } }
+    if (z.t > z.life) { scene.remove(z.m); mDisp(z.m); return false; }
     return true;
   });
 }
-function clearZones() { zones.forEach(z => scene.remove(z.m)); zones = []; fxs.forEach(f => scene.remove(f.m)); fxs = []; slowT = 0; }
+function clearZones() { zones.forEach(z => { scene.remove(z.m); mDisp(z.m); }); zones = []; fxs.forEach(f => { scene.remove(f.m); if (f.m.material) f.m.material.dispose(); }); fxs = []; slowT = 0; }
 const spikeGeo = new THREE.ConeGeometry(.45, 1.8, 6);
 function iceSpike(z) { for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(spikeGeo, new THREE.MeshBasicMaterial({ color: i ? 0xbfefff : 0x7fd8ff, transparent: true })); m.position.set(z.x + (Math.random() - .5) * .8, z.y + .4, z.z + (Math.random() - .5) * .8); m.scale.setScalar(.7 + Math.random() * .5); addFx(m, .9, 1.2); } tone(900, .2, "triangle", .05, 0, 1600); }
 
@@ -4863,13 +4884,41 @@ const BOSS = {
 // 보스 단계: 그 천체 보스를 쓰러뜨린 횟수로 정해져요. 1~5번째 싸움은 기본, 6~10번째는 강화, 11번째부터는 각성(새 공격이 더 늘어요)
 const BOSS_TIER = [
   null,
-  { n: "", hp: 1, dk: 1, sp: 1, idle: 2.6, extra: 0, sum: [.67, .34], per: 2, loot: 1, core: 0, col: null, crown: 0xd070ff, sc: 1 },
-  { n: "강화된 ", hp: 1.6, dk: 1.3, sp: 1.15, idle: 2.0, extra: 1, sum: [.75, .5, .25], per: 2, loot: 1.5, core: 1, col: "#ff4a2a", crown: 0xff7030, sc: 1.06 },
-  { n: "각성한 ", hp: 2.4, dk: 1.6, sp: 1.3, idle: 1.5, extra: 2, sum: [.8, .6, .4, .2], per: 3, loot: 2, core: 2, col: "#9a3aff", crown: 0xff2a6a, sc: 1.14 },
+  { n: "", hp: 1, dk: 1, sp: 1, idle: 2.2, extra: 0, sum: [.67, .34], per: 2, loot: 1, core: 0, col: null, crown: 0xd070ff, sc: 1 },
+  { n: "강화된 ", hp: 1.6, dk: 1.3, sp: 1.15, idle: 1.8, extra: 1, sum: [.75, .5, .25], per: 2, loot: 1.5, core: 1, col: "#ff4a2a", crown: 0xff7030, sc: 1.06 },
+  { n: "각성한 ", hp: 2.4, dk: 1.6, sp: 1.3, idle: 1.4, extra: 2, sum: [.8, .6, .4, .2], per: 3, loot: 2, core: 2, col: "#9a3aff", crown: 0xff2a6a, sc: 1.14 },
 ];
 const bossTier = (pk) => { const w = (S.bossWin && S.bossWin[pk]) || 0; return w >= 10 ? 3 : w >= 5 ? 2 : 1; };
 // 강화·각성 때 더해지는 공격(앞에서부터 하나씩): 십자 땅울림, 연속 충격파, 따라오는 낙하, 네 갈래 회전 광선, 순간이동 내려찍기
 const BOSS_EXTRA = { earth: ["quake", "shock"], moon: ["meteor", "blink"], mars: ["blink", "meteor"], mercury: ["spin", "shock"], europa: ["meteor", "spin"], titan: ["shock", "quake"] };
+// 보스마다 하나씩 있는 대표 공격: 첫 싸움부터 나오고, 처음 볼 때 그 천체의 과학 이야기를 알려 줘요
+const BOSS_SIG = {
+  earth: { k: "burrow", n: "땅속 굴착", t: "굴착기가 땅속으로 파고들어 발밑을 쫓아와요! 흙이 들썩이는 곳에서 멀리 달아나세요. 땅속에 있을 때는 때릴 수 없어요." },
+  moon: { k: "rays", n: "광조 낙하", t: "돌 조각이 여러 갈래 줄로 떨어지고, 곧 그 사이로 한 번 더 떨어져요. 공기가 없는 달에서는 운석이 부딪혀 튄 돌 조각이 멀리 날아가 크레이터 둘레에 밝은 줄무늬(광조)를 남겨요." },
+  mars: { k: "devils", n: "먼지 회오리", t: "화성에서는 햇볕에 데워진 땅 위로 공기가 솟아오르며 먼지 회오리(더스트 데빌)가 자주 생겨요. 회오리는 천천히 쫓아오니 멈추지 말고 계속 움직이세요." },
+  mercury: { k: "checker", n: "햇빛 바둑판", t: "수성은 공기가 거의 없어 햇빛이 막힘없이 땅에 꽂혀요. 빛이 바둑판 칸마다 번갈아 떨어지니, 먼저 빛이 꽂힌 칸으로 옮겨 서세요." },
+  europa: { k: "geyser", n: "얼음 틈 물기둥", t: "유로파 얼음 틈에서 물기둥이 솟는 듯한 모습이 관측된 적이 있어요. 얼음 가시 울타리의 빈틈으로 빠져나가세요. 가운데 물기둥은 높아서 점프로 넘을 수 없어요." },
+  titan: { k: "gust", n: "진한 대기 돌풍", t: "타이탄의 대기는 지구보다 1.5배 진해서 바람이 훨씬 세게 밀어요. 보스가 공기를 빨아들이면 끌려가지 않게 반대쪽으로 계속 걸으세요." },
+};
+// 공격 고르기: 가까우면 근접 공격, 멀면 원거리 공격을 더 자주 골라요. 방금 쓴 공격은 바로 다시 쓰지 않아요
+const ATK_NEAR = { slam: 1, slam2: 1, quake: 1, shock: 1, storm: 1, breath: 1, pulse: 1, spin: 1, sweep: 1, gust: 1 };
+const ATK_FAR = { leap: 1, fan: 1, meteor: 1, rain: 1, spikes: 1, checker: 1, geyser: 1, devils: 1, rays: 1, burrow: 1, dash3: 1, blink: 1 };
+function pickAtk(b, dist) {
+  const h = b.hist, w = b.pat.map(k => {
+    let v = k === h[h.length - 1] ? 0 : k === h[h.length - 2] ? .4 : 1;
+    if (dist < 5 && ATK_NEAR[k]) v *= 2.2; if (dist > 8 && ATK_FAR[k]) v *= 2.2; if (dist > 9 && ATK_NEAR[k]) v *= .45;
+    if (k === b.sig) v *= 1.3; return v; });
+  let r = Math.random() * w.reduce((a, c) => a + c, 0), k = b.pat[0];
+  for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0 && w[i] > 0) { k = b.pat[i]; break; } }
+  h.push(k); if (h.length > 4) h.shift(); return k;
+}
+const devilGeo = new THREE.ConeGeometry(1.05, 3.4, 12, 1, true), devilGeo2 = new THREE.ConeGeometry(.6, 2.4, 10, 1, true), pillarGeo = new THREE.BoxGeometry(1.7, 12, 1.7), geyserGeo = new THREE.CylinderGeometry(1, 1.3, 1, 16, 1, true);
+devilGeo.rotateX(Math.PI); devilGeo.translate(0, 1.7, 0); devilGeo2.rotateX(Math.PI); devilGeo2.translate(0, 1.2, 0); geyserGeo.translate(0, .5, 0);
+function devilMesh() {
+  const g = new THREE.Group(), mk = (geo, c, o) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, side: THREE.DoubleSide }));
+  g.add(mk(devilGeo, 0xd08a5a, .42)); const inner = mk(devilGeo2, 0x8a4a2a, .5); inner.rotation.y = 1; g.add(inner);
+  const d = mk(discGeo, 0xff6a3a, .3); d.scale.setScalar(1.3); g.add(d); return g;
+}
 const BOSS_ZC = { earth: 0xffa040, moon: 0xff3030, mars: 0xff6a3a, mercury: 0xffd040, europa: 0x60c8ff, titan: 0xff9a30 };
 let boss = null, lair = null;
 const lairBeamGeo = new THREE.CylinderGeometry(.5, .5, 70, 10, 1, true);
@@ -4903,8 +4952,8 @@ function spawnBoss() {
   const crown = new THREE.MeshBasicMaterial({ color: T.crown }); box(.5, .08, .08, crown, 0, 1.5, 0, g); box(.08, .26, .08, crown, -.2, 1.6, 0, g); box(.08, .26, .08, crown, .2, 1.6, 0, g);
   if (tier > 1) box(.08, .36, .08, crown, 0, 1.66, 0, g); if (tier > 2) { box(.08, .3, .08, crown, -.32, 1.58, 0, g); box(.08, .3, .08, crown, .32, 1.58, 0, g); }
   scene.add(g);
-  const hp = Math.round(B.hp * T.hp), pat = B.pat.concat((BOSS_EXTRA[S.planet] || []).slice(0, T.extra));
-  boss = { B, T, tier, g, p: new THREE.Vector3(lair.x + .5, lair.y + .2, lair.z + .5), v: new THREE.Vector3(), hp, maxHp: hp, dk: T.dk, sp: B.sp * T.sp, idle: T.idle, pat, nm: T.n + B.n, st: "go", stT: 0, next: 0, flash: 0, walk: 0, ground: false, summoned: 0 };
+  const sig = (BOSS_SIG[S.planet] || {}).k, hp = Math.round(B.hp * T.hp), pat = B.pat.concat(sig ? [sig] : [], (BOSS_EXTRA[S.planet] || []).slice(0, T.extra));
+  boss = { B, T, tier, g, p: new THREE.Vector3(lair.x + .5, lair.y + .2, lair.z + .5), v: new THREE.Vector3(), hp, maxHp: hp, dk: T.dk, sp: B.sp * T.sp, idle: T.idle, pat, sig, hist: [], chain: 0, airT: 0, airCD: 2, lastSt: "go", nm: T.n + B.n, st: "go", stT: 0, next: 0, flash: 0, walk: 0, ground: false, summoned: 0 };
   showBossBar(true); sfx.boom(1); tone(70, 1.6, "sawtooth", .08, 0, 140);
   S.bossSeen = S.bossSeen || {}; const fightNo = ((S.bossWin && S.bossWin[S.planet]) || 0) + 1;
   if (!S.bossSeen[S.planet]) { S.bossSeen[S.planet] = true; showFact(`보스: ${B.n}`, B.fact); }
@@ -4912,7 +4961,7 @@ function spawnBoss() {
   else toast(`${b2n(T.n + B.n)} 깨어났어요! (${fightNo}번째)`, 2200);
 }
 const b2n = (n) => n + josa(n, "이", "가");
-function clearBoss() { if (boss) { scene.remove(boss.g); if (boss.beams) boss.beams.forEach(b => scene.remove(b)); if (boss.beams4) boss.beams4.forEach(b => scene.remove(b)); boss = null; } showBossBar(false); bossFog = 0; clearZones(); }
+function clearBoss() { bossPull = null; if (boss) { scene.remove(boss.g); if (boss.beams) boss.beams.forEach(b => scene.remove(b)); if (boss.beams4) boss.beams4.forEach(b => scene.remove(b)); boss = null; } showBossBar(false); bossFog = 0; clearZones(); }
 function bossDie() {
   const b = boss, B = b.B, x = Math.floor(b.p.x), y = Math.floor(b.p.y + 1), z = Math.floor(b.p.z);
   for (let i = 0; i < 6; i++) burst(x + Math.round(Math.random() * 2 - 1), y + i % 3, z + Math.round(Math.random() * 2 - 1), i % 2 ? 23 : 9); sfx.boom(1);
@@ -4928,7 +4977,7 @@ function bossDie() {
 function bossBeam(col) { const m = new THREE.Mesh(laserGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .5, depthWrite: false })); scene.add(m); return m; }
 function aimBeam(m, x0, y0, z0, ang, len, w) { m.position.set(x0, y0, z0); m.rotation.set(0, ang, 0); m.translateZ(-len / 2); m.scale.set(w, w, len); }
 function bossTick(dt) {
-  bossFog = Math.max(0, bossFog - dt * .5);
+  bossFog = Math.max(0, bossFog - dt * .5); bossPull = null;
   if (mobFree() || !BOSS[S.planet] || !$("startOv").hidden) { if (boss) clearBoss(); hideLair(); return; }
   ensureLair();
   const L = lair, dl = Math.hypot(P.pos.x - L.x - .5, P.pos.z - L.z - .5), cdLeft = (S.bossCD[S.planet] || 0) - Date.now();
@@ -4941,14 +4990,23 @@ function bossTick(dt) {
   b.stT += dt; let wx = 0, wz = 0, face = true, arms = null;
   // 체력이 2/3, 1/3이 되면 졸개를 불러요
   const T = b.T, ph = b.hp / b.maxHp; if (b.summoned < T.sum.length && ph < T.sum[b.summoned]) { b.summoned++; for (let i = 0; i < T.per; i++) { const a = Math.random() * 6.28; mkMob(B.mini, b.p.x + Math.cos(a) * 2.5, b.p.y + 1, b.p.z + Math.sin(a) * 2.5); } toast(`${b2n(b.nm)} 부하를 불렀어요!`, 1600); tone(200, .5, "square", .05, 0, 600); }
-  // 각성한 보스는 체력이 30% 아래로 내려가면 화가 나서 더 빨라져요
-  if (b.tier === 3 && ph < .3 && !b.rage) { b.rage = true; b.idle *= .65; b.sp *= 1.15; toast(`${b2n(b.nm)} 화가 났어요! 공격이 빨라져요`, 2000); tone(90, 1, "sawtooth", .07, 0, 50); }
+  // 체력 60% 아래: 아직 안 쓰던 공격을 하나 더 꺼내요. 30% 아래: 화가 나서 빨라지고 공격을 이어서 몰아쳐요
+  if (!b.ph2 && ph < .6) { b.ph2 = true; const nx = (BOSS_EXTRA[S.planet] || []).find(k => !b.pat.includes(k)); if (nx) b.pat.push(nx); toast(`${b2n(b.nm)} 새 공격을 꺼냈어요!`, 1600); tone(260, .5, "square", .04, 0, 520); }
+  if (ph < .3 && !b.rage) { b.rage = true; const nx = (BOSS_EXTRA[S.planet] || []).find(k => !b.pat.includes(k)); if (nx) b.pat.push(nx);
+    b.idle *= b.tier === 3 ? .65 : .75; b.sp *= 1.15; toast(`${b2n(b.nm)} 화가 났어요! 공격을 몰아쳐요`, 2000); tone(90, 1, "sawtooth", .07, 0, 50); }
+  // 공중에 오래 떠 있으면(중력이 약한 곳) 떨어질 자리를 계산해 터뜨려요. 공중에서는 방향을 거의 못 바꾸니까요(관성)
+  b.airT = !P.ground && !paused && dl < 30 ? b.airT + dt : 0; b.airCD -= dt;
+  if (b.airT > .9 && b.airCD <= 0 && b.st !== "burrow") { b.airCD = [0, 2.4, 1.8, 1.3][b.tier]; const t = .8, vy = Math.max(P.vel.y - g * t, PLANETS[S.planet].thick ? -1.6 : -40);
+    const ty = P.pos.y + (P.vel.y + vy) / 2 * t, sy = Math.max(ty, topY(Math.floor(P.pos.x + P.vel.x * t), Math.floor(P.pos.z + P.vel.z * t)) + 1) + .9;
+    addZone({ sky: true, x: P.pos.x + P.vel.x * t, y: sy, z: P.pos.z + P.vel.z * t, r: 1.9, delay: t, dmg: 12, boss: true, col: BOSS_ZC[S.planet] || 0xff3030, blk: S.planet === "europa" ? 14 : 23 }); tone(900, .3, "sine", .03, 0, 1500);
+    if (!S.skyHint) { S.skyHint = true; toast("공중에 오래 떠 있으면 보스가 떨어질 자리를 노려요! 공중에서는 방향을 거의 못 바꿔요(관성)", 3600); } }
   const home = Math.hypot(b.p.x - L.x - .5, b.p.z - L.z - .5), zc = BOSS_ZC[S.planet] || 0xff3030;
   if (b.st === "go") {
     if (home > 16) { const hx = L.x + .5 - b.p.x, hz = L.z + .5 - b.p.z, hl = Math.hypot(hx, hz) || 1; wx = hx / hl * b.sp; wz = hz / hl * b.sp; }
     else if (dist > 2.2) { wx = dx / dist * b.sp; wz = dz / dist * b.sp; }
     if (dist < 2.4 && Math.abs(dy) < 2 && (b.cd = (b.cd || 0) - dt) <= 0) { b.cd = 1.4; hit(10); }
-    if (b.stT > b.idle) { b.st = b.pat[b.next++ % b.pat.length]; b.stT = 0; b.n = 0; b.fired = false; }
+    if (b.stT > b.idle * (.7 + .3 * ph)) { b.st = pickAtk(b, dist); b.stT = 0; b.n = 0; b.fired = false; b.sub = "";
+      const sg = BOSS_SIG[S.planet]; if (sg && b.st === sg.k && !(S.bossSig = S.bossSig || {})[S.planet]) { S.bossSig[S.planet] = true; toast(`${sg.n}: ${sg.t}`, 6000); } }
   } else if (b.st === "slam" || b.st === "slam2") {
     arms = -2.8 * Math.min(1, b.stT * 1.6); if (b.stT < .9) b.flash = .4 + .3 * Math.sin(b.stT * 20);
     if (b.stT > 1 && !b.fired) { b.fired = true; sfx.boom(quiet ? .2 : 1); for (let i = 0; i < 4; i++) burst(Math.floor(b.p.x) + (i % 2 ? 1 : -1), Math.floor(b.p.y) - 1, Math.floor(b.p.z) + (i > 1 ? 1 : -1), 4);
@@ -5047,7 +5105,76 @@ function bossTick(dt) {
       addZone({ x: b.p.x, y: Math.floor(b.p.y + .01), z: b.p.z, r: 3, delay: .7, dmg: 16, boss: true, col: zc, fx: (q) => { sfx.boom(quiet ? .2 : .8); for (let i = 0; i < 4; i++) burst(Math.floor(q.x) + (i % 2 ? 1 : -1), q.y, Math.floor(q.z) + (i > 1 ? 1 : -1), 4); } }); }
     else arms = -2.8 * Math.min(1, (b.stT - .7) * 2);
     if (b.stT > 1.9) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "burrow") {
+    // 땅속 굴착(지구): 땅속으로 파고들어 흙먼지가 발밑을 쫓아와요. 먼지가 멈추면 곧 그 자리로 솟구쳐요
+    b.v.x *= .5; b.v.z *= .5; face = false;
+    if (!b.mk) { b.mk = { x: b.p.x, z: b.p.z }; sfx.boom(.6); tone(55, 2.6, "sawtooth", .05, 0, 85); }
+    b.burrow = b.stT > .45 && !b.up;
+    const chase = 2.4 + b.tier * .45;
+    if (b.stT < .45) { arms = -2.8; if (Math.random() < dt * 14) burst(Math.floor(b.p.x), Math.floor(b.p.y) - 1, Math.floor(b.p.z), get(Math.floor(b.p.x), Math.floor(b.p.y) - 1, Math.floor(b.p.z)) || 4); }
+    else if (b.stT < 2.9) { const mx = P.pos.x - b.mk.x, mz = P.pos.z - b.mk.z, ml = Math.hypot(mx, mz) || 1, st = Math.min(ml, chase * dt); b.mk.x += mx / ml * st; b.mk.z += mz / ml * st;
+      // 흙이 들썩이는 자리 표시: 갈색 원이 나를 따라와요
+      if (!b.mkZ) { const g = new THREE.Group(), d = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: 0x6a4424, transparent: true, opacity: .55, depthWrite: false, side: THREE.DoubleSide })), r = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: zc, transparent: true, opacity: .7, depthWrite: false, side: THREE.DoubleSide }));
+        d.scale.setScalar(1.3); r.scale.setScalar(1.6); g.add(d); g.add(r); b.mkZ = addZone({ move: true, mesh: g, x: b.mk.x, y: Math.floor(b.p.y + .01), z: b.mk.z, vx: 0, vz: 0, r: 1.6, life: 2.5, dmg: 0 }); }
+      b.mkZ.x = b.mk.x; b.mkZ.z = b.mk.z;
+      if (Math.random() < dt * 9) { const fx = Math.floor(b.mk.x), fz = Math.floor(b.mk.z), ty = topY(fx, fz); burst(fx, ty, fz, get(fx, ty, fz) || 4); }
+      if ((b.cd = (b.cd || 0) - dt) <= 0) { b.cd = .45; tone(70 + Math.random() * 30, .25, "sawtooth", .03, 0, 50); } }
+    else if (!b.fired) { b.fired = true; const fx = Math.floor(b.mk.x), fz = Math.floor(b.mk.z), y = topY(fx, fz) + 1;
+      addZone({ x: b.mk.x, y, z: b.mk.z, r: 2.6, delay: .6, dmg: 18, boss: true, col: zc, fx: (q) => {
+        sfx.boom(quiet ? .3 : 1); for (let i = 0; i < 6; i++) burst(Math.floor(q.x) + (i % 3) - 1, q.y - 1 + (i > 2 ? 1 : 0), Math.floor(q.z) + (i % 2 ? 1 : -1), get(Math.floor(q.x), q.y - 1, Math.floor(q.z)) || 4);
+        if (boss !== b) return; b.up = true; b.burrow = false; if (Math.abs(q.y - b.p.y) < 7 && !mobHits(q.x, q.y + .2, q.z, B.w, B.h)) b.p.set(q.x, q.y + .2, q.z); b.v.set(0, 9, 0);
+        if (Math.hypot(P.pos.x - q.x, P.pos.z - q.z) < q.r && Math.abs(P.pos.y - q.y) < 2.2) P.vel.y = Math.max(P.vel.y, 9); } }); }
+    if (b.stT > 4.2) { b.burrow = false; b.up = false; b.mk = b.mkZ = null; b.st = "go"; b.stT = 0; }
+  } else if (b.st === "rays") {
+    // 광조 낙하(달): 여러 갈래 줄로 돌 조각이 떨어지고, 0.7초 뒤 그 사이 줄로 한 번 더 떨어져요
+    b.v.x *= .7; b.v.z *= .7; arms = -2.6 * Math.min(1, b.stT * 1.5); if (b.stT < .7) b.flash = .4 + .3 * Math.sin(b.stT * 20);
+    if (b.n < 2 && b.stT > .7 + b.n * .7) { if (!b.n) b.a0 = toP + Math.random() * .5; b.n++; sfx.boom(quiet ? .2 : .7);
+      const rays = b.tier > 2 ? 8 : 6, off = b.n === 2 ? Math.PI / rays : 0, grp = {};
+      for (let k = 0; k < rays; k++) { const a = b.a0 + off + k * Math.PI * 2 / rays, fx = -Math.sin(a), fz = -Math.cos(a);
+        for (let d = 2, i = 0; d <= 12.8; d += 1.8, i++) { const x = b.p.x + fx * d, z = b.p.z + fz * d, y = topY(Math.floor(x), Math.floor(z)) + 1;
+          if (Math.abs(y - b.p.y) > 5) continue;
+          addZone({ x, y, z, r: 1.05, delay: .55 + d * .07, dmg: 13, boss: true, grp, col: 0xd8dce8, fx: i % 2 ? null : (q) => burst(Math.floor(q.x), q.y - 1, Math.floor(q.z), 11) }); } } }
+    if (b.stT > 3.4) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "devils") {
+    // 먼지 회오리(화성): 회오리 몇 개가 천천히 쫓아와요. 보스가 다른 공격을 하는 동안에도 한참 남아 있어요
+    b.v.x *= .7; b.v.z *= .7; face = false; b.g.rotation.y += dt * 8;
+    if (Math.random() < dt * 10) puff(b.p.x + (Math.random() - .5) * 3, b.p.y + Math.random() * 2, b.p.z + (Math.random() - .5) * 3, 1.2);
+    if (!b.fired && b.stT > .9) { b.fired = true; const n = b.tier > 1 ? 4 : 3; tone(120, 1.4, "sawtooth", quiet ? .02 : .05, 0, 260);
+      for (let i = 0; i < n; i++) { const a = toP + Math.PI + (i - (n - 1) / 2) * 1.1, x = b.p.x - Math.sin(a) * 2.5, z = b.p.z - Math.cos(a) * 2.5;
+        addZone({ move: true, home: true, mesh: devilMesh(), x, y: Math.floor(b.p.y + .01), z, vx: -Math.sin(a) * 3, vz: -Math.cos(a) * 3, sp: 2.4 + b.tier * .35 + i * .15, seed: i * 2.1, r: 1.25, life: 6.5 + b.tier, dmg: 9, boss: true,
+          tickFx: (q, d) => { if (Math.random() < d * 2.5) burst(Math.floor(q.x), q.y + Math.floor(Math.random() * 3), Math.floor(q.z), 16); } }); } }
+    if (b.stT > 1.8) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "checker") {
+    // 햇빛 바둑판(수성): 바둑판 칸에 햇빛이 번갈아 꽂혀요. 먼저 꽂힌 칸으로 옮겨 서야 다음 빛을 피해요
+    b.v.x *= .7; b.v.z *= .7; arms = -2.4; b.flash = .3 + .2 * Math.sin(b.stT * 12);
+    if (b.n < 2 && b.stT > .3 + b.n * 1.15) { if (!b.n) b.c0 = [Math.round(P.pos.x - .5) + .5, Math.round(P.pos.z - .5) + .5]; b.n++; tone(1300 + b.n * 200, .5, "sine", quiet ? .015 : .04, 0, 2000);
+      const N = b.tier > 2 ? 7 : 5, sz = 2.4, hN = (N - 1) / 2, grp = {};
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { if ((i + j) % 2 !== b.n - 1) continue; const x = b.c0[0] + (i - hN) * sz, z = b.c0[1] + (j - hN) * sz, y = topY(Math.floor(x), Math.floor(z)) + 1;
+        if (Math.abs(y - P.pos.y) > 5) continue;
+        addZone({ x, y, z, r: 1.75, delay: 1.05, dmg: 15, boss: true, grp, col: 0xffd040, fx: (q) => { const m = new THREE.Mesh(pillarGeo, new THREE.MeshBasicMaterial({ color: 0xfff0a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); m.position.set(q.x, q.y + 6, q.z); addFx(m, .45, 0, null, .8); } }); } }
+    if (b.stT > 3.1) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "geyser") {
+    // 얼음 틈 물기둥(유로파): 얼음 가시 울타리가 나를 둘러싸고(빈틈 한 곳), 곧 가운데에서 높은 물기둥이 솟아요
+    b.v.x *= .7; b.v.z *= .7; arms = -2.2; if (b.stT < .5) b.flash = .4;
+    if (!b.fired && b.stT > .5) { b.fired = true; const cx = P.pos.x, cz = P.pos.z, y = Math.floor(P.pos.y + .01), n = 16, R = 4.4, gap = Math.floor(Math.random() * n), grp = {}; tone(600, .5, "triangle", .04, 0, 1200);
+      for (let k = 0; k < n; k++) { if (k === gap || k === (gap + 1) % n) continue; const a = (k + .5) * Math.PI * 2 / n; addZone({ x: cx + Math.cos(a) * R, y, z: cz + Math.sin(a) * R, r: 1, delay: 1, dmg: 13, boss: true, grp, col: 0x60c8ff, fx: iceSpike }); }
+      addZone({ x: cx, y, z: cz, r: 3.5, hh: 14, delay: 2.1, dmg: 18, boss: true, col: 0xbff0ff, fx: (q) => { sfx.boom(.3); const m = new THREE.Mesh(geyserGeo, new THREE.MeshBasicMaterial({ color: 0xcff4ff, transparent: true, depthWrite: false, side: THREE.DoubleSide })); m.scale.set(q.r * .85, .5, q.r * .85); m.position.set(q.x, q.y, q.z); addFx(m, 1.3, 0, null, .7); fxs[fxs.length - 1].gy = 14;
+        for (let i = 0; i < 5; i++) burst(Math.floor(q.x) + (i % 3) - 1, q.y + i * 2, Math.floor(q.z) + (i % 2), 14);
+        if (Math.hypot(P.pos.x - q.x, P.pos.z - q.z) < q.r && P.pos.y - q.y < 14) P.vel.y = Math.max(P.vel.y, 10); } }); }
+    if (b.stT > 3) { b.st = "go"; b.stT = 0; }
+  } else if (b.st === "gust") {
+    // 진한 대기 돌풍(타이탄): 공기를 빨아들여 나를 끌어당긴 뒤 바닥을 내리쳐요. 반대쪽으로 계속 걸으세요
+    b.v.x *= .6; b.v.z *= .6; arms = b.stT < 2.8 ? -1.4 : -2.8;
+    if (b.stT > .4 && b.stT < 2.8) { const k = 3.2 + b.tier * .35; if (dist > 1.2 && dist < 18) bossPull = [-dx / dist * k, -dz / dist * k];
+      if (!b.n) { b.n = 1; tone(140, 2.4, "sawtooth", .04, 0, 420); addZone({ x: b.p.x, y: Math.floor(b.p.y + .01), z: b.p.z, r: 4.2, delay: 2.4, dmg: 20, boss: true, col: zc }); }
+      if (Math.random() < dt * 40) { const a = Math.random() * 6.28, r = 3 + Math.random() * 8, x = b.p.x + Math.cos(a) * r, z = b.p.z + Math.sin(a) * r, m = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({ color: 0xffd0a0, transparent: true, depthWrite: false }));
+        m.scale.set(1.6, 1.6, 9); m.position.set(x, b.p.y + .4 + Math.random() * 2.5, z); m.lookAt(b.p.x, m.position.y, b.p.z); addFx(m, r / 12, 0, [-Math.cos(a) * 12, -Math.sin(a) * 12], .55); } }
+    if (b.stT > 2.8 && !b.fired) { b.fired = true; sfx.boom(1); addZone({ wave: true, x: b.p.x, y: b.p.y, z: b.p.z, max: 10, sp: 9, dmg: 12, boss: true, col: zc });
+      for (let i = 0; i < 4; i++) burst(Math.floor(b.p.x) + (i % 2 ? 1 : -1), Math.floor(b.p.y) - 1, Math.floor(b.p.z) + (i > 1 ? 1 : -1), 4); }
+    if (b.stT > 3.6) { b.st = "go"; b.stT = 0; }
   }
+  // 몰아치기: 화가 나면 공격이 끝나자마자 0.35초 뒤에 다음 공격을 이어서 해요(각성은 세 번까지)
+  if (b.st !== b.lastSt) { if (b.st === "go" && b.lastSt !== "stun" && b.rage && b.chain < (b.tier > 2 ? 2 : 1) && Math.random() < .55) { b.chain++; b.stT = b.idle * (.7 + .3 * ph) - .35; } else if (b.st === "go") b.chain = 0; b.lastSt = b.st; }
   // 움직임
   const quick = b.sub === "dash" || b.st === "leap" ? 12 : 6;
   b.v.x += (wx - b.v.x) * Math.min(1, dt * quick); b.v.z += (wz - b.v.z) * Math.min(1, dt * quick); b.v.y -= g * dt; if (b.v.y < -30) b.v.y = -30;
@@ -5064,7 +5191,8 @@ function bossTick(dt) {
   b.flash = Math.max(0, b.flash - dt * 3);
   const [sk, bl0] = lightAt(Math.floor(b.p.x), Math.floor(b.p.y + 1), Math.floor(b.p.z)), bl = Math.max(bl0, handAt(b.p.x, b.p.y + 1, b.p.z)), lk = .45 + .55 * Math.max(smooth(-.12, .25, env.e) * sk / 15, bl / 15);
   if (b.st !== "pulse") u.mats.forEach((mt, i) => { mt.color.copy(u.base[i]).multiplyScalar(lk); if (b.flash) mt.color.lerp(cB.set(0xff3030), b.flash * .7); });
-  b.g.position.copy(b.p); if (face) b.g.rotation.y = toP; else if (b.dir && b.sub === "dash") b.g.rotation.y = Math.atan2(-b.dir[0], -b.dir[1]);
+  b.g.position.copy(b.p); if (b.st === "burrow" && !b.up) { const k = Math.min(1, b.stT / .45); b.g.position.y -= k * B.h * 1.1; b.g.visible = k < 1; } else if (b.st !== "blink") b.g.visible = true;
+  if (face) b.g.rotation.y = toP; else if (b.dir && b.sub === "dash") b.g.rotation.y = Math.atan2(-b.dir[0], -b.dir[1]);
   const sp = Math.hypot(b.v.x, b.v.z); b.walk += dt * sp * 1.2; const sw = Math.sin(b.walk * 3) * Math.min(1, sp / 2) * .6;
   if (u.legs) { u.legs[0].rotation.x = sw; u.legs[1].rotation.x = -sw; }
   u.arms.forEach((a, i) => { a.rotation.x = arms != null ? arms : (i ? sw : -sw) - (dist < 4 ? 1 : 0); });
@@ -5365,7 +5493,7 @@ function petTarget(m) { let best = null, bd = 12; for (const r of mobs) { const 
   if (!best && boss && Math.hypot(boss.p.x - P.pos.x, boss.p.z - P.pos.z) < 12) best = boss; return best; }
 function petBite(m, tg) {
   const dmg = 4 + (MLV[S.planet] || 1) * 1.5; tone(200, .1, "sawtooth", .05, 0, 120);
-  if (tg === boss) { boss.hp -= dmg * .5; boss.flash = 1; if (boss.hp <= 0) bossDie(); }
+  if (tg === boss) { if (boss.burrow) return; boss.hp -= dmg * .5; boss.flash = 1; if (boss.hp <= 0) bossDie(); }
   else { tg.hp -= dmg; tg.flash = 1; if (tg.hp <= 0) { const x = Math.floor(tg.p.x), y = Math.floor(tg.p.y + .5), z = Math.floor(tg.p.z);
       burst(x, y, z, 23); sfx.robot(); scene.remove(tg.g); if (tg.beam) scene.remove(tg.beam); mobs = mobs.filter(o => o !== tg);
       const got = []; tg.T.drop.forEach(([id, k]) => { for (let n = k; n > 0; n--) if (n >= 1 || Math.random() < n) got.push(id); }); got.forEach(id => { S.inv[id] = (S.inv[id] || 0) + 1; spawnDrop(id, x, y, z); });
@@ -5608,6 +5736,7 @@ function attackTick(dt) {
     return true;
   }
   if (best === boss) {
+    if (atkCD <= 0 && boss.burrow) { atkCD = .45; swing = .001; toast("땅속에 숨어서 맞지 않아요! 흙먼지를 피하세요", 1100); return true; }
     if (atkCD <= 0) { atkCD = .45; swing = .001; const crit = boss.st === "stun"; boss.hp -= atkDmg() * (crit ? 2 : 1); boss.flash = 1; sfx.hit(crit); if (crit) toast("지친 틈에 두 배 피해!", 900); if (boss.hp <= 0) bossDie(); }
     return true;
   }
