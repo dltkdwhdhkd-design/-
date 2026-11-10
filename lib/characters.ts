@@ -1,0 +1,14 @@
+import {CHARACTER_FRAMES} from './character-frames.ts';
+export const CHARACTER_ATLASES=['/art/walk-atlas-a.png','/art/walk-atlas-b.png','/art/knife.png'];
+export function portraitStyle(index:number){const i=((index%16)+16)%16,c=CHARACTER_FRAMES[i][0],size=(c[3]-c[1])*.40,x=c[4]-size*.5,y=c[1];return{backgroundImage:`url(${CHARACTER_ATLASES[Math.floor(i/8)]})`,backgroundSize:`${1086/size*100}% ${1448/size*100}%`,backgroundPosition:`${x/(1086-size)*100}% ${y/(1448-size)*100}%`};}
+export type CharacterMotion={phase:number;stride:number;face:number;attack:number;hurt?:number;ghost?:boolean;weapon?:'knife'|'acid'};
+export function characterFrame(m:CharacterMotion){return m.attack>0&&m.attack<.95?5:m.stride>.12&&!m.ghost?1+Math.floor(m.phase)%4:0;}
+export function drawable(image:CanvasImageSource|undefined){if(!image)return false;const src=image as HTMLImageElement;return 'complete' in src?src.complete&&src.naturalWidth>0:true;}
+// Each frame is a separately drawn pose. Feet share a ground anchor; the sprite never bobs vertically.
+export function drawCharacter(ctx:CanvasRenderingContext2D,atlases:CanvasImageSource[],index:number,m:CharacterMotion){const i=((index%16)+16)%16,frames=CHARACTER_FRAMES[i],c=frames[characterFrame(m)],idle=frames[0],scale=94/(idle[3]-idle[1]);ctx.save();ctx.scale(m.face<0?-1:1,1);if(m.hurt)ctx.rotate(-m.hurt*.15);if(!drawable(atlases[Math.floor(i/8)])){ctx.fillStyle=['#78d6ef','#ee986f','#c399ef','#a0d97f'][i%4];ctx.beginPath();ctx.roundRect(-16,-64,32,48,10);ctx.fill();ctx.beginPath();ctx.arc(0,-78,13,0,Math.PI*2);ctx.fill();ctx.fillRect(-14,-18,10,20);ctx.fillRect(4,-18,10,20);ctx.fillStyle='#14202d';ctx.font='bold 15px Arial';ctx.textAlign='center';ctx.fillText(String(i+1),0,-38);ctx.restore();return;}if(characterFrame(m)===5&&m.weapon!=='acid'&&drawable(atlases[2])){const handX=(c[2]-c[4]-14)*scale,handY=-(c[3]-c[1])*.72*scale;ctx.drawImage(atlases[2],58,194,1890,382,handX-17,handY-8,82,16.6);}ctx.drawImage(atlases[Math.floor(i/8)],c[0],c[1],c[2]-c[0],c[3]-c[1],(c[0]-c[4])*scale,-(c[3]-c[1])*scale,(c[2]-c[0])*scale,(c[3]-c[1])*scale);ctx.restore();}
+// Frames rendered from the 3D figure (lib/doll-sprites.ts): 0 idle, 1-4 walk, 5 knife strike,
+// 6 strike without a knife (acid). Drawn with the same anchor (feet at 0,0) and the same
+// 94 px figure height as the painted atlas, which stays as the fallback without WebGL.
+export const DOLL_FRAMES=7;
+export type DollSheet={image:CanvasImageSource;frameW:number;frameH:number;footX:number;footY:number;scale:number};
+export function drawDoll(ctx:CanvasRenderingContext2D,sheet:DollSheet,m:CharacterMotion){const base=characterFrame(m),f=base===5&&m.weapon==='acid'?6:base;const s=sheet.scale;ctx.save();ctx.scale(m.face<0?-1:1,1);if(m.hurt)ctx.rotate(-m.hurt*.15);ctx.drawImage(sheet.image,f*sheet.frameW,0,sheet.frameW,sheet.frameH,-sheet.footX*s,-sheet.footY*s,sheet.frameW*s,sheet.frameH*s);ctx.restore();}

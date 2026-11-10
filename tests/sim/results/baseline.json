@@ -1,0 +1,731 @@
+[
+ {
+  "scenario": "p6c2-iso1-d25",
+  "client": "baseline",
+  "room": 6,
+  "clients": 2,
+  "isolates": 1,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 194.4,
+   "p95": 263.9,
+   "max": 373.3
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 21,
+   "p95": 50,
+   "max": 82
+  },
+  "observer": {
+   "frameJumpPxMax": 5.5,
+   "frameJumpPxP99": 4.5,
+   "stalledMovingFramesPct": 8.4,
+   "displayErrorPx": {
+    "p50": 38.4,
+    "p95": 286.1
+   },
+   "displayDelayMs": {
+    "p50": 806.5,
+    "p95": 1639.8,
+    "max": 1794.9
+   },
+   "trajectoryErrorPx": {
+    "p50": 5.3,
+    "p95": 19.6,
+    "max": 41.3
+   },
+   "missingWhileVisiblePct": 2.6,
+   "vanishEvents": 1
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 97,
+    "pressToConfirmMs": 97,
+    "firstPressAt": 11513,
+    "victimSeesDeathMs": 240,
+    "observersSeeBodyP50": null,
+    "observersSeeBodyMax": null,
+    "truthGapAtPress": 74,
+    "witnesses": 0,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 9,
+   "statementsPerSec": 24,
+   "writeStatementsPerSec": 9,
+   "kbReadPerSec": 45,
+   "primaryBusyPct": 0.4,
+   "avgQueueWaitMs": 0,
+   "stateBytes": 5535
+  },
+  "counts": {
+   "frame.http": 6,
+   "ws.connect": 2,
+   "frame.live": 646,
+   "track.deleted": 10,
+   "frame.action": 1,
+   "vanish.event": 1
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 6,
+   "framesPerSec": 62
+  }
+ },
+ {
+  "scenario": "p16-iso16-d25",
+  "client": "baseline",
+  "room": 16,
+  "clients": 16,
+  "isolates": 16,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 189.9,
+   "p95": 264.9,
+   "max": 431.5
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 140,
+   "p95": 220,
+   "max": 5130
+  },
+  "observer": {
+   "frameJumpPxMax": 12,
+   "frameJumpPxP99": 5.2,
+   "stalledMovingFramesPct": 10,
+   "displayErrorPx": {
+    "p50": 61.3,
+    "p95": 236.6
+   },
+   "displayDelayMs": {
+    "p50": 770.8,
+    "p95": 1938.2,
+    "max": 4003
+   },
+   "trajectoryErrorPx": {
+    "p50": 8.4,
+    "p95": 26.2,
+    "max": 135.6
+   },
+   "missingWhileVisiblePct": 0.1,
+   "vanishEvents": 5
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 102,
+    "pressToConfirmMs": 102,
+    "firstPressAt": 7866,
+    "victimSeesDeathMs": 199,
+    "observersSeeBodyP50": 187,
+    "observersSeeBodyMax": 261,
+    "truthGapAtPress": 72,
+    "witnesses": 11,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 96,
+    "pressToConfirmMs": 96,
+    "firstPressAt": 11103,
+    "victimSeesDeathMs": 133,
+    "observersSeeBodyP50": 157,
+    "observersSeeBodyMax": 177,
+    "truthGapAtPress": 80,
+    "witnesses": 6,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 5,
+    "errors": [
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요."
+    ],
+    "confirmMs": 104,
+    "pressToConfirmMs": 1131,
+    "firstPressAt": 15210,
+    "victimSeesDeathMs": 1233,
+    "observersSeeBodyP50": 1233,
+    "observersSeeBodyMax": 3498,
+    "truthGapAtPress": 215,
+    "witnesses": 7,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 114,
+   "statementsPerSec": 299,
+   "writeStatementsPerSec": 78,
+   "kbReadPerSec": 2505,
+   "primaryBusyPct": 5.4,
+   "avgQueueWaitMs": 0.5,
+   "stateBytes": 15286
+  },
+  "counts": {
+   "frame.http": 96,
+   "ws.connect": 19,
+   "frame.live": 4769,
+   "track.deleted": 430,
+   "frame.action": 3,
+   "vanish.event": 5
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 8,
+   "framesPerSec": 57
+  }
+ },
+ {
+  "scenario": "p29-iso29-d25",
+  "client": "baseline",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 205.3,
+   "p95": 283.3,
+   "max": 379.5
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 153,
+   "p95": 229,
+   "max": 8292
+  },
+  "observer": {
+   "frameJumpPxMax": 9.6,
+   "frameJumpPxP99": 7.3,
+   "stalledMovingFramesPct": 9.9,
+   "displayErrorPx": {
+    "p50": 63.4,
+    "p95": 223.9
+   },
+   "displayDelayMs": {
+    "p50": 671,
+    "p95": 2070,
+    "max": 4379
+   },
+   "trajectoryErrorPx": {
+    "p50": 9,
+    "p95": 25.3,
+    "max": 147.6
+   },
+   "missingWhileVisiblePct": 0.2,
+   "vanishEvents": 38
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 128,
+    "pressToConfirmMs": 128,
+    "firstPressAt": 7025,
+    "victimSeesDeathMs": 230,
+    "observersSeeBodyP50": 192,
+    "observersSeeBodyMax": 3612,
+    "truthGapAtPress": 75,
+    "witnesses": 22,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 135,
+    "pressToConfirmMs": 135,
+    "firstPressAt": 12603,
+    "victimSeesDeathMs": 219,
+    "observersSeeBodyP50": 244,
+    "observersSeeBodyMax": 282,
+    "truthGapAtPress": 39,
+    "witnesses": 12,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 121,
+    "pressToConfirmMs": 121,
+    "firstPressAt": 15309,
+    "victimSeesDeathMs": 312,
+    "observersSeeBodyP50": 216,
+    "observersSeeBodyMax": 263,
+    "truthGapAtPress": 16,
+    "witnesses": 16,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 199,
+   "statementsPerSec": 531,
+   "writeStatementsPerSec": 146,
+   "kbReadPerSec": 8495,
+   "primaryBusyPct": 13.4,
+   "avgQueueWaitMs": 4.2,
+   "stateBytes": 30678
+  },
+  "counts": {
+   "frame.http": 127,
+   "ws.connect": 31,
+   "frame.live": 8820,
+   "frame.dropped": 2,
+   "track.deleted": 1650,
+   "vanish.event": 38,
+   "frame.action": 3
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 16,
+   "framesPerSec": 46
+  }
+ },
+ {
+  "scenario": "p29-iso1-d170",
+  "client": "baseline",
+  "room": 29,
+  "clients": 29,
+  "isolates": 1,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 387.7,
+   "p95": 505.4,
+   "max": 960.5
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 54,
+   "p95": 74,
+   "max": 8745
+  },
+  "observer": {
+   "frameJumpPxMax": 9.1,
+   "frameJumpPxP99": 6.7,
+   "stalledMovingFramesPct": 8.3,
+   "displayErrorPx": {
+    "p50": 30.6,
+    "p95": 178.5
+   },
+   "displayDelayMs": {
+    "p50": 559.8,
+    "p95": 1792,
+    "max": 4643
+   },
+   "trajectoryErrorPx": {
+    "p50": 4,
+    "p95": 23.7,
+    "max": 274.3
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 5
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 3,
+    "errors": [
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요."
+    ],
+    "confirmMs": 350,
+    "pressToConfirmMs": 867,
+    "firstPressAt": 7357,
+    "victimSeesDeathMs": 1127,
+    "observersSeeBodyP50": 1135,
+    "observersSeeBodyMax": 3099,
+    "truthGapAtPress": 174,
+    "witnesses": 9,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 6,
+    "errors": [
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요."
+    ],
+    "confirmMs": 419,
+    "pressToConfirmMs": 1735,
+    "firstPressAt": 11295,
+    "victimSeesDeathMs": 1971,
+    "observersSeeBodyP50": 1973,
+    "observersSeeBodyMax": 5343,
+    "truthGapAtPress": 273,
+    "witnesses": 15,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 378,
+    "pressToConfirmMs": 378,
+    "firstPressAt": 16924,
+    "victimSeesDeathMs": 544,
+    "observersSeeBodyP50": 548,
+    "observersSeeBodyMax": 554,
+    "truthGapAtPress": 86,
+    "witnesses": 15,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 20,
+   "statementsPerSec": 131,
+   "writeStatementsPerSec": 104,
+   "kbReadPerSec": 425,
+   "primaryBusyPct": 4.2,
+   "avgQueueWaitMs": 0.2,
+   "stateBytes": 30416
+  },
+  "counts": {
+   "frame.http": 85,
+   "ws.connect": 29,
+   "frame.live": 10345,
+   "track.deleted": 1530,
+   "vanish.event": 5,
+   "frame.action": 3,
+   "frame.dropped": 12
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 14,
+   "framesPerSec": 51
+  }
+ },
+ {
+  "scenario": "p29-iso29-d170",
+  "client": "baseline",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "ackMs": {
+   "p50": 389.1,
+   "p95": 514.5,
+   "max": 1454.8
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 335,
+   "p95": 456,
+   "max": 8587
+  },
+  "observer": {
+   "frameJumpPxMax": 9.6,
+   "frameJumpPxP99": 7,
+   "stalledMovingFramesPct": 17.1,
+   "displayErrorPx": {
+    "p50": 90.6,
+    "p95": 255.2
+   },
+   "displayDelayMs": {
+    "p50": 879.8,
+    "p95": 2194,
+    "max": 4936
+   },
+   "trajectoryErrorPx": {
+    "p50": 9.8,
+    "p95": 41.5,
+    "max": 207.3
+   },
+   "missingWhileVisiblePct": 1.2,
+   "vanishEvents": 182
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 403,
+    "pressToConfirmMs": 403,
+    "firstPressAt": 7136,
+    "victimSeesDeathMs": 596,
+    "observersSeeBodyP50": 552,
+    "observersSeeBodyMax": 5437,
+    "truthGapAtPress": 94,
+    "witnesses": 13,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 9,
+    "errors": [
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요."
+    ],
+    "confirmMs": 397,
+    "pressToConfirmMs": 2463,
+    "firstPressAt": 11338,
+    "victimSeesDeathMs": 2606,
+    "observersSeeBodyP50": 3413,
+    "observersSeeBodyMax": 8550,
+    "truthGapAtPress": 164,
+    "witnesses": 15,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 367,
+    "pressToConfirmMs": 367,
+    "firstPressAt": 15891,
+    "victimSeesDeathMs": 628,
+    "observersSeeBodyP50": 576,
+    "observersSeeBodyMax": 618,
+    "truthGapAtPress": 38,
+    "witnesses": 9,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 138,
+   "statementsPerSec": 366,
+   "writeStatementsPerSec": 102,
+   "kbReadPerSec": 5772,
+   "primaryBusyPct": 8.9,
+   "avgQueueWaitMs": 1,
+   "stateBytes": 30727
+  },
+  "counts": {
+   "frame.http": 100,
+   "ws.connect": 31,
+   "frame.live": 8671,
+   "frame.dropped": 3,
+   "vanish.event": 182,
+   "track.deleted": 1623,
+   "frame.action": 3
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 14,
+   "framesPerSec": 46
+  }
+ },
+ {
+  "scenario": "p29-iso29-d170-adverse",
+  "client": "baseline",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   170,
+   40
+  ],
+  "net": [
+   30,
+   15
+  ],
+  "loss": 0.02,
+  "hide": {
+   "client": 5,
+   "from": 6000,
+   "to": 11000
+  },
+  "reconnect": {
+   "client": 7,
+   "at": 12000
+  },
+  "ackMs": {
+   "p50": 441.9,
+   "p95": 771.8,
+   "max": 1307.8
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 358,
+   "p95": 584,
+   "max": 6109
+  },
+  "observer": {
+   "frameJumpPxMax": 270.8,
+   "frameJumpPxP99": 7.8,
+   "stalledMovingFramesPct": 20.2,
+   "displayErrorPx": {
+    "p50": 99.2,
+    "p95": 262.4
+   },
+   "displayDelayMs": {
+    "p50": 871,
+    "p95": 2226,
+    "max": 7029.9
+   },
+   "trajectoryErrorPx": {
+    "p50": 12.3,
+    "p95": 55.5,
+    "max": 189.9
+   },
+   "missingWhileVisiblePct": 1.5,
+   "vanishEvents": 211
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 3,
+    "errors": [
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요."
+    ],
+    "confirmMs": 397,
+    "pressToConfirmMs": 962,
+    "firstPressAt": 8466,
+    "victimSeesDeathMs": 1139,
+    "observersSeeBodyP50": 1139,
+    "observersSeeBodyMax": 2227,
+    "truthGapAtPress": 150,
+    "witnesses": 17,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 3,
+    "errors": [
+     "error:공격할 대상 가까이 이동하세요.",
+     "error:공격할 대상 가까이 이동하세요."
+    ],
+    "confirmMs": 439,
+    "pressToConfirmMs": 951,
+    "firstPressAt": 11387,
+    "victimSeesDeathMs": 1111,
+    "observersSeeBodyP50": 1118,
+    "observersSeeBodyMax": 6581,
+    "truthGapAtPress": 98,
+    "witnesses": 21,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 2,
+    "errors": [
+     "error:공격할 대상 가까이 이동하세요."
+    ],
+    "confirmMs": 444,
+    "pressToConfirmMs": 1010,
+    "firstPressAt": 16708,
+    "victimSeesDeathMs": 1223,
+    "observersSeeBodyP50": 1117,
+    "observersSeeBodyMax": 2828,
+    "truthGapAtPress": 70,
+    "witnesses": 14,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 135,
+   "statementsPerSec": 350,
+   "writeStatementsPerSec": 94,
+   "kbReadPerSec": 5569,
+   "primaryBusyPct": 9.6,
+   "avgQueueWaitMs": 1.2,
+   "stateBytes": 30422
+  },
+  "counts": {
+   "frame.http": 151,
+   "ws.connect": 38,
+   "frame.live": 7096,
+   "frame.dropped": 232,
+   "vanish.event": 211,
+   "track.deleted": 1667,
+   "frame.action": 3
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 17,
+   "framesPerSec": 44
+  }
+ }
+]

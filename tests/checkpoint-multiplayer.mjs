@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+const origin='http://terminal.local:4173',token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32)),b=>b.toString(16).padStart(2,'0')).join('');
+async function req(key,body,game=false,status=200){const res=await fetch(origin+(game?'/api/game':'/api/field'),{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await res.json();assert.equal(res.status,status,JSON.stringify(data));return data;}
+const host=token();let r=await req(host,{action:'create',config:{mode:'field',count:29}},true);const code=r.code,users=Array.from({length:29},(_,i)=>({key:token(),name:'이동'+i,avatar:i%16}));
+await Promise.all(users.map(u=>req(u.key,{action:'join',code,...u},true)));await Promise.all(users.map(u=>req(u.key,{action:'ready',ready:true,code},true)));r=await req(host,{action:'start',code,seq:r.seq},true);r=await req(host,{action:'next',code,seq:r.seq},true);
+const frames=await Promise.all(users.map(u=>req(u.key,{action:'frame',code,seq:r.seq,protocol:2,inputs:[],warp:0})));
+await new Promise(resolve=>setTimeout(resolve,130));
+const payload=(i,base=frames[i].frame.own)=>({action:'frame',code,seq:r.seq,count:29,protocol:2,warp:0,base,inputs:Array.from({length:5},(_,n)=>({n:base.ack+n+1,dx:1,dy:0,ms:20}))});
+const moved=await Promise.all(users.map((u,i)=>req(u.key,payload(i))));assert.ok(moved.every(f=>f.transport==='checkpoint'));moved.forEach((f,i)=>{assert.equal(f.frame.own.ack,5);assert.ok(Math.abs(f.frame.own.x-frames[i].frame.own.x-20.5)<.2);});
+assert.ok(moved.every(f=>!Object.hasOwn(f.frame.own,'history')),'movement history must stay server-side');
+const stored=await workerDb.prepare('SELECT history FROM field_positions WHERE code=? AND player=?').bind(code,moved[0].frame.own.id).first();assert.ok(JSON.parse(stored.history).length>=1);
+const checkpoint=moved[0].frame.own,rowsBefore=await workerDb.prepare('SELECT * FROM field_positions WHERE code=? AND player=?').bind(code,checkpoint.id).first();
+for(let i=0;i<5;i++)await req(users[0].key,{...payload(0,checkpoint),inputs:[]});
+const rowsAfter=await workerDb.prepare('SELECT * FROM field_positions WHERE code=? AND player=?').bind(code,checkpoint.id).first();assert.deepEqual(rowsAfter,rowsBefore,'idle frames must not write positions');
+const forged=await req(users[0].key,{...payload(0),base:{...checkpoint,x:4000,y:2000,clock:Date.now()-100000},inputs:[{n:6,dx:0,dy:0,ms:20}]});assert.equal(forged.transport,'sync');assert.ok(forged.frame.own.x<1300);
+const victimBefore=await workerDb.prepare('SELECT * FROM field_positions WHERE code=? AND player=?').bind(code,moved[1].frame.own.id).first();await req(users[0].key,payload(1,moved[1].frame.own));const victimAfter=await workerDb.prepare('SELECT * FROM field_positions WHERE code=? AND player=?').bind(code,moved[1].frame.own.id).first();assert.deepEqual(victimBefore,victimAfter,'checkpoint must belong to authenticated player');
+const f=await req(users[2].key,{...payload(2),inputs:[]});const concurrent=payload(2,f.frame.own);const [a,b]=await Promise.all([req(users[2].key,concurrent),req(users[2].key,concurrent)]);assert.equal(a.frame.own.ack,b.frame.own.ack);assert.equal(a.frame.own.x,b.frame.own.x);
+await req(host,{action:'pause',code,seq:r.seq},true);const paused=await req(users[3].key,payload(3,moved[3].frame.own));assert.equal(paused.transport,'sync');assert.equal(paused.frame.own.x,moved[3].frame.own.x);
+await req(host,{action:'pause',code,seq:r.seq},true);r=await req(host,{action:'next',code,seq:r.seq},true);const meeting=await req(users[4].key,payload(4,moved[4].frame.own));assert.equal(meeting.transport,'sync');assert.equal(meeting.frame.own.x,moved[4].frame.own.x);
+console.log('PASS: 29 clients use one-roundtrip verified movement; idle frames produce zero position writes; forged coordinates/clock and cross-player checkpoints rejected; duplicate input exactly once; pause and meeting gates.');

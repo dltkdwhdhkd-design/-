@@ -1,0 +1,1 @@
+ALTER TABLE `field_positions` ADD `history` text DEFAULT '[]' NOT NULL;

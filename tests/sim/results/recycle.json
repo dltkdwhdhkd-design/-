@@ -1,0 +1,119 @@
+[
+ {
+  "scenario": "p29-iso29-d25-recycle",
+  "client": "current",
+  "room": 29,
+  "clients": 29,
+  "isolates": 29,
+  "d1": [
+   25,
+   8
+  ],
+  "net": [
+   20,
+   8
+  ],
+  "loss": 0,
+  "budget": 120,
+  "ackMs": {
+   "p50": 97.3,
+   "p95": 136.6,
+   "max": 721.8
+  },
+  "correctionPx": {
+   "events": 0,
+   "p95": null,
+   "max": null
+  },
+  "remoteSampleAgeMs": {
+   "p50": 175,
+   "p95": 243,
+   "max": 5285
+  },
+  "observer": {
+   "frameJumpPxMax": 13.4,
+   "frameJumpPxP99": 7.1,
+   "stalledMovingFramesPct": 2.8,
+   "displayErrorPx": {
+    "p50": 50.7,
+    "p95": 87.6
+   },
+   "displayDelayMs": {
+    "p50": 317.9,
+    "p95": 419.6,
+    "max": 3545.5
+   },
+   "trajectoryErrorPx": {
+    "p50": 2.6,
+    "p95": 20.6,
+    "max": 244.1
+   },
+   "missingWhileVisiblePct": 0,
+   "vanishEvents": 2
+  },
+  "kills": [
+   {
+    "attacker": 0,
+    "victim": 1,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 97,
+    "pressToConfirmMs": 97,
+    "firstPressAt": 7544,
+    "victimSeesDeathMs": 124,
+    "observersSeeBodyP50": 189,
+    "observersSeeBodyMax": 11521,
+    "truthGapAtPress": 11,
+    "witnesses": 16,
+    "timeout": false
+   },
+   {
+    "attacker": 2,
+    "victim": 3,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 74,
+    "pressToConfirmMs": 74,
+    "firstPressAt": 12686,
+    "victimSeesDeathMs": 95,
+    "observersSeeBodyP50": 98,
+    "observersSeeBodyMax": 137,
+    "truthGapAtPress": 49,
+    "witnesses": 5,
+    "timeout": false
+   },
+   {
+    "attacker": 4,
+    "victim": 5,
+    "attempts": 1,
+    "errors": [],
+    "confirmMs": 70,
+    "pressToConfirmMs": 70,
+    "firstPressAt": 17993,
+    "victimSeesDeathMs": 95,
+    "observersSeeBodyP50": 158,
+    "observersSeeBodyMax": 163,
+    "truthGapAtPress": 27,
+    "witnesses": 5,
+    "timeout": false
+   }
+  ],
+  "db": {
+   "roundTripsPerSec": 293,
+   "statementsPerSec": 512,
+   "writeStatementsPerSec": 226,
+   "kbReadPerSec": 1597,
+   "primaryBusyPct": 9.6,
+   "avgQueueWaitMs": 5.4,
+   "stateBytes": 30452
+  },
+  "counts": {
+   "ws.connect": 129,
+   "vanish.event": 2
+  },
+  "simFidelity": {
+   "eventLoopP99Ms": 15,
+   "framesPerSec": 45
+  }
+ }
+]

@@ -1,0 +1,40 @@
+# tests/browser/verify-ui.mjs 실행 기록 (2026-10-12, 로컬 wrangler dev + 헤드리스 Chromium, 소프트웨어 WebGL)
+# 봇: 실제 WebSocket 프로토콜로 걷는 15~28명. 프레임 속도는 소프트웨어 렌더링 값이라 실제 기기 수치가 아님.
+# 주의: 아래 nereid.errors의 setPointerCapture 예외는 이 실행 뒤 components/FirstPersonViewport.tsx에서 수정함.
+
+lobby.errors []
+host-aurora.view {"hostBar":true,"fps":false}
+host-aurora.errors []
+host-nereid.view {"hostBar":true,"fps":false}
+host-nereid.errors []
+aurora.ownMove {"movedPx":131.2,"acked":33,"pendingAfter":0}
+aurora.remoteMotion {"frames":67,"maxJumpPx":54.3,"p99JumpPx":50.2,"vanishNearby":0,"frameDtP50":116.6,"frameDtP95":233.3,"stats":{"rttMs":1,"frameGapP95":54.9,"sampleAgeP50":60,"sampleAgeP95":118.5,"renderDelayP50":177.9,"renderDelayP95":1198.3,"ackP50":60.8,"ackP95":126.1,"correctionMax":null,"actionP50":null,"killLast":null,"frameWorkP95":1.8,"frameDtP95":50,"counts":{"frame.http":1,"live.ready":1,"frame.live":310},"server":{"instance":"ef4dfaa2","conn":"da9cd92b","peersHere":16,"ownedHere":16,"instances":1,"dbRttMs":6,"dbStatementsPerSec":7.6,"queries":16,"budget":800,"dbErrors":0,"recycles":0,"checkpointAge":144}},"transport":"live"}
+aurora.netPanel 네트워크 진단 | 전송 | WebSocket (실시간) | RTT | 1ms | 프레임 간격 p95 | 55ms | 원격 샘플 나이 p50/p95 | 61ms / 120ms | 원격 표시 지연 p50/p95 | 178ms / 1198ms | 입력 확인 p50/p95 | 61ms / 126ms | 보정 오차 최대 | – | 행동 응답 p50 | – | 마지막 공격 요청→확정 | – | 프레임 작업 p95 / 간격 p95 | 2ms / 50ms | 미확인 입력 | 0 | 재전송·재기준·재연결 | 0 · 0 · 0 | 서버 인스턴스 | ef4dfaa2 · 이 인스턴스 16명 / 전체 1개 | D1 RTT · 초당 문장 | 6ms · 7.6 | D1 쿼리(이 연결) | 16 / 800 | D1 오류 · 재활용 | 0 · 0 | 체크포인트 나이 | 144ms | F3으로 열고 닫기
+aurora.fullscreen {"fullscreenElement":"HTML","immersive":true,"overflowX":false}
+aurora.mapInFullscreen {"visible":true,"insideFullscreen":true}
+aurora.escClosesMap true
+aurora.afterEsc {"fullscreenElement":"HTML","immersive":true}
+aurora.meeting {"fullscreenElement":"HTML","fieldGone":true,"text":"밤의 시민 NIGHTFALL 직업 도감 게임 규칙 화면 축소 ROOM AFKD8Y 16명 생존 브라우저 DAY 01 · DISCUSSION 누구의 말을 믿겠습니까?  친구들과 대화하며 마피아를 찾아내세요.  남은 시간 04:57 탐색 회의 추방 투표  진행자가 회의를 소집했습니다.  시"}
+aurora.errors []
+nereid.ownMove {"movedPx":20.5,"acked":6,"pendingAfter":0}
+nereid.remoteMotion {"frames":19,"maxJumpPx":277.4,"p99JumpPx":66.7,"vanishNearby":0,"frameDtP50":450,"frameDtP95":650,"stats":{"rttMs":1,"frameGapP95":61.2,"sampleAgeP50":69.5,"sampleAgeP95":116.5,"renderDelayP50":430.6,"renderDelayP95":2430.2,"ackP50":56.8,"ackP95":56.8,"correctionMax":null,"actionP50":null,"killLast":null,"frameWorkP95":2.7,"frameDtP95":50,"counts":{"frame.http":2,"live.ready":1,"frame.live":324},"server":{"instance":"ef4dfaa2","conn":"f21c8973","peersHere":16,"ownedHere":16,"instances":1,"dbRttMs":6,"dbStatementsPerSec":7.6,"queries":16,"budget":800,"dbErrors":0,"recycles":0,"checkpointAge":100}},"transport":"live"}
+nereid.netPanel 네트워크 진단 | 전송 | WebSocket (실시간) | RTT | 1ms | 프레임 간격 p95 | 61ms | 원격 샘플 나이 p50/p95 | 70ms / 117ms | 원격 표시 지연 p50/p95 | 432ms / 2430ms | 입력 확인 p50/p95 | 57ms / 57ms | 보정 오차 최대 | – | 행동 응답 p50 | – | 마지막 공격 요청→확정 | – | 프레임 작업 p95 / 간격 p95 | 3ms / 50ms | 미확인 입력 | 0 | 재전송·재기준·재연결 | 0 · 0 · 0 | 서버 인스턴스 | ef4dfaa2 · 이 인스턴스 16명 / 전체 1개 | D1 RTT · 초당 문장 | 6ms · 7.6 | D1 쿼리(이 연결) | 16 / 800 | D1 오류 · 재활용 | 0 · 0 | 체크포인트 나이 | 100ms | F3으로 열고 닫기
+nereid.fullscreen {"fullscreenElement":"HTML","immersive":true,"overflowX":false}
+nereid.mapInFullscreen {"visible":true,"insideFullscreen":true}
+nereid.escClosesMap true
+nereid.afterEsc {"fullscreenElement":"HTML","immersive":true}
+nereid.pointerLock CANVAS
+nereid.meeting {"fullscreenElement":"HTML","fieldGone":true,"text":"밤의 시민 NIGHTFALL 직업 도감 게임 규칙 화면 축소 ROOM RXNFLG 16명 생존 브라우저 DAY 01 · DISCUSSION 누구의 말을 믿겠습니까?  친구들과 대화하며 마피아를 찾아내세요.  남은 시간 04:57 탐색 회의 추방 투표  진행자가 회의를 소집했습니다.  시"}
+nereid.errors ["Failed to execute 'setPointerCapture' on 'Element': InvalidStateError"]
+solo.view {"fps":true,"role":true}
+solo.errors []
+mobile-portrait {"overflowX":false,"joystick":true,"actions":true,"toggle":true,"immersive":true}
+mobile-portrait.stickMovePx 182.3
+mobile-portrait.errors []
+mobile-landscape {"overflowX":false,"joystick":true,"actions":true,"toggle":true,"immersive":true}
+mobile-landscape.stickMovePx 91.4
+mobile-landscape.errors []
+perf29-aurora {"frames":45,"maxJumpPx":66.7,"p99JumpPx":66.7,"vanishNearby":1,"frameDtP50":199.9,"frameDtP95":433.4,"stats":{"rttMs":1,"frameGapP95":55.3,"sampleAgeP50":65,"sampleAgeP95":105,"renderDelayP50":178.6,"renderDelayP95":1283.4,"ackP50":null,"ackP95":null,"correctionMax":null,"actionP50":null,"killLast":null,"frameWorkP95":4.1,"frameDtP95":50,"counts":{"frame.http":2,"live.ready":1,"frame.live":342},"server":{"instance":"ef4dfaa2","conn":"c79a15c5","peersHere":29,"ownedHere":29,"instances":1,"dbRttMs":6,"dbStatementsPerSec":7.6,"queries":6,"budget":800,"dbErrors":0,"recycles":0,"checkpointAge":208}},"transport":"live"}
+perf29-aurora.errors []
+perf29-nereid {"frames":17,"maxJumpPx":66.7,"p99JumpPx":66.7,"vanishNearby":10,"frameDtP50":633.3,"frameDtP95":983.2,"stats":{"rttMs":1,"frameGapP95":99.8,"sampleAgeP50":65.5,"sampleAgeP95":117.5,"renderDelayP50":897.7,"renderDelayP95":3068,"ackP50":null,"ackP95":null,"correctionMax":null,"actionP50":null,"killLast":null,"frameWorkP95":1.9,"frameDtP95":50,"counts":{"frame.http":2,"live.ready":1,"frame.live":290},"server":{"instance":"ef4dfaa2","conn":"130617e8","peersHere":29,"ownedHere":29,"instances":1,"dbRttMs":15,"dbStatementsPerSec":8,"queries":8,"budget":800,"dbErrors":0,"recycles":0,"checkpointAge":22}},"transport":"live"}
+perf29-nereid.errors []
