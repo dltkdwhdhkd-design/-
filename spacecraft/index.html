@@ -291,6 +291,7 @@ td.unk { color: #4e5786; }
 #craftWhere.ok { color: var(--good); }
 .inv span canvas { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; image-rendering: pixelated; }
 #notice small { display: block; color: var(--ore); font-size: .7em; letter-spacing: .08em; }
+#invFx { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at center, rgba(120,200,255,0) 40%, rgba(140,210,255,.7)); opacity: 0; }
 #hurt { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: radial-gradient(ellipse at center, rgba(255,0,0,0) 45%, rgba(220,20,30,.55)); opacity: 0; }
 .look { display: grid; grid-template-columns: minmax(180px, 260px) 1fr; gap: 18px; align-items: start; }
 @media (max-width: 640px) { .look { grid-template-columns: 1fr; } }
@@ -346,7 +347,7 @@ td.unk { color: #4e5786; }
 </script>
 
 <canvas id="view"></canvas>
-<div id="hurt"></div>
+<div id="hurt"></div><div id="invFx"></div>
 
 <div class="hud" id="mission" hidden>
   <span class="label" id="mNo"></span>
@@ -1922,6 +1923,8 @@ function computeEnv() {
 
 /* ═════════════ 생존 ═════════════ */
 let cause = "", warnMsg = "";
+// 부활하면 3초 동안 무적이에요(게임이 멈춰 있는 동안은 줄지 않아요). 로봇·보스·대결·운석·방사선·환경 피해를 모두 막아요
+let spawnInv = 0;
 function survival(dt) {
   const pk = S.planet, PL = PLANETS[pk], su = suit();
   const nearCore = Math.hypot(P.pos.x - (base.x + .5), P.pos.z - (base.z + .5)) < 5 && Math.abs(P.pos.y - base.y) < 4;
@@ -1952,7 +1955,8 @@ function survival(dt) {
   if (S.st > 45) { dmg += Math.min(25, (S.st - 45) / 4); cause = "hot"; }
   if (S.st < 0) { dmg += Math.min(25, -S.st / 4); cause = "cold"; }
   if (env.Pa > su.pr) { dmg += 30; cause = "pressure"; }
-  if (dmg) { S.hp -= dmg * dt; hurtT = Math.min(1, hurtT + dt * 2); if (gameT - lastHurt > .7) { lastHurt = gameT; sfx.hurt(); hurtT = 1; } }
+  if (dmg && spawnInv > 0) {}
+  else if (dmg) { S.hp -= dmg * dt; hurtT = Math.min(1, hurtT + dt * 2); if (gameT - lastHurt > .7) { lastHurt = gameT; sfx.hurt(); hurtT = 1; } }
   else if (radNow) {} // 방사선을 쬐는 동안은 회복되지 않아요
   else if (nearCore) S.hp = Math.min(100, S.hp + 6 * dt); else if (S.food >= 6) S.hp = Math.min(100, S.hp + (S.food >= 16 ? .6 : .4) * dt);
   // 경고
@@ -1989,7 +1993,7 @@ let pvpBy = "";
 // 대결에서 맞았을 때(네트워크로 받은 값이라 피해를 18로 제한)
 function takeHit(dmg, who, ax, az) {
   if (!$("startOv").hidden || S.hp <= 0) return;
-  if (Math.hypot(P.pos.x - base.x - .5, P.pos.z - base.z - .5) < SAFE_R) return;
+  if (Math.hypot(P.pos.x - base.x - .5, P.pos.z - base.z - .5) < SAFE_R || spawnInv > 0) return;
   S.hp -= Math.max(0, Math.min(30, dmg || 0)) * (1 - armorK()); cause = "pvp"; pvpBy = who; hurtT = 1; lastHurt = gameT; sfx.hurt();
   const dx = P.pos.x - ax, dz = P.pos.z - az, L = Math.hypot(dx, dz) || 1; P.vel.x += dx / L * 5; P.vel.z += dz / L * 5; P.vel.y = Math.max(P.vel.y, 3);
   toast(`${who}에게 맞았어요! 체력 ${Math.max(0, Math.round(S.hp))}`, 1200);
@@ -2002,7 +2006,7 @@ function die() {
   const items = {}; let n = 0;
   for (const id in S.inv) if (S.inv[id] > 0) { items[id] = S.inv[id]; n += S.inv[id]; S.inv[id] = 0; }
   if (n) { const gas = PLANETS[pk].gas; makePile(items, gas ? base.x + 4.5 : P.pos.x, gas ? base.y + 1 : P.pos.y + .2, gas ? base.z + .5 : P.pos.z, "death"); }
-  S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; S.food = 20; toBase(); clearMobs();
+  S.hp = 100; S.o2 = 100; S.pw = maxPw(); S.st = 20; S.food = 20; toBase(); clearMobs(); spawnInv = 3;
   // 침대가 있으면 침대 위에서 다시 시작해요
   const bed = (S.spawn || {})[pk]; let atBed = false;
   if (bed && get(bed[0], bed[1], bed[2]) === 73 && !SOLID(get(bed[0], bed[1] + 1, bed[2])) && !SOLID(get(bed[0], bed[1] + 2, bed[2]))) { P.pos.set(bed[0] + .5, bed[1] + 1.01, bed[2] + .5); P.vel.set(0, 0, 0); atBed = true; }
@@ -3148,7 +3152,7 @@ function hazards2(dt) {
         editMany(L); burst(met.x, met.y, met.z, 12); burst(met.x, met.y, met.z, 9); sfx.boom(1); hurtT = Math.max(hurtT, .6);
         const pd = Math.hypot(P.pos.x - met.x - .5, P.pos.z - met.z - .5, (P.pos.y - met.y) * .7);
         if (pd < 15) evBump("meteor");
-        if (pd < 3.5) { S.hp -= 8 + 30 * (1 - pd / 3.5); cause = "meteor"; hurtT = 1; sfx.hurt(); P.vel.y = 5; if (S.hp <= 0) die(); }
+        if (pd < 3.5 && !(spawnInv > 0)) { S.hp -= 8 + 30 * (1 - pd / 3.5); cause = "meteor"; hurtT = 1; sfx.hurt(); P.vel.y = 5; if (S.hp <= 0) die(); }
         scene.remove(met.rock); scene.remove(met.ring); met = null; metNext = gameT + 45 + Math.random() * 40;
         firstLog("met-" + pk, { t: "대기가 없는 곳의 운석", ev: "운석이 타지 않고 그대로 떨어져 구덩이(크레이터)를 만들었어요. 바닥에 철광석이 박혔어요.", x: `지구에서는 우주에서 들어온 작은 암석 대부분이 대기와 부딪히며 타 버려 별똥별로 보여요. ${PL.name}에는 대기가 없어서 운석이 타지 않고 표면까지 그대로 떨어져요. 그래서 ${PL.name} 표면에는 크레이터가 아주 많아요. 운석에는 철이 많이 들어 있기도 해요.` });
       }
@@ -3161,7 +3165,7 @@ function hazards2(dt) {
     else if (flare.st === 1) { flare.t -= dt; warnMsg = `${fname}까지 ${Math.ceil(flare.t)}초: 땅속이나 지붕 아래로!`; if (flare.t <= 0) flare = { st: 2, t: 25 }; }
     else if (flare.st === 2) {
       flare.t -= dt;
-      if (!covered()) { radNow = true; S.hp -= 4 * dt; cause = "rad"; hurtT = Math.min(1, hurtT + dt * 1.5); warnMsg = `${fname}! 강한 방사선 · 머리 위를 막아 주는 블록 아래로 피하세요`; if (S.hp <= 0) die(); }
+      if (!covered()) { radNow = true; if (!(spawnInv > 0)) { S.hp -= 4 * dt; hurtT = Math.min(1, hurtT + dt * 1.5); } cause = "rad"; warnMsg = `${fname}! 강한 방사선 · 머리 위를 막아 주는 블록 아래로 피하세요`; if (S.hp <= 0) die(); }
       else warnMsg = `${fname} 중 · 지붕 아래라 안전해요 (${Math.ceil(flare.t)}초)`;
       if (flare.t <= 0) {
         flare = { st: 0, t: 0 }; flareNext = gameT + 170 + Math.random() * 110; toast(`${fname}이 지나갔어요`, 2000);
@@ -3332,7 +3336,7 @@ function fallTick(dt) {
   if (k < 1) return;
   burst(e.x, e.y - 1, e.z, F.burst); burst(e.x, e.y, e.z, F.burst);
   const pd = Math.hypot(hdx(e.x + .5), P.pos.z - e.z - .5, (P.pos.y - e.y) * .7);
-  if (F.dmg && pd < 1.2) { S.hp -= F.dmg * (1 - armorK()); cause = "meteor"; hurtT = 1; sfx.hurt(); toast("머리 위로 떨어졌어요! 원 바로 가운데는 피하세요"); if (S.hp <= 0) die(); }
+  if (F.dmg && pd < 1.2 && !(spawnInv > 0)) { S.hp -= F.dmg * (1 - armorK()); cause = "meteor"; hurtT = 1; sfx.hurt(); toast("머리 위로 떨어졌어요! 원 바로 가운데는 피하세요"); if (S.hp <= 0) die(); }
   if (pd < 22) sfx.place(F.burst);
   makePile(F.items(), e.x + .5, e.y + .2, e.z + .5, "ev");
   dropFall(); fallNext = gameT + 28 + Math.random() * 22;
@@ -4682,6 +4686,7 @@ const LVL = () => { const l = MLV[S.planet] || 1; return { l, hp: 1 + (l - 1) * 
 // 보스 공격은 갑옷을 갖춰도 아프게: 기본 ×1.7에 보스마다 세기(k)를 곱해요
 const BOSS_DMG = 1.7;
 function hurtBy(dmg, kx, kz, kick = 6, isBoss = false) {
+  if (spawnInv > 0) return;
   dmg *= (isBoss ? BOSS_DMG * (boss ? boss.B.k * (boss.dk || 1) : 1) : LVL().dmg) * (1 - armorK());
   S.hp -= dmg; cause = "robot"; hurtT = 1; lastHurt = gameT; sfx.hurt();
   const L = Math.hypot(kx, kz) || 1; P.vel.x += kx / L * kick; P.vel.z += kz / L * kick; P.vel.y = Math.max(P.vel.y, 3);
@@ -4759,7 +4764,7 @@ function mobTick(dt) {
       if (m.st === "go") { wx = dx / dist * T.sp; wz = dz / dist * T.sp; if (dist < 3.4 && m.cd <= 0) { m.st = "wind"; m.stT = 0; tone(90, 1, "sawtooth", quiet ? .02 : .07, 0, 220); } }
       else if (m.st === "wind") { if (m.stT > 1) {
           burst(fx, Math.floor(m.p.y) - 1, fz, 4); burst(fx + 1, Math.floor(m.p.y) - 1, fz, 4); burst(fx - 1, Math.floor(m.p.y) - 1, fz + 1, 4); sfx.boom(quiet ? .1 : .7);
-          if (dist < 4.2 && P.ground && Math.abs(dy) < 1.5 && !paused) { hurtBy(16, dx, dz, 7); P.vel.y = Math.max(P.vel.y, 6); }
+          if (dist < 4.2 && P.ground && Math.abs(dy) < 1.5 && !paused && !(spawnInv > 0)) { hurtBy(16, dx, dz, 7); P.vel.y = Math.max(P.vel.y, 6); }
           m.st = "go"; m.cd = 2.8; } }
     } else {
       wx = dx / dist * T.sp; wz = dz / dist * T.sp;
@@ -4832,6 +4837,7 @@ function addZone(z) {
 function addFx(m, life, up = 0, v = null, op = 1) { scene.add(m); fxs.push({ m, t: 0, life, up, v, op }); }
 const mDisp = (m) => m.traverse(o => { if (o.material) o.material.dispose(); });
 function zoneTick(dt) {
+  const safe = paused || spawnInv > 0; // 멈춤·부활 무적 중에는 맞지 않아요
   slowT = Math.max(0, slowT - dt);
   fxs = fxs.filter(f => { f.t += dt; f.m.position.y += f.up * dt; if (f.gy) f.m.scale.y = Math.min(f.gy, f.m.scale.y + f.gy * dt * 5); if (f.v) { f.m.position.x += f.v[0] * dt; f.m.position.z += f.v[1] * dt; } if (f.m.material) f.m.material.opacity = Math.max(0, 1 - f.t / f.life) * (f.op || 1); if (f.t > f.life) { scene.remove(f.m); if (f.m.material) f.m.material.dispose(); return false; } return true; });
   zones = zones.filter(z => {
@@ -4844,19 +4850,19 @@ function zoneTick(dt) {
       z.m.position.set(z.x, z.y + .06, z.z); z.m.rotation.y += dt * 7; const fade = Math.min(1, z.t * 2, (z.life - z.t) * 1.5);
       z.m.scale.setScalar(Math.max(.01, fade)); if (z.tickFx) z.tickFx(z, dt);
       const d2 = Math.hypot(P.pos.x - z.x, P.pos.z - z.z);
-      if (z.dmg && (z.cd = (z.cd || 0) - dt) <= 0 && fade > .6 && d2 < z.r && dy > -1 && dy < 3.2 && !paused) { z.cd = .7; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 8, z.boss); P.vel.y = Math.max(P.vel.y, 6); }
+      if (z.dmg && (z.cd = (z.cd || 0) - dt) <= 0 && fade > .6 && d2 < z.r && dy > -1 && dy < 3.2 && !safe) { z.cd = .7; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 8, z.boss); P.vel.y = Math.max(P.vel.y, 6); }
     } else if (z.sky) {
       // 공중 폭발: 내가 떨어질 자리를 계산해서 터져요
       const k = Math.min(1, z.t / z.delay); z.m.scale.setScalar(z.r * (.3 + .7 * k)); z.m.material.opacity = .15 + .35 * k + (k > .8 ? .2 * Math.sin(z.t * 40) : 0);
       if (!z.done && z.t >= z.delay) { z.done = true; burst(Math.floor(z.x), Math.floor(z.y), Math.floor(z.z), z.blk || 23); tone(300, .25, "square", .04, 0, 80);
-        if (Math.hypot(P.pos.x - z.x, P.pos.y + .9 - z.y, P.pos.z - z.z) < z.r + .4 && !paused) hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 6, z.boss); }
+        if (Math.hypot(P.pos.x - z.x, P.pos.y + .9 - z.y, P.pos.z - z.z) < z.r + .4 && !safe) hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 6, z.boss); }
     } else if (z.wave) { const r = Math.min(z.max, .5 + z.t * z.sp); z.m.scale.setScalar(r); z.m.material.opacity = .85 * (1 - r / z.max) + .1;
-      if (!z.hit && z.dmg && Math.abs(d - r) < .9 && dy > -1 && dy < 1.1 && P.ground && !paused) { z.hit = true; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 7, z.boss); P.vel.y = Math.max(P.vel.y, 5); } }
+      if (!z.hit && z.dmg && Math.abs(d - r) < .9 && dy > -1 && dy < 1.1 && P.ground && !safe) { z.hit = true; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 7, z.boss); P.vel.y = Math.max(P.vel.y, 5); } }
     else if (z.pool) { z.m.material.opacity = z.t < z.delay ? .2 + .3 * z.t / z.delay : .45 + .1 * Math.sin(z.t * 6);
-      if (z.t > z.delay && d < z.r && dy > -1 && dy < 2 && !paused) { slowT = Math.max(slowT, .4); if ((z.tick = (z.tick || 0) - dt) <= 0) { z.tick = .5; hurtBy(z.dmg / 2, 0, 0, 0, z.boss); } }
+      if (z.t > z.delay && d < z.r && dy > -1 && dy < 2 && !safe) { slowT = Math.max(slowT, .4); if ((z.tick = (z.tick || 0) - dt) <= 0) { z.tick = .5; hurtBy(z.dmg / 2, 0, 0, 0, z.boss); } }
       if (z.t > z.life - 1) z.m.material.opacity *= Math.max(0, z.life - z.t); }
     else if (!z.done) { const k = Math.min(1, z.t / z.delay); z.m.material.opacity = .2 + .7 * k; z.m.scale.setScalar(z.r * (.5 + .5 * k));
-      if (z.t >= z.delay) { z.done = true; if (z.fx) z.fx(z); if (d < z.r && dy > -1 && dy < (z.hh || 2.2) && !paused && !(z.grp && z.grp.hit)) { if (z.grp) z.grp.hit = true; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 6, z.boss); } } }
+      if (z.t >= z.delay) { z.done = true; if (z.fx) z.fx(z); if (d < z.r && dy > -1 && dy < (z.hh || 2.2) && !safe && !(z.grp && z.grp.hit)) { if (z.grp) z.grp.hit = true; hurtBy(z.dmg, P.pos.x - z.x, P.pos.z - z.z, 6, z.boss); } } }
     if (z.t > z.life) { scene.remove(z.m); mDisp(z.m); return false; }
     return true;
   });
@@ -5123,7 +5129,7 @@ function bossTick(dt) {
       addZone({ x: b.mk.x, y, z: b.mk.z, r: 2.6, delay: .6, dmg: 18, boss: true, col: zc, fx: (q) => {
         sfx.boom(quiet ? .3 : 1); for (let i = 0; i < 6; i++) burst(Math.floor(q.x) + (i % 3) - 1, q.y - 1 + (i > 2 ? 1 : 0), Math.floor(q.z) + (i % 2 ? 1 : -1), get(Math.floor(q.x), q.y - 1, Math.floor(q.z)) || 4);
         if (boss !== b) return; b.up = true; b.burrow = false; if (Math.abs(q.y - b.p.y) < 7 && !mobHits(q.x, q.y + .2, q.z, B.w, B.h)) b.p.set(q.x, q.y + .2, q.z); b.v.set(0, 9, 0);
-        if (Math.hypot(P.pos.x - q.x, P.pos.z - q.z) < q.r && Math.abs(P.pos.y - q.y) < 2.2) P.vel.y = Math.max(P.vel.y, 9); } }); }
+        if (Math.hypot(P.pos.x - q.x, P.pos.z - q.z) < q.r && Math.abs(P.pos.y - q.y) < 2.2 && !(spawnInv > 0)) P.vel.y = Math.max(P.vel.y, 9); } }); }
     if (b.stT > 4.2) { b.burrow = false; b.up = false; b.mk = b.mkZ = null; b.st = "go"; b.stT = 0; }
   } else if (b.st === "rays") {
     // 광조 낙하(달): 여러 갈래 줄로 돌 조각이 떨어지고, 0.7초 뒤 그 사이 줄로 한 번 더 떨어져요
@@ -5160,7 +5166,7 @@ function bossTick(dt) {
       for (let k = 0; k < n; k++) { if (k === gap || k === (gap + 1) % n) continue; const a = (k + .5) * Math.PI * 2 / n; addZone({ x: cx + Math.cos(a) * R, y, z: cz + Math.sin(a) * R, r: 1, delay: 1, dmg: 13, boss: true, grp, col: 0x60c8ff, fx: iceSpike }); }
       addZone({ x: cx, y, z: cz, r: 3.5, hh: 14, delay: 2.1, dmg: 18, boss: true, col: 0xbff0ff, fx: (q) => { sfx.boom(.3); const m = new THREE.Mesh(geyserGeo, new THREE.MeshBasicMaterial({ color: 0xcff4ff, transparent: true, depthWrite: false, side: THREE.DoubleSide })); m.scale.set(q.r * .85, .5, q.r * .85); m.position.set(q.x, q.y, q.z); addFx(m, 1.3, 0, null, .7); fxs[fxs.length - 1].gy = 14;
         for (let i = 0; i < 5; i++) burst(Math.floor(q.x) + (i % 3) - 1, q.y + i * 2, Math.floor(q.z) + (i % 2), 14);
-        if (Math.hypot(P.pos.x - q.x, P.pos.z - q.z) < q.r && P.pos.y - q.y < 14) P.vel.y = Math.max(P.vel.y, 10); } }); }
+        if (Math.hypot(P.pos.x - q.x, P.pos.z - q.z) < q.r && P.pos.y - q.y < 14 && !(spawnInv > 0)) P.vel.y = Math.max(P.vel.y, 10); } }); }
     if (b.stT > 3) { b.st = "go"; b.stT = 0; }
   } else if (b.st === "gust") {
     // 진한 대기 돌풍(타이탄): 공기를 빨아들여 나를 끌어당긴 뒤 바닥을 내리쳐요. 반대쪽으로 계속 걸으세요
@@ -5870,6 +5876,7 @@ function updateCamera(dt) {
   handHemi.intensity = li * .9; handSun.intensity = li * .5;
   // 다쳤을 때 붉은 테두리
   hurtT = Math.max(0, hurtT - dt * 1.6); $("hurt").style.opacity = hurtT.toFixed(2);
+  $("invFx").style.opacity = spawnInv > 0 ? (Math.min(1, spawnInv * 2) * (.55 + .35 * Math.sin(performance.now() / 90))).toFixed(2) : 0;
 }
 // 꾸미기 창: 작은 미리보기를 따로 그려요
 let lookR = null, lookScene = null, lookAv = null, lookOpen = false;
@@ -6463,6 +6470,7 @@ function frameBody(now, xf) {
   hl.visible = !!h; if (h) hl.position.set(h.x + .5, h.y + .5, h.z + .5);
   { const lv = handLv(); handU.value.set(P.pos.x, P.pos.y + 1.2, P.pos.z, lv / 15); }
   cookTick(dt);
+  if (!paused && spawnInv > 0) { if (spawnInv === 3) toast("다시 일어났어요! 3초 동안 무적이에요", 1800); spawnInv = Math.max(0, spawnInv - dt); }
   if (!paused) { mobTick(dt); bossTick(dt); zoneTick(dt); animalTick(dt); if (rocketAim()) {} else if (attackTick(dt)) { mining = null; crack.material.opacity = 0; } else mineTick(dt, h); } else crack.material.opacity = 0;
   // 파편
   parts = parts.filter(p => (p.l -= dt) > 0);
